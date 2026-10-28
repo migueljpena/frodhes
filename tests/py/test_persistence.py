@@ -322,7 +322,7 @@ def test_094_settings_record_preset_index():
     user bank; 21 since the 200A's F20, F21): F01..F16 stay, U01..U16 move by 5, once; the preset it names then plays as stored (an empty one: the
     record's panel)"""
     fl = flash_file("v094")
-    for pre, want in ((0, 0), (15, 15), (16, 21), (31, 36)):
+    for pre, want in ((0, 0), (15, 15), (16, 21), (31, 36)):   # (and REG, new since: as measured, 127)
         img = bytearray(b"\xff" * 5 * SECTOR)
         r = v1_record({P["TYPE"]: 1, P["DRIVE"]: 20}, preset=pre)
         r[O_VER], r[O_FLAGS] = 2, 255                       # every flag up to 0.9.5's RC, flags2 (0.9.5) clear
@@ -331,6 +331,7 @@ def test_094_settings_record_preset_index():
         b = boot(f"v094-{pre}", fl, check_preset=want != NO_PRESET)
         s = b.state(100)
         assert s["preset"] == str(want) and not b.fails, (pre, s["preset"], b.fails)
+        assert s["reg"] == "127", s["reg"]
         if want == NO_PRESET:
             assert (s["p.0"], s["p.1"]) == ("1", "20"), (pre, s["p.0"], s["p.1"])
 

@@ -35,7 +35,7 @@ enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL
 /* card slots: a parameter id (< P_COUNT) or one of these */
 enum { S_KVEL = 64, S_TUNE, S_BPM, S_CLOCK, S_SCMODE, S_SCALE, S_ROOT, S_TRANS, S_TWKIND, S_PERF0, S_ASG0 = S_PERF0 + 4,
        S_ARPMODE = S_ASG0 + 4, S_ARPRATE, S_ARPOCT, S_ARPGATE, S_USBVOL, S_CHTYPE, S_CHINV, S_CHVOICE, S_CHSTRUM,
-       S_SQBARS, S_SQQUANT, S_SQSWING, S_SQEDIT, S_MCH, S_TRS, S_COLOR, S_BRIGHT, S_LEDS, S_TOUCH, S_NONE = 0xFF };
+       S_SQBARS, S_SQQUANT, S_SQSWING, S_SQEDIT, S_MCH, S_TRS, S_COLOR, S_BRIGHT, S_LEDS, S_TOUCH, S_REG, S_NONE = 0xFF };
 #ifndef FM1_NENC                                       /* the HAL's encoders and buttons (the FM-1: 7, 14; the SMK-37:
                                                          * 8, 18); the host and the emulator stand in for the FM-1 */
 #define FM1_NENC 7u
@@ -586,6 +586,7 @@ static int32_t slot_val(uint32_t s, int32_t *hi)
     case S_BRIGHT: *hi = DIM_N - 1; return DIM_N - 1 - (int32_t)set.dim;
     case S_LEDS: *hi = (int32_t)LEDS_N - 1; return (int32_t)leds_disp();
     case S_TOUCH: *hi = KV_NTOUCH - 1; return (int32_t)kv_touch();   /* keyvel.h: LIGHT .. FIXED */
+    case S_REG: *hi = 127; return set.reg;                          /* the 200A's regulation */
     case S_CHTYPE: *hi = CH_NTYPE - 1; return CH_TYPE;
     case S_CHINV: *hi = 3; return CH_INV;
     case S_CHVOICE: *hi = 2; return CH_VOICE;
@@ -671,6 +672,7 @@ static void slot_text(uint32_t s, char *v)
     case S_BRIGHT: p_fmt_int(v, DIM_N - (int32_t)set.dim); return;
     case S_LEDS: p_strcpy(v, LEDS_NAME[leds_disp()], 6); return;
     case S_TOUCH: p_strcpy(v, KV_TOUCH_NAME[kv_touch()], 6); return;
+    case S_REG: fmt_r10(v, set.reg); return;
     case S_CHTYPE: p_strcpy(v, CH_TYPE_NAME[CH_TYPE], 9); return;
     case S_CHINV: p_strcpy(v, CH_INV_NAME[CH_INV], 4); return;
     case S_CHVOICE: p_strcpy(v, CH_VOICE_NAME[CH_VOICE], 5); return;
@@ -752,6 +754,7 @@ static void slot_turn(uint32_t s, int32_t d)
         ui_draw_page_change();
         break;
     case S_LEDS: set.leds = LEDS_STORED[clampi((int32_t)leds_disp() + sgn(d), 0, (int32_t)LEDS_N - 1)]; break;
+    case S_REG: set.reg = (uint8_t)clampi((int32_t)set.reg + d, 0, 127); break;   /* (frodhes.c hands it to reed.c) */
     case S_TOUCH:                                       /* how the keys' velocity follows the press (keyvel.c) */
         kv_touch_store((uint32_t)clampi((int32_t)kv_touch() + sgn(d), 0, KV_NTOUCH - 1));
         kv_apply();

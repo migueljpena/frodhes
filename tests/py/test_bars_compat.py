@@ -168,7 +168,7 @@ def test_preset_index_conversion(new):
     assert chain(16, 15) == 15 and chain(16, 31) == 36                           # F16 stays, U16 -> 36
     for pre in pres:
         assert d[f"conv.new.{pre}"].split()[0] == str(pre)          # flags2 set: untouched
-    assert d["fresh.flags4"] == "1" and d["fresh.flags32"] == "1" and d["fresh.flags2"] == "3"
+    assert d["fresh.flags4"] == "1" and d["fresh.flags32"] == "1" and d["fresh.flags2"] == "7"
 
 
 def test_rc_starters_become_factory(new):

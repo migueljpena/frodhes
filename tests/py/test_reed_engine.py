@@ -145,3 +145,16 @@ def test_spread_places_low_left_high_right_and_keeps_the_centre(ref):
     assert np.dot(sd, m * 0 + o) < 0                              # the low note: left (S against M: L = M + S)
     o2, sd2 = run_ev(ref, [(0, "spread 127"), (0, "on 88 100")], 40, side=True)
     assert np.dot(sd2, o2) > 0
+
+
+def test_amp_follows_the_model_speaker_and_knocks(ref):
+    """200A AMP (TYPE 7): the line through reed_model.speaker (the play page's speaker.json) and the key-up knocks
+    after it (reed_model.render_notes with spk)"""
+    S = json.load(open(os.path.join(ROOT, "docs", "model", "data", "wurli_speaker.json")))
+    notes = [(1, 45, 110, 30), (11, 60, 90, 25), (21, 72, 120, 20)]
+    nblk = 100
+    ev = [(0, "amp 2")] + [(b, "on %d %d" % (m, v)) for b, m, v, ln in notes] + [(b + ln, "off %d" % m) for b, m, v, ln in notes]
+    c = run_ev(ref, ev, nblk)
+    P = json.load(open(SET))
+    p = M.render_notes([(b * B / M.FS, m, v, ln * B / M.FS) for b, m, v, ln in notes], nblk * B / M.FS, P, spk=S) * P["drive"]
+    assert 20 * np.log10(rms(c - p) / rms(p)) < -55

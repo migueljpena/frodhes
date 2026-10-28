@@ -15,7 +15,7 @@ motion into sound, with the bark of hard notes, the bell of the attack, the slow
 keys that each sound a little different; on the vibraphone a mallet strikes a bar,
 its tuned tube rings along and the motor makes it pulse; on the marimba a yarn mallet strikes a rosewood bar whose
 long tube makes the low notes bloom; on the Wurli 200A a felt hammer strikes a steel reed that barks past its pickup.
-Seven instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Vibes, Marimba and Wurli 200A), a
+Eight instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Vibes, Marimba, Wurli 200A and 200A Amp), a
 stage-keyboard effects chain (compressor, a drive with five overdrive types, a resonant filter with its LFO, tremolo / wah, phaser, chorus, delay
 with a digital, an analog-style and a tape echo, a reverb with hall, plate and infinite types), tap tempo with MIDI
 clock sync, USB-MIDI in and out and TRS MIDI in, MIDI pitch bend, release velocity and a stereo SPREAD by key on the Rhodes, chord mode, a pattern recorder (1–16 bar loops, quantize, overdub, undo / erase), an arpeggiator, scales, a sustain pedal, velocity from the FM-1's own keys (TOUCH: LIGHT / MEDIUM / HEAVY / FIXED), 10-voice polyphony on every instrument and 21 factory plus 16 user presets. The screen shows one page at a time with

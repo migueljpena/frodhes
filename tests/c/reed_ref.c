@@ -54,6 +54,7 @@ int main(int argc, char **argv)
             else if (!strcmp(kind, "offv")) re_note_off((uint32_t)a, (uint32_t)b);
             else if (!strcmp(kind, "bend")) rh_bend_t = (int32_t)llround((pow(2.0, a / 12000.0) - 1.0) * 1073741824.0);
             else if (!strcmp(kind, "spread")) rh_spread = a;
+            else if (!strcmp(kind, "amp")) { re_amp = (uint8_t)(a != 0); if (a == 2) re_spk_n = RE_SPK_GLIDE; }   /* "SAMPLE amp 1": 200A AMP (2: no glide in) */
             else if (!strcmp(kind, "vib")) {                       /* "SAMPLE vib DEPTH SHAPE INC": on */
                 unsigned sh = 0, inc = 0;
                 if (fscanf(ev, "%u %u", &sh, &inc) != 2) return 1;

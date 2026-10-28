@@ -35,6 +35,7 @@ ROM_LO, ROM_HI = 0xFFC00000, 0xFFCFFFFF
 NLV = 4                                                   # strike levels a key: one per contact length
 LOG_N, EXP_N, TANH_N, SIN_N = 1024, 1024, 1024, 1024
 TANH_MAX = 8.0
+SPK = os.path.join(ROOT, "docs/model/data/wurli_speaker.json")   # the play page's speaker.json
 
 
 def rom_safe(v):
@@ -110,8 +111,8 @@ def reg_rows(P):
     R = P["reg"]
     out = []
     for T in R["tables"]:
-        out.append([(lg(T["d"][i]), lg(T["g"][i]), lg(T["t60"][i]), q(T["cents"][i], 16), q(T["sn"][i], 30))
-                    for i in range(64)])
+        out.append([(lg(T["d"][i]), lg(T["g"][i]), lg(T["t60"][i]), q(T["cents"][i], 16), q(T["sn"][i], 30),
+                     q(T["ref"][i], 30)) for i in range(64)])
     return R["amt"], out
 
 
@@ -165,6 +166,25 @@ def header(P, src):
     w("#define RE_TR_C1 %d" % q(c1[0], 16))
     w("#define RE_TR_HD1 %d" % q(c1[1], 16))
     w("#define RE_TR_LPA %d" % q(math.exp(-2 * math.pi * M.TREM_LP_HZ / FS), 30))
+    Sp = json.load(open(SPK))
+    w("/* the 200A AMP (reed_model.speaker_biquads, %s): five biquads (b0 b1 b2 a1 a2, Q30), the gain (Q16) */"
+      % os.path.relpath(SPK, ROOT))
+    w("static const int32_t RE_SPK[5][5] = {%s};" % ", ".join(
+        "{%s}" % ", ".join(str(q(x, 30)) for x in (b[0], b[1], b[2], a[1], a[2])) for b, a in M.speaker_biquads(Sp)))
+    w("#define RE_SPK_G %d" % q(10 ** (Sp["gain_db"] / 20), 16))
+    w("#define RE_SPK_GLIDE %du       /* LINE <-> AMP over 20 ms (samples) */" % int(round(0.02 * FS)))
+    Tk = P["thump"]
+    wk = 2 * math.pi * Tk["hz"] / FS
+    ak = math.sin(wk) / (2 * Tk["q"])
+    w("/* the key's return knock (reed_model.thump; the AMP only: heard in the room): its band-pass (twice), the 5 ms")
+    w(" * rise, the T60's step, its length, its gain at NOISE 64 (norm x 10^(db / 20), Q16) */")
+    w("#define RE_KN_B0 %d" % q(ak / (1 + ak), 30))
+    w("#define RE_KN_A1 %d" % q(-2 * math.cos(wk) / (1 + ak), 30))
+    w("#define RE_KN_A2 %d" % q((1 - ak) / (1 + ak), 30))
+    w("#define RE_KN_RISE %du" % int(round(0.005 * FS)))
+    w("#define RE_KN_DEC %d" % q(math.exp(-6.907755 / (Tk["t60"] * FS)), 30))
+    w("#define RE_KN_LEN %du" % int(round(0.5 * FS)))
+    w("#define RE_KN_G %d" % q(Tk["norm"] * 10 ** (Tk["db"] / 20), 16))
     w("/* the action noise (reed_model.snoise): its band-pass (twice), rise, T60, velocities, length */")
     wn = 2 * math.pi * S["hz"] / FS
     al = math.sin(wn) / (2 * S["q"])
@@ -184,9 +204,9 @@ def header(P, src):
                                                           r["n0"], ", ".join(map(str, r["lvl"])), ", ".join(map(str, r["lvl0"]))))
     w("};")
     w("static const uint16_t RE_REG_AMT[RE_NREG] = {%s};   /* the anchors' REG, Q15 */" % ", ".join(str(int(round(a * 32768))) for a in amts))
-    w("static const re_reg_t RE_REG[RE_NREG][RE_NKEY] = {   /* ld, lg, lt60x (logs), cents (Q16), sn (Q30) */")
+    w("static const re_reg_t RE_REG[RE_NREG][RE_NKEY] = {   /* ld, lg, lt60x (logs), cents (Q16), sn, ref (Q30) */")
     for T in reg:
-        w("    {" + ", ".join("{%d,%d,%d,%d,%d}" % t for t in T) + "},")
+        w("    {" + ", ".join("{%d,%d,%d,%d,%d,%d}" % t for t in T) + "},")
     w("};")
     table(w, "RE_VPOW", "int32_t", [q((v / 127.0) ** P["gamma"], 30) for v in range(128)])
     w("/* log2(1 + i / %d), 2^(-i / %d), sin(pi / 2 i / %d), tanh(i %g / %d): Q30 */" % (LOG_N, EXP_N, SIN_N, TANH_MAX, TANH_N))

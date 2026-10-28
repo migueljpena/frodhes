@@ -34,19 +34,19 @@ typedef struct {
     const char *const *names; /* F_ENUM */
 } pdesc_t;
 
-static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB", "200A"};
-static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA", "WURLI 200A"};
+static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB", "200A", "2AMP"};
+static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA", "WURLI 200A", "200A AMP"};
 /* TYPE -> engine (0 Rhodes, 1 bars, 2 reeds: reed.c, the Wurlitzer 200A), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
  * step with N_TYPE. The Rhodes types 0..3 are unchanged; VIBES (4) is the first bar type, MARIMBA (5) the second
- * (bars.c BAR_TYPE[1]), the 200A (6) the reed engine's. TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
+ * (bars.c BAR_TYPE[1]), the 200A (6) the reed engine's, 200A AMP (7) the same through its amp and speaker. TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
  * bit0 a motor (the MOTOR controls and their auto-on), bit1 a damper (key-up damps; without one DECAY's second card
  * is MUTE, the player's hand: 0 = rings out). */
-#define N_TYPE_N 7u
-static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 2};
-static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1, 0};
-static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0, 0};
-static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0, 2};
-static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96, 0};   /* the bar types' CC 79 band starts, rising in TYPE
+#define N_TYPE_N 8u
+static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 2, 2};
+static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1, 0, 1};
+static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0, 0, 0};
+static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0, 2, 2};
+static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96, 0, 0};   /* the bar types' CC 79 band starts, rising in TYPE
                                     * order (frodhes.c midi_cc): VIBES 0..95, MARIMBA 96..127 (the Rhodes: CC 80) */
 _Static_assert(sizeof N_TYPE / sizeof N_TYPE[0] == N_TYPE_N && sizeof N_TYPE_LONG / sizeof N_TYPE_LONG[0] == N_TYPE_N,
                "one name per TYPE");
@@ -93,7 +93,7 @@ static const char *const N_SYNC[] = {"FREE", "1/32", "16T", "1/16", "8T", "16D",
                                      "1/1", "2BAR", "4BAR"};
 
 static const pdesc_t PARAMS[P_COUNT] = {
-    [P_TYPE] = {"TYPE", 6, 0, F_ENUM, 80, N_TYPE},
+    [P_TYPE] = {"TYPE", 7, 0, F_ENUM, 80, N_TYPE},
     [P_DRIVE] = {"DRV", 127, 0, F_R10, 81, 0},
     [P_TW_SW] = {"TREM", 2, 0, F_ENUM, 17, N_TW},
     [P_TW_DEPTH] = {"DPTH", 127, 0, F_R10, 18, 0},
@@ -194,13 +194,16 @@ typedef struct {
                                                 * has taken in (frodhes.c st_old_scan; 0: none) */
     uint8_t seq_rsv[45];
     uint8_t flags2;                            /* 0.9.5: 1 = the preset index in the 19-factory layout (U01 = 19);
-                                                * 2 = in the 21-factory one (U01 = 21: the 200A's F20, F21) */
+                                                * 2 = in the 21-factory one (U01 = 21: the 200A's F20, F21);
+                                                * 4 = reg holds the 200A's REG (older records: 0 here, set to 127) */
+    uint8_t reg;                               /* the 200A's REG (0 every key even .. 127 as measured): the instrument's,
+                                                * as TUNE, not a preset's (reed.c re_knob RK_REG) */
 #if BOARD_SMK37
     uint8_t smk_mst[2];                        /* 0.9.6, SMK-37: K1's MASTER + 1, little endian (0, every record
                                                 * before: smk_input.h's 724; frodhes_smk.h smk_master_stored) */
-    uint8_t reserved[19];
+    uint8_t reserved[18];
 #else
-    uint8_t reserved[21];
+    uint8_t reserved[20];
 #endif
 } settings_t;
 _Static_assert(sizeof(settings_t) == 256, "settings record is 256 B");
@@ -303,7 +306,8 @@ static void params_defaults(void)
     set.ver = SET_VER;
     set.flags = 4u | 32u | 64u | 128u;   /* a fresh record: its preset index is already in today's layout (19 factory:
                                     * flags2 1), its PERFORM knobs today's defaults */
-    set.flags2 = 1u | 2u;
+    set.flags2 = 1u | 2u | 4u;
+    set.reg = 127;
     set.preset = 0;
     set.bpm10 = 1200;
     set.clock = 1;                 /* EXT: follows MIDI clock when it comes (USB or TRS) */
@@ -393,6 +397,8 @@ static void params_sanitize(void)
     if (!set.key_vel || set.key_vel > 127) set.key_vel = 96;
     if (set.vel_curve > 3u) set.vel_curve = 0;              /* TOUCH (keyvel.h): 0 = MEDIUM */
     if (set.tune < -50 || set.tune > 50) set.tune = 0;
+    if (!(set.flags2 & 4u)) { set.reg = 127; set.flags2 |= 4u; }   /* records before the 200A's REG: as measured */
+    if (set.reg > 127u) set.reg = 127;
     if (set.focus > 2) set.focus = 0;
     if (set.sc_mode > 2) set.sc_mode = 0;
     if (set.sc_scale > 10) set.sc_scale = 0;

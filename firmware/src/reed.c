@@ -40,7 +40,7 @@ typedef struct {
     int32_t lt60, ld, wa, lgk, lt1, lt127, n0;
     int32_t lvl[4], lvl0[4];                   /* Q24: with the second mode's share, without it (BELL 0) */
 } re_key_t;
-typedef struct { int32_t ld, lg, lt, cents, sn; } re_reg_t;
+typedef struct { int32_t ld, lg, lt, cents, sn, ref; } re_reg_t;
 #include "reed_tables.h"
 _Static_assert(RE_NLV == 4u, "reed.c: four strike levels a key");
 _Static_assert(RE_NV >= 1u && RE_NV <= 32u, "summaries are 32-bit masks");
@@ -61,6 +61,7 @@ typedef struct {
     int32_t gout;                             /* Q24 output gain: the bell's slope-1 norm x g x g_key */
     int32_t ltcap;                            /* log2 of the contact's cap (tc_per periods), samples, Q26 */
     int32_t sn;                               /* Q30 the action noise's gain (x NOISE) */
+    int32_t kn;                               /* Q30 the key's return knock's (its mf note's peak x NOISE: the AMP) */
     int32_t lom[RE_NM], la[RE_NM];            /* each mode's log2 angle and log2 decay a sample (Q26): the ISR's
                                                * own words under a bend or a part-damper */
 } re_rk_t;
@@ -113,7 +114,10 @@ typedef struct {
 } re_sn_t;
 
 static re_voice_t re_v[RE_NV];
-static re_sn_t re_sn[RE_NSN];
+static re_sn_t re_sn[RE_NSN], re_kn[RE_NV];   /* the action noises; the key-up knocks (AMP) */
+static volatile uint8_t re_amp;               /* the output: 0 LINE (TYPE 200A), 1 the 200A's amp and speaker (200A AMP) */
+static uint32_t re_spk_n;                     /* the glide between them: 0 .. RE_SPK_GLIDE samples (AMP's share) */
+static int32_t re_spk_st[2][5][4];            /* the speaker's biquads' x1 x2 y1 y2 (Q28): M, S */
 static uint32_t re_active_bits;
 static uint8_t re_notes[RE_NV];
 static uint32_t re_ages;
@@ -238,8 +242,8 @@ static int32_t re_reg(int32_t a15, uint32_t key, uint32_t f)
     const re_reg_t *A, *B;
     while (i + 2u < RE_NREG && a15 > (int32_t)RE_REG_AMT[i + 1]) i++;
     A = &RE_REG[i][key]; B = &RE_REG[i + 1u][key];
-    x = f == 0 ? A->ld : f == 1 ? A->lg : f == 2 ? A->lt : f == 3 ? A->cents : A->sn;
-    y = f == 0 ? B->ld : f == 1 ? B->lg : f == 2 ? B->lt : f == 3 ? B->cents : B->sn;
+    x = f == 0 ? A->ld : f == 1 ? A->lg : f == 2 ? A->lt : f == 3 ? A->cents : f == 4 ? A->sn : A->ref;
+    y = f == 0 ? B->ld : f == 1 ? B->lg : f == 2 ? B->lt : f == 3 ? B->cents : f == 4 ? B->sn : B->ref;
     t = ((a15 - (int32_t)RE_REG_AMT[i]) << 15) / (int32_t)(RE_REG_AMT[i + 1] - RE_REG_AMT[i]);
     t = t < 0 ? 0 : t > 32768 ? 32768 : t;
     return x + (int32_t)(((int64_t)(y - x) * t) >> 15);
@@ -304,6 +308,7 @@ static void re_build(re_rks_t *R)
         r->gout = (int32_t)re_exp2((int32_t)(((int64_t)lzz * (R->p16 + 65536)) >> 16) - (1 << 26) - lp - ld + lg, 24);
         r->ltcap = RE_L_TCPER + RE_L_2PI - lom;
         r->sn = (int32_t)(((int64_t)re_reg(a15, key, 4) * n15) >> 15);
+        r->kn = (int32_t)(((int64_t)re_reg(a15, key, 5) * n15) >> 15);
     }
 }
 
@@ -539,9 +544,31 @@ static uint32_t re_key_w(const re_voice_t *v)
     return (w * v->rg) >> 15;
 }
 
+/* a key comes back up (the pedal down too): its knock, heard in the room (reed_model.thump; the AMP only) */
+static void re_knock(uint32_t note)
+{
+    const re_rk_t *r;
+    uint32_t i, best = 0;
+    re_sn_t *q;
+    if (!re_amp || !re_pub || note < RE_KEY_LO || note >= RE_KEY_LO + RE_NKEY) return;
+    r = &re_rks[re_pub - 1u].k[note - RE_KEY_LO];
+    if (!r->kn) return;
+    for (i = 0; i < RE_NV; i++) {
+        if (!re_kn[i].on) { best = i; break; }
+        if (re_kn[i].i > re_kn[best].i) best = i;
+    }
+    q = &re_kn[best];
+    memset(q, 0, sizeof *q);
+    q->s = note * 2654435761u;
+    q->g = (int32_t)(((((int64_t)r->kn * RE_KN_G) >> 16) * RE_DRIVE) >> 18);   /* x drive, Q28 */
+    q->env = 1 << 30; q->on = 1;
+}
+
 static void re_note_off(uint32_t note, uint32_t rv)
 {
-    uint32_t i;
+    uint32_t i, was = 0;
+    for (i = 0; i < RE_NV; i++) was |= re_v[i].alive && re_v[i].note == note && re_v[i].held;
+    if (was) re_knock(note);
     for (i = 0; i < RE_NV; i++)
         if (re_v[i].alive && re_v[i].note == note) {
             re_v[i].held = 0;
@@ -570,6 +597,7 @@ static void re_kill_all(void)
     uint32_t i;
     for (i = 0; i < RE_NV; i++) { re_v[i].alive = 0; re_v[i].pend = 0; }
     for (i = 0; i < RE_NSN; i++) re_sn[i].on = 0;
+    for (i = 0; i < RE_NV; i++) re_kn[i].on = 0;
     re_active_bits = 0; re_s1 = 0;
 }
 
@@ -646,6 +674,36 @@ static void re_vibrato(int32_t *o, uint32_t n)
         re_vlp += (int32_t)(((int64_t)(o[i] - re_vlp) * ((1 << 30) - RE_TR_LPA)) >> 30);
         o[i] = (int32_t)(((int64_t)(o[i] + (int32_t)(((int64_t)(re_vlp - o[i]) * m) >> 30)) * g) >> 30);
     }
+}
+
+/* one sample of a knock (reed_model.thump), Q30 x its gain (Q28): the same LCG and band-pass form as the noise */
+static int32_t re_kn_next(re_sn_t *q)
+{
+    int32_t x, j, e;
+    q->s = 1664525u * q->s + 1013904223u;
+    x = (int32_t)((q->s >> 8) << 7) - (1 << 30);
+    for (j = 0; j < 2; j++) {
+        int32_t *f = q->f[j];
+        int64_t y = (int64_t)RE_KN_B0 * x - (int64_t)RE_KN_B0 * f[1] - (int64_t)RE_KN_A1 * f[2] - (int64_t)RE_KN_A2 * f[3];
+        f[1] = f[0]; f[0] = x; f[3] = f[2]; f[2] = (int32_t)(y >> 30); x = f[2];
+    }
+    e = q->i < RE_KN_RISE ? q->env / (int32_t)RE_KN_RISE * (int32_t)q->i : q->env;
+    q->env = (int32_t)(((int64_t)q->env * RE_KN_DEC) >> 30);
+    if (++q->i >= RE_KN_LEN) q->on = 0;
+    return (int32_t)(((((int64_t)x * e) >> 30) * q->g) >> 28);
+}
+
+/* the 200A's speaker (reed_model.speaker: five biquads and a gain) on x (Q30), its states c */
+static int32_t re_spk(int32_t x, int32_t (*c)[4])
+{
+    int32_t y = x >> 2, k;                                        /* Q28: the low peak's +6 dB has room */
+    for (k = 0; k < 5; k++) {
+        const int32_t *b = RE_SPK[k];
+        int32_t *s = c[k];
+        int64_t a = (int64_t)b[0] * y + (int64_t)b[1] * s[0] + (int64_t)b[2] * s[1] - (int64_t)b[3] * s[2] - (int64_t)b[4] * s[3];
+        s[1] = s[0]; s[0] = y; s[3] = s[2]; s[2] = (int32_t)(a >> 30); y = s[2];
+    }
+    return (int32_t)(((int64_t)y * RE_SPK_G) >> 14);              /* x gain, back to Q30 */
 }
 
 static void re_render(int32_t *mono, uint32_t n)
@@ -727,6 +785,23 @@ static void re_render(int32_t *mono, uint32_t n)
         mono[i] = o + ns[i];                                          /* Q30 for now: the vibrato next */
     }
     re_vibrato(mono, n);
+    if (re_amp || re_spk_n) {                                    /* the AMP (reed-worklet.js: the speaker after the
+                                                                  * vibrato, its share gliding 20 ms; the knocks after it) */
+        for (i = 0; i < n; i++) {
+            int32_t sp = re_spk(mono[i], re_spk_st[0]), kn = 0, m;
+            uint32_t j2;
+            if (re_amp && re_spk_n < RE_SPK_GLIDE) re_spk_n++;
+            else if (!re_amp && re_spk_n) re_spk_n--;
+            m = (int32_t)((re_spk_n << 15) / RE_SPK_GLIDE);       /* Q15 */
+            for (j2 = 0; j2 < RE_NV; j2++) if (re_kn[j2].on) kn += re_kn_next(&re_kn[j2]);
+            mono[i] += (int32_t)(((int64_t)(sp - mono[i] + kn) * m) >> 15);
+            if (rh_side_on) {
+                int32_t ss = re_spk(rh_side[i] << 15, re_spk_st[1]) >> 15;
+                rh_side[i] += (int32_t)(((int64_t)(ss - rh_side[i]) * m) >> 15);
+            }
+        }
+        if (!re_spk_n) memset(re_spk_st, 0, sizeof re_spk_st);
+    }
     for (i = 0; i < n; i++) {
 #ifdef RE_TAP
         re_tap[i] = mono[i];

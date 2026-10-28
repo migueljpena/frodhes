@@ -119,7 +119,7 @@ preset or switch an effect it briefly shows what happened, in large letters.
 | --- | --- |
 | **SELECT** (knob) | Next / previous page |
 | **K1 K2 K3 K4** | The four cards on the current page |
-| **ALGORITHM** (knob) | The TYPE (the four Rhodes, VIBES, MARIMBA and the WURLI 200A), from any page (on SEQUENCER: the step cursor) |
+| **ALGORITHM** (knob) | The TYPE (the four Rhodes, VIBES, MARIMBA, the WURLI 200A and 200A AMP), from any page (on SEQUENCER: the step cursor) |
 | **PRESETS** (knob) | Browse the sounds F01–F21 and your U01–U16 (loads when you stop turning; on SEQUENCER: bar by bar) |
 | **MASTER** (knob) | Volume (it glides as you turn it, without steps) |
 | **HOME** | PERFORM page; press again for the main page (titled FRODHES), and back |
@@ -176,7 +176,7 @@ The page after PERFORM (press **HOME** twice) carries the instrument's name as i
 
 | Knob | Card | What it does |
 | --- | --- | --- |
-| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **VIBES**, the vibraphone (see [VIBES](#vibes-the-vibraphone)), **MARIMBA** (see [MARIMBA](#marimba)), or **WURLI 200A**, the reed electric piano (see [WURLI 200A](#wurli-200a)). Applies to the next notes. |
+| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **VIBES**, the vibraphone (see [VIBES](#vibes-the-vibraphone)), **MARIMBA** (see [MARIMBA](#marimba)), **WURLI 200A**, the reed electric piano, or **200A AMP**, the same through its own amp and speaker (see [WURLI 200A](#wurli-200a)). Applies to the next notes. |
 | K2 | **TONE** | Where the tine sits against the pickup: lower is rounder and warmer, higher is more bell and midrange (the same as VOICE 1/2's TONE). On VIBES and MARIMBA: **MALLET** |
 | K3 | **BELL** | The bright metallic overtone at the start of each note (the same as VOICE 1/2's BELL). On VIBES: **MOTOR** on / off; on MARIMBA: **TUBE** |
 | K4 | **KEY VEL** | How hard the FM-1's own keys strike: the velocity of a medium press (TOUCH on [SETUP](#setup); harder presses play louder, softer ones quieter), and with TOUCH at **FIXED** the velocity of every press. Around 60–80 soft and round, 96 medium (the default), 108–127 hard with bark. MIDI notes keep their own velocity. |
@@ -742,7 +742,9 @@ response folds a hard strike into the 200A's **bark** (the growl of loud notes),
 differentiating input and the preamp (shared by every note, as in the instrument) finish the line signal: what the
 200A's own output gives, before its amp and speaker. Every key has its own regulation, measured on a real 200A
 (each reed's position, level, decay and tuning), and its strike has the hammer's short knock and the action's
-noise. Notes outside A1–C7 do not sound, as on the instrument.
+noise. Notes outside A1–C7 do not sound, as on the instrument. One step further, **200A AMP** is the same 200A heard
+through its own amp and speaker in a room (fitted to recordings of a 200A's line and speaker side by side: fuller
+low mids, a presence peak, the top rolled off), with the soft knock of each key coming back up, heard in the room.
 
 **VOICE 1/3** (how the reed is struck): **TONE** the shape of the pickup's plates (down rounder and darker, up more
 mids and edge; the level stays), **BARK** how far the reed swings past them (more growl and more output; the main
@@ -753,12 +755,15 @@ page's K2), **BELL** the reed's second mode (down to none at 0; past the middle 
 tremolo, on the VIBES motor's controls): **VIBRATO** on / off, **DEPTH** (the main page's K3; at 127 the troughs go
 20 dB down), **SPEED** (95 is the 200A's own 5.4 Hz; SYNC follows the tempo as the motor does) and **SHAPE** (0 the
 200A's measured cycle: the volume stays up and dips in short troughs, the loud phase a little darker; 127 a smooth
-sine).
+sine). **VOICE 4/4**: **REG**, the keys' regulation: at 10 every key as on the measured 200A (each reed's position,
+so its bark, its level, decay and tuning a little different from its neighbours), at 0 every key even (smooth
+curves from bass to treble), in between a share of it. REG belongs to the instrument, as TUNE does: it is kept with
+the settings, not in a preset.
 
 The sustain pedal works as on the Rhodes, half-pedal included (a lighter damper, a longer tail), the release
 velocity too (a quick lift damps harder), and so do the pitch bend (±2 semitones) and SPREAD (low keys left, high keys
 right). **Presets:** **F20 WURLI 200A** (dry, no vibrato) and **F21 200A VIB** (the vibrato at 5.4 Hz). **Over
-MIDI:** CC 115 (any value) selects it; Program Change 35 / 36 loads F20 / F21. **Polyphony:** 10 notes. Its CPU
+MIDI:** CC 115 selects it (0–63; 64–127: 200A AMP); Program Change 35 / 36 loads F20 / F21. **Polyphony:** 10 notes. Its CPU
 time on the FM-1 is not measured yet.
 
 ## 6. Presets
@@ -1003,7 +1008,7 @@ MARIMBA ignore it.
 | --- | --- | --- | --- |
 | 64 | Sustain (half-pedal) | 80 | TYPE (0–31 STAGE, 32–63 SUITCASE, 64–95 FELT, 96–127 DYNO) |
 | Pitch bend | ±2 semitones, the Rhodes types and the WURLI 200A (VIBES and MARIMBA ignore it) | 121 | Reset all controllers: the pitch bend back to 0 |
-| 115 | TYPE: the WURLI 200A (any value) | | |
+| 115 | TYPE of the reed piano: 0–63 WURLI 200A, 64–127 200A AMP | | |
 | 47 / 48 | VIBES MOTOR on (≥ 64) / DEPTH (no effect on MARIMBA) | 49 / 50 / 51 | VIBES MOTOR SPEED / SHAPE / SYNC |
 | 79 | TYPE of the bar instruments: 0–95 VIBES, 96–127 MARIMBA | 9 | Developer: the bar instruments' mode cap, VIBES and MARIMBA (0 = automatic, 1–49 = 0–48 upper modes, ≥ 50 = none; not saved) |
 | 10 | Developer: reset (≥ 64): every LFO, the delay / reverb lines and the noise to their start state (for comparing recordings) | | |

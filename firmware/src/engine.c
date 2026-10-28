@@ -4,7 +4,8 @@
  *   TYPE 0..3  ST77 SUIT FELT DYNO   the Rhodes engine (rhodes.c, unchanged)
  *   TYPE 4     VIBES                 the bar engine (bars.c)
  *   TYPE 5     MARIMBA               the bar engine
- *   TYPE 6     200A                  the reed engine (reed.c, the Wurlitzer 200A)
+ *   TYPE 6     200A                  the reed engine (reed.c, the Wurlitzer 200A): its line
+ *   TYPE 7     200A AMP              the same through its amp and speaker
  *
  * The app calls only these entry points: eng_note_on / eng_note_off / eng_pedal_level / eng_all_off post events
  * into this file's ring (main loop -> ISR, single producer, single consumer); eng_set_type(TYPE); eng_quiet(),
@@ -77,7 +78,7 @@ static void eng_set_type(uint32_t t)
 {
     uint8_t w = eng_want, s = eng_want_sub;
     if (t < ENG_RH_NTYPE) { rh_type = (uint8_t)t; eng_want = ENG_RHODES; }
-    else if (t == ENG_REED_TYPE) eng_want = ENG_REED;
+    else if (t == ENG_REED_TYPE || t == ENG_REED_TYPE + 1u) { eng_want = ENG_REED; re_amp = (uint8_t)(t != ENG_REED_TYPE); }
     else { t -= ENG_RH_NTYPE; eng_want_sub = (uint8_t)(t < BAR_NTYPE ? t : 0u); eng_want = ENG_BARS; }
     if (eng_want != w || (eng_want == ENG_BARS && eng_want_sub != s)) eng_epoch++;
 }
@@ -284,7 +285,7 @@ static void eng_host_report(void)                /* tests/host.c, at the end of 
     printf("ev_drop %u\n", (unsigned)(eq_drop + ev_drop));
     printf("rhodes steals %u\n", (unsigned)rh_h_steals);          /* tools/engine_ab.py */
     printf("cpu-proxy-reed %u voices max %u of %u\n", eng_h_max_us[ENG_REED], eng_h_max_nv[ENG_REED], (unsigned)RE_NV);
-    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub : eng_cur == ENG_REED ? ENG_REED_TYPE : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
+    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub : eng_cur == ENG_REED ? ENG_REED_TYPE + re_amp : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
     if (eng_h_log) fclose(eng_h_log);
     if (bar_h_pred) fclose(bar_h_pred);
 }

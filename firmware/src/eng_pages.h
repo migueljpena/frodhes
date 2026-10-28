@@ -82,7 +82,8 @@ static const char *const ENG_MRMB_HINT[] = {"HOW THE MALLET STRIKES", "HOW BARS 
 
 /* the 200A (TYPE 6, the reed engine, reed.c): the Rhodes' cards, what they do on a reed (TONE the pickup plates'
  * shape, BARK the reed's swing, BELL its second mode / the ping, HAMMER the felt), then its vibrato on the VIBES
- * motor's parameters (VIBRATO on / off, DEPTH, SPEED, SHAPE: 0 the 200A's own cycle, 127 a smooth sine) */
+ * motor's parameters (VIBRATO on / off, DEPTH, SPEED, SHAPE: 0 the 200A's own cycle, 127 a smooth sine), and REG,
+ * the keys' regulation (the settings' set.reg, as TUNE: the instrument's) */
 static const ectl_t ENG_REED_C[] = {
     {P_TONE, "TONE", EK_AMT, EU_NONE},
     {P_BARK, "BARK", EK_AMT, EU_NONE, 1},    /* FRODHES K2: the 200A's character */
@@ -96,8 +97,10 @@ static const ectl_t ENG_REED_C[] = {
     {P_MOT_DEPTH, "DEPTH", EK_AMT, EU_NONE, 2},                                       /* FRODHES K3 */
     {P_MOT_RATE, "SPEED", EK_AMT, EU_HZ},
     {P_MOT_SHAPE, "SHAPE", EK_AMT, EU_NONE},
+    {S_REG, "REG", EK_AMT, EU_NONE},         /* the keys' regulation: 10 as measured, 0 every key even (settings) */
 };
-static const char *const ENG_REED_HINT[] = {"HOW THE REED IS STRUCK", "HOW NOTES DIE AWAY", "THE 200A'S VIBRATO"};
+static const char *const ENG_REED_HINT[] = {"HOW THE REED IS STRUCK", "HOW NOTES DIE AWAY", "THE 200A'S VIBRATO",
+                                            "10 AS MEASURED, 0 EVEN"};
 
 #define ENG_UI_ROW(c, mk, h) {c, sizeof c / sizeof c[0], mk, h}
 static const engui_t ENG_UI[] = {           /* by TYPE_UI */
@@ -106,7 +109,7 @@ static const engui_t ENG_UI[] = {           /* by TYPE_UI */
     ENG_UI_ROW(ENG_MRMB_C, 28, ENG_MRMB_HINT),   /* make-up: VIBES's until the marimba is measured on the FM-1 */
     ENG_UI_ROW(ENG_REED_C, 15, ENG_REED_HINT),   /* make-up: the Rhodes' until the 200A is measured on the FM-1 */
 };
-static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2, 3};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
+static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2, 3, 3};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
 _Static_assert(sizeof ENG_RHODES_HINT / sizeof ENG_RHODES_HINT[0] == (sizeof ENG_RHODES_C / sizeof ENG_RHODES_C[0] + 3u) / 4u &&
                sizeof ENG_BARS_HINT / sizeof ENG_BARS_HINT[0] == (sizeof ENG_BARS_C / sizeof ENG_BARS_C[0] + 3u) / 4u &&
                sizeof ENG_MRMB_HINT / sizeof ENG_MRMB_HINT[0] == (sizeof ENG_MRMB_C / sizeof ENG_MRMB_C[0] + 3u) / 4u &&

@@ -346,10 +346,11 @@ static void midi_cc(uint32_t cc, uint32_t v)
         ui_mark_param(P_TYPE);
         return;
     }
-    if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 2): any value, the 200A (the
-                                                        * only one so far; CC 79 and 80 are as before) */
+    if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 2): 0..63 the 200A, 64..127 200A
+                                                        * AMP (CC 79 and 80 are as before) */
         uint32_t t, pick = 0u;
         for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 2u) { pick = t; break; }
+        if (pick && v >= 64u) pick++;
         if (pick) { type_pick((int32_t)pick); ui_mark_param(P_TYPE); }
         return;
     }
@@ -594,7 +595,7 @@ static void app_main(void)
         eng_pump();                             /* (notes.c: events that waited for room in the engine's ring) */
         rev_poll();                             /* (rev_types.c: HALL's lines cleared after a TYPE change) */
         rh_cc_poll();                           /* (rhodes.c: the note-on coefficients, when TUNE / DECAY / RELEASE moved) */
-        re_knob(RK_TUNE, (int32_t)set.tune * 65536); re_poll();   /* (reed.c: every key's words, when a VOICE knob moved) */
+        re_knob(RK_TUNE, (int32_t)set.tune * 65536); re_knob(RK_REG, set.reg); re_poll();   /* (reed.c: every key's words, when a VOICE knob moved) */
         seq_poll();
         arp_poll();
         ui_leds(lit, tempo_beat_led() || (arp_on() && arp_n && arp_playing < 128u));
@@ -802,6 +803,7 @@ static int host_state(const char *key, char *v, unsigned n)
     else if (!strcmp(key, "saving")) snprintf(v, n, "%u", set_saving);   /* the settings' save runs (settings_poll) */
     else if (!strcmp(key, "ledduty")) snprintf(v, n, "%u %u", fm1_led_duty[0], fm1_led_duty[1]);   /* DISPLAY BRIGHTNESS: the keys', the buttons' lit duty /16 */
     else if (!strcmp(key, "bars")) snprintf(v, n, "%d", eng_is_bars());
+    else if (!strcmp(key, "reg")) snprintf(v, n, "%u", (unsigned)set.reg);   /* the 200A's REG (settings) */
     else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_BARS ? bar_active_bits : rh_active_bits));
     else if (!strcmp(key, "held")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_BARS ? bar_held_bits : rh_held_bits));
     else if (key[0] == 'v' && key[1] == 'n' && key[2] >= '0' && key[2] <= '9') {   /* vnN: voices sounding note N
@@ -830,7 +832,7 @@ static int host_state(const char *key, char *v, unsigned n)
 static void host_dump(void)
 {
     static const char *const K[] = {"header", "preset", "page", "vpage", "hint", "msg", "oct", "bpm", "sus", "byp", "arp", "hold",
-                                    "arpn", "arpv", "arpends", "chord", "play", "rec", "notes", "savemode", "undo", "dirty", "ledduty", "bars", "voices", "held", "pitches",
+                                    "arpn", "arpv", "arpends", "chord", "play", "rec", "notes", "savemode", "undo", "dirty", "ledduty", "bars", "reg", "voices", "held", "pitches",
                                     "srcs", "refs", "quiet", "drops", "fxdrv", "label0", "card0", "label1", "card1", "label2", "card2",
                                     "label3", "card3", "bpm10", "setbpm", "pubs", "bpmmarks", "sqtick", "sqreads", "twinc", "lfoinc", "clklock", "beatsmp", "dlysync", "twph", "cpph", "phph", "lfoph", "motph", "wavn"};
     char key[24], v[64];
