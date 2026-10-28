@@ -65,12 +65,12 @@ def test_the_plans_examples():
                    ("firmware/gen/rhodes_tables.h", ["rhodes"]), ("firmware/gen/bars_tables.h", ["vibes", "marimba"])):
         m = tm.analyze([f])
         assert m["tiers"] == ["T0", "T1", "T2"] and m["t1"] == list(tm.ALL) and m["t2"] == eng, f
-    assert tm.analyze(["firmware/src/engine.c"])["t2"] == ["rhodes", "vibes", "marimba", "effects"]
+    assert tm.analyze(["firmware/src/engine.c"])["t2"] == ["rhodes", "vibes", "marimba", "reed", "effects"]
     for f in ("firmware/src/notes.c", "firmware/src/arp.c", "firmware/src/seq.c", "firmware/src/tempo.c"):
         m = tm.analyze([f])
         assert m["t1"] == [1, 3] and not m["t2"] and any("sequencer" in e for e in m["extras"]), f
     new = tm.analyze(["firmware/src/newthing.c"])                       # unknown firmware: everything
-    assert new["tiers"] == ["T0", "T1", "T2"] and new["t1"] == list(tm.ALL) and len(new["t2"]) == 4
+    assert new["tiers"] == ["T0", "T1", "T2"] and new["t1"] == list(tm.ALL) and len(new["t2"]) == 5
     both = tm.analyze(["firmware/src/ui.c", "firmware/src/seq.c", "docs/MANUAL.md"])     # the union
     assert both["t1"] == [1, 3, 4, 5] and set(both["groups"]) == {"ui", "notes", "host"}
     assert tm.analyze([])["tiers"] == ["T0"]
