@@ -19,7 +19,7 @@ The invariants (check), on every run:
   race       the host's own voice checks (RACE STUCK / RACE LOST: a voice held that no note wants)
   peak       the output never passes the limiter's ceiling (24000)
   wrap       (--san / --san-every) no int16 narrowing in the audio path out of range: the sanitizer build has the
-             (int16_t) casts of rhodes / bars / fx / the delay and reverbs taken out (a no-op in range) and checks the
+             (int16_t) casts of rhodes / fx / the delay and reverbs taken out (a no-op in range) and checks the
              implicit ones; with signed overflow (UBSan) that is every int wrap. (A sample-step test cannot tell a
              wrap from loud bright audio under the 24000 limiter: steps up to 48000 are legal; 0.9.5's 5 "wraps" of
              40-43k were a +22 dB makeup into HP12 and a tape echo near the ceiling, bit-identical in this build)
@@ -27,8 +27,8 @@ The invariants (check), on every run:
   stuck      no voice held, no note source or count left after the panic (the end: every note off on all 16
              channels, pedal up, arp, sequencer, chord mode, delay and reverb off)
   silence    exact silence (the gate's 0) from 10 s after the panic, so no stuck voice, tail or DC
-  probe      a note over MIDI after the panic sounds (the device is alive; LEVEL set to 0 dB for it, MARIMBA at -12
-             dB and HAMMER 0 is -43 dBFS), and with FX bypassed and VIBES' motor off
+  probe      a note over MIDI after the panic sounds (the device is alive; LEVEL set to 0 dB for it), and with FX
+             bypassed and the 200A's vibrato off
              (its pulse is in the engine, so FX keeps it) it is never louder after its key-up than before it (+1 dB)
   roundtrip  SAVE (into a user slot) then a power cycle (the flash kept: FRODHES_FLASH) gives the same parameters,
              preset, octave, chord and sequencer settings; the saved preset equals the panel (expect preset)
@@ -68,10 +68,10 @@ SAN_FLAGS = ["-fsanitize=undefined,address,implicit-signed-integer-truncation", 
              "-fno-omit-frame-pointer"]
 # the wrap check: the sanitizer build is compiled from a copy of the source with the audio path's (int16_t) casts
 # taken out, so a narrowing that changes a sample (an int16 wrap) is a sanitizer report; in range they are no-ops
-WRAP_SRC = ("rhodes.c", "bars.c", "fx.c", "dly_tape.c", "rev_plate.c", "rev_inf.c")
+WRAP_SRC = ("rhodes.c", "fx.c", "dly_tape.c", "rev_plate.c", "rev_inf.c")   # (reed.c: no int16_t casts)
 RAND_MS = 20000                    # the random part
 FOCUS_XF = False                   # --focus-xfade: more of the controls with a crossfade (switches, TYPEs, LEVEL, MIX, presets)
-FOCUS_CC = [80, 79, 17, 85, 88, 12, 106, 107, 110, 70, 84, 95, 91, 111, 27, 89]
+FOCUS_CC = [80, 115, 17, 85, 88, 12, 106, 107, 110, 70, 84, 95, 91, 111, 27, 89]
 SHED_PER_MIN = 0                   # --shed: voice sheds a minute (the FM-1 sheds when the audio runs late; tests/host.c)
 LIM_T = 24000
 DEV_CC = {119, 41}                 # not sent: RAW skips the limiter by design; key velocity's test modes
@@ -79,7 +79,7 @@ DEV_CC = {119, 41}                 # not sent: RAW skips the limiter by design; 
 _src = open(os.path.join(ROOT, "firmware", "src", "params.c")).read()
 KNOWN_CC = sorted({int(c) for c in re.findall(r'\[P_\w+\] = \{"[^"]*", \d+, \d+, F_\w+, (\d+)', _src)}
                   | {64, 85, 86, 87, 111, 114, 120, 123, 43, 44, 45, 46, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
-                     63, 79, 121, 1})
+                     63, 115, 121, 1})
 PNAME = re.search(r"enum \{ (P_TYPE.*?)P_COUNT \};", _src, re.S).group(1)
 PNAME = [w.strip() for w in re.sub(r"/\*.*?\*/", "", PNAME, flags=re.S).replace("\n", " ").split(",") if w.strip()]
 
@@ -260,9 +260,9 @@ def panic(t0):
     quiet = (t0 + 10000, t0 + 12000)
     gone = t0 + 12000
     L.append((gone, "dump"))
-    p0 = gone + 300                                   # the probe: FX bypassed, VIBES' motor off, a MIDI note
+    p0 = gone + 300                                   # the probe: FX bypassed, the 200A's vibrato off, a MIDI note
     L += [(p0 + c, f"midi 0x{0xB0 | c:02X} 111 127") for c in range(16)]
-    L += [(p0 + 20 + c, f"midi 0x{0xB0 | c:02X} 47 0") for c in range(16)]   # (the motor is in the engine)
+    L += [(p0 + 20 + c, f"midi 0x{0xB0 | c:02X} 47 0") for c in range(16)]   # (the vibrato is in the engine)
     L += [(p0 + 40 + c, f"midi 0x{0xB0 | c:02X} 110 64") for c in range(16)]  # (LEVEL at 0 dB: -12 is legal)
     n0 = p0 + 100
     L += [(n0 + c, f"midi 0x{0x90 | c:02X} 60 100") for c in range(16)]
@@ -417,7 +417,7 @@ def analyse(r, mk):
     n0, rel = mk["note"]
     held_db = rms_db(r.x[ms(rel - 60):ms(rel - 10)])
     onset_db = max(rms_db(r.x[ms(n0 + k):ms(n0 + k + 20)]) for k in range(0, 200, 10))
-    if onset_db < -40:                          # (MARIMBA has died away by the key-up: its onset counts)
+    if onset_db < -40:                          # (a note died away by the key-up: its onset counts)
         bad.append(("probe", f"the probe note after the panic: {onset_db:.1f} dBFS at its onset (dead?)"))
     elif held_db > -70:
         after = max(rms_db(r.x[ms(rel + k):ms(rel + k + 10)]) for k in range(0, 300, 5))
@@ -445,7 +445,7 @@ def check(events, binary=BIN, only=None):
             if r2.code != 0 or not boot:
                 bad.append(("roundtrip", f"the boot after the run failed: exit {r2.code} {r2.out[-200:]}"))
             elif saved:
-                keys = [k for k in saved if k.startswith("p.")] + ["preset", "oct", "chord", "bars"]
+                keys = [k for k in saved if k.startswith("p.")] + ["preset", "oct", "chord", "reed"]
                 diff = [f"{k} {saved.get(k)} -> {boot.get(k)}" for k in keys if saved.get(k) != boot.get(k)]
                 if diff:
                     bad.append(("roundtrip", "after a power cycle: " + ", ".join(diff[:8])))
@@ -477,7 +477,7 @@ def starts_sound(line):
 
 
 NOTE_BTN = {10, 11, 12, 13}                 # ARP, SEQ, PLAY, REC: they start or stop notes
-NOTE_CC = set(range(43, 64)) | {79, 80}      # the arpeggiator, chord mode, the sequencer; (TYPE: a new engine)
+NOTE_CC = set(range(43, 64)) | {80, 115}     # the arpeggiator, chord mode, the sequencer; (TYPE: a new engine)
 
 
 def eligible(events, i):

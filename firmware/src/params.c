@@ -15,8 +15,9 @@ enum { P_TYPE, P_DRIVE, P_TW_SW, P_TW_DEPTH, P_TW_RATE, P_TW_SYNC, P_TW_MODE, P_
        P_LFO_SHAPE, P_LFO_RATE, P_LFO_SYNC, P_LFO_RETRIG,                     /*        its LFO */
        P_DRV_TONE, P_DRV_MIX, P_DRV_SW, P_RV_DECAY, P_RV_TONE, P_RV_PREDLY,   /* records v3: the drive's and the
                                                                                * reverb's new controls (fx.c) */
-       P_MOT_ON, P_MOT_DEPTH, P_MOT_RATE, P_MOT_SHAPE, P_MOT_SYNC,            /* records v3: the vibraphone's motor
-                                                                               * (the bar engine; the MOTOR page) */
+       P_MOT_ON, P_MOT_DEPTH, P_MOT_RATE, P_MOT_SHAPE, P_MOT_SYNC,            /* records v3: Frodhes' vibraphone
+                                                                               * motor; here the 200A's vibrato (reed.c,
+                                                                               * its VOICE 3/4) */
        P_RV_TYPE, P_RV_SIZE, P_RV_MOD, P_RV_LOCUT,                           /* 0.9.5: the reverb's TYPE and REVERB 2
                                                                                * (rev_types.c); in the records' spare
                                                                                * slots (np: older records load them at
@@ -34,38 +35,22 @@ typedef struct {
     const char *const *names; /* F_ENUM */
 } pdesc_t;
 
-static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB", "200A", "2AMP"};
-static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA", "WURLI 200A", "200A AMP"};
-/* TYPE -> engine (0 Rhodes, 1 bars, 2 reeds: reed.c, the Wurlitzer 200A), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
- * step with N_TYPE. The Rhodes types 0..3 are unchanged; VIBES (4) is the first bar type, MARIMBA (5) the second
- * (bars.c BAR_TYPE[1]), the 200A (6) the reed engine's, 200A AMP (7) the same through its amp and speaker. TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
- * bit0 a motor (the MOTOR controls and their auto-on), bit1 a damper (key-up damps; without one DECAY's second card
- * is MUTE, the player's hand: 0 = rings out). */
-#define N_TYPE_N 8u
-static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 2, 2};
-static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1, 0, 1};
-static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0, 0, 0};
-static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0, 2, 2};
-static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96, 0, 0};   /* the bar types' CC 79 band starts, rising in TYPE
-                                    * order (frodhes.c midi_cc): VIBES 0..95, MARIMBA 96..127 (the Rhodes: CC 80) */
+static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "200A", "2AMP"};
+static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "WURLI 200A", "200A AMP"};
+/* TYPE -> engine (0 Rhodes, 1 reeds: reed.c, the Wurlitzer 200A), the engine's own type index, and the drive row
+ * (fx.c, 0..3), in step with N_TYPE. The Rhodes types 0..3 are Frodhes' own; the 200A (4) the reed engine's line, 200A
+ * AMP (5) the same through its amp and speaker. Frodhes had VIBES and MARIMBA (its bar engine) at 4 and 5: records
+ * that name them are converted (params_retype) */
+#define N_TYPE_N 6u
+static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1};
+static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1};
+static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0};
 _Static_assert(sizeof N_TYPE / sizeof N_TYPE[0] == N_TYPE_N && sizeof N_TYPE_LONG / sizeof N_TYPE_LONG[0] == N_TYPE_N,
                "one name per TYPE");
-#define TYPE_IS_BARS(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] == 1u)   /* the main loop's TYPE (the UI) */
-#define TYPE_IS_REED(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] == 2u)   /* the 200A */
-#define TYPE_HAS_MOTOR(t) ((uint32_t)(t) < N_TYPE_N && (TYPE_FLAGS[(t)] & 1u) != 0u)   /* VIBES */
-#define TYPE_NO_DAMPER(t) (TYPE_IS_BARS(t) && !(TYPE_FLAGS[(t)] & 2u))   /* MARIMBA: DECAY's second card is MUTE */
-/* the engine queries (engine.c, lane C, after the merge: it defines ENG_HAS_BARS, the BK_* knob ids and these
- * functions). Until then a stub: a bar TYPE plays as STAGE 77 and MOTOR as the tremolo's AM, so the tree builds and
- * plays; the UI already shows the bar cards (it asks TYPE_IS_BARS of the main loop's TYPE, not the engine) */
-#ifndef ENG_HAS_BARS
-enum { BK_STRIKE, BK_MALLET, BK_TUBE, BK_WEIGHT, BK_RING, BK_DAMPER, BK_NOISE,      /* the VOICE / DECAY cards, 0..127 */
-       BK_MOT_ON, BK_MOT_DEPTH, BK_MOT_SHAPE, BK_MOT_INC };                          /* the motor (INC: a Q32 step) */
-static void eng_set_type(uint32_t t) { rh_type = (uint8_t)(t < N_TYPE_N && TYPE_ENGINE[t] ? 0u : t); }
-static int eng_is_bars(void) { return 0; }       /* the engine plays bars for the TYPE last set (not the ISR latch) */
-static void eng_bar_knob(uint32_t k, uint32_t v) { (void)k; (void)v; }
-#endif
-#define PR_NF_SET 21u              /* presets.c PR_NF: the factory presets (12 before VIBES, 14 before MARIMBA, 16
-                                    * before F17..F19, 0.9.5; 19 before the 200A's F20..F21) */
+#define TYPE_IS_REED(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] == 1u)   /* the 200A */
+#define PR_NF_SET 17u              /* presets.c PR_NF: the factory presets (12 before VIBES, 14 before MARIMBA, 16
+                                    * before F17..F19, 0.9.5; 19 before the 200A's F20..F21; 17 without VIBES and
+                                    * MARIMBA's F13..F16) */
 static const char *const N_TW[] = {"OFF", "TRM", "WAH"};
 static const char *const N_CP[] = {"OFF", "CHO", "PHA"};   /* "PHA": records before 0.4 */
 static const char *const N_ONOFF[] = {"OFF", "ON"};
@@ -93,7 +78,7 @@ static const char *const N_SYNC[] = {"FREE", "1/32", "16T", "1/16", "8T", "16D",
                                      "1/1", "2BAR", "4BAR"};
 
 static const pdesc_t PARAMS[P_COUNT] = {
-    [P_TYPE] = {"TYPE", 7, 0, F_ENUM, 80, N_TYPE},
+    [P_TYPE] = {"TYPE", 5, 0, F_ENUM, 80, N_TYPE},
     [P_DRIVE] = {"DRV", 127, 0, F_R10, 81, 0},
     [P_TW_SW] = {"TREM", 2, 0, F_ENUM, 17, N_TW},
     [P_TW_DEPTH] = {"DPTH", 127, 0, F_R10, 18, 0},
@@ -147,7 +132,7 @@ static const pdesc_t PARAMS[P_COUNT] = {
     [P_RV_DECAY] = {"RDCY", 127, 64, F_R10, 92, 0},          /*        the REVERB page: the hall's length (64 = as before) */
     [P_RV_TONE] = {"RTON", 127, 64, F_BIP, 93, 0},           /*        its high damping, dark .. bright (64 = as before) */
     [P_RV_PREDLY] = {"PDLY", 127, 0, F_PDLY, 94, 0},         /*        pre-delay 0 .. 80 ms */
-    [P_MOT_ON] = {"MOT", 1, 0, F_ENUM, 47, N_ONOFF},         /* on by itself when the TYPE turns to a bar type */
+    [P_MOT_ON] = {"MOT", 1, 0, F_ENUM, 47, N_ONOFF},         /* the 200A's VIBRATO */
     [P_MOT_DEPTH] = {"DPTH", 127, 110, F_R10, 48, 0},        /* 110: a clear ~8 dB pulse over F3..F6 (host) */
     [P_MOT_RATE] = {"RATE", 127, 78, F_HZ, 49, 0},           /* 0.5 .. 10.1 Hz (120 and up: 10.1); 78 = 3.5 Hz */
     [P_MOT_SHAPE] = {"SHPE", 127, 0, F_R10, 50, 0},
@@ -184,7 +169,7 @@ typedef struct {
     uint8_t trs_off;                           /* 0.9.1: 1 = the TRS MIDI input is ignored (MIDI page) */
     uint8_t undo_preset;                       /* 0.9.3: the preset the undo copy is (index + 1; 0 = not known) */
     uint8_t panel3[16], undo3[16];             /* records v3: ids 48..63 (flags bit 16: present) */
-    uint8_t mot_user_off;                      /* records v3: 1 = switched off on the MOTOR page (no auto-on) */
+    uint8_t mot_user_off;                      /* records v3: Frodhes' VIBES motor switched off by hand (not read) */
     uint8_t chord_last;                        /* 0.9.3: the chord type EDIT turns back on (0 = none yet: MAJ) */
     uint8_t palette;                           /* 0.9.4: DISPLAY COLOR, the step (ui.c COLOR_ACC; 0 = AMBER) */
     uint8_t dim;                               /* 0.9.4: DISPLAY BRIGHTNESS, steps down from full: 0 (as made) .. 9; the
@@ -195,7 +180,9 @@ typedef struct {
     uint8_t seq_rsv[45];
     uint8_t flags2;                            /* 0.9.5: 1 = the preset index in the 19-factory layout (U01 = 19);
                                                 * 2 = in the 21-factory one (U01 = 21: the 200A's F20, F21);
-                                                * 4 = reg holds the 200A's REG (older records: 0 here, set to 127) */
+                                                * 4 = reg holds the 200A's REG (older records: 0 here, set to 127);
+                                                * 8 = without VIBES and MARIMBA: 17 factory presets (U01 = 17), TYPE
+                                                * 4 / 5 the 200A (params_retype) */
     uint8_t reg;                               /* the 200A's REG (0 every key even .. 127 as measured): the instrument's,
                                                 * as TUNE, not a preset's (reed.c re_knob RK_REG) */
 #if BOARD_SMK37
@@ -210,6 +197,8 @@ _Static_assert(sizeof(settings_t) == 256, "settings record is 256 B");
 
 static settings_t set;
 static uint8_t set_pr_from_rc;    /* params_sanitize converted an index of 16 factory presets that named U10..U12 */
+static uint8_t set_retype;        /* params_sanitize converted a record from before flags2 8: the user presets too
+                                   * (presets.c presets_load_bank) */
 /* TOUCH (keyvel.h): stored so that 0, every record before key velocity, is MEDIUM */
 static uint32_t kv_touch(void) { return (set.vel_curve + 1u) & 3u; }
 static void kv_touch_store(uint32_t touch) { set.vel_curve = (uint8_t)((touch + 3u) & 3u); }
@@ -232,17 +221,16 @@ static void params_split_phaser(uint8_t *p, uint32_t np)
  * old user presets with it too) */
 static void params_v3_convert(uint8_t *p)
 {
-    if (p[P_TW_SW] == 1u && p[P_TW_MODE] == 2u) {    /* TREM/WAH = MOTOR (VIBES, 0.9.3 drafts) */
-        if (TYPE_IS_BARS(p[P_TYPE])) {               /* a bar TYPE: the motor's own parameters, the effect off */
-            p[P_MOT_ON] = 1;
-            p[P_MOT_DEPTH] = p[P_TW_DEPTH];
-            p[P_MOT_RATE] = p[P_TW_RATE] > 120u ? 120u : p[P_TW_RATE];
-            p[P_MOT_SHAPE] = p[P_TW_SHAPE];
-            p[P_MOT_SYNC] = p[P_TW_SYNC];
-            p[P_TW_SW] = 0;
-        }
-        p[P_TW_MODE] = 1;                            /* a Rhodes TYPE played MOTOR as the AM tremolo: it still does */
-    }
+    if (p[P_TW_SW] == 1u && p[P_TW_MODE] == 2u)     /* TREM/WAH = MOTOR (VIBES, 0.9.3 drafts) */
+        p[P_TW_MODE] = 1;                            /* a Rhodes TYPE played MOTOR as the AM tremolo: it still does (a
+                                                      * VIBES record becomes a Rhodes one: params_retype) */
+}
+/* a record from before flags2 8 (Frodhes' TYPEs: 4 VIBES, 5 MARIMBA, then this firmware's 6 / 7 the 200A): VIBES
+ * and MARIMBA play as STAGE 77 (the bar engine is not here), the 200A moves to 4 / 5 */
+static void params_retype(uint8_t *p)
+{
+    if (p[P_TYPE] == 4u || p[P_TYPE] == 5u) p[P_TYPE] = 0;
+    else if (p[P_TYPE] == 6u || p[P_TYPE] == 7u) p[P_TYPE] = (uint8_t)(p[P_TYPE] - 2u);
 }
 /* the PERFORM knobs' defaults, as ui.c PERF_T indexes (perf[k] = 0 plays these): DRIVE, FILTER, DELAY, REVERB, the
  * chain's order (after 0.9.4); up to 0.9.4 TREM/WAH, PHASER, FILTER, DELAY. A record without flags bit 64 (0.9.4 and
@@ -277,12 +265,11 @@ static uint8_t snd_base[P_SLOTS];
 static uint16_t bpm_hand = 1200;
 #if BOARD_SMK37
 /* the SMK's mod wheel (frodhes_smk.h smk_wheels; 0.9.6, #29: it wrote DEPTH, so its rest was DEPTH 0 and it lost the
- * preset's): 0..127 on top of TREM/WAH's DEPTH and the motor's DEPTH, up to 127 at the top; at rest the DEPTH as set.
- * What it switched on to get there (smk_mw_woke: P_TW_SW or P_MOT_ON, to smk_mw_wv) it switches off at rest; a sound
+ * preset's): 0..127 on top of TREM/WAH's DEPTH and the 200A vibrato's DEPTH, up to 127 at the top; at rest the DEPTH
+ * as set. What it switched on to get there (smk_mw_woke: P_TW_SW, to smk_mw_wv) it switches off at rest; a sound
  * loaded or saved meanwhile (snd_base_take) keeps its own */
 static int32_t smk_mw, smk_mw_wv;
 static uint32_t smk_mw_woke;
-static uint8_t smk_mw_uoff;                     /* set.mot_user_off before the wheel switched the motor on */
 #define MW_ADD(v) ((v) + (smk_mw * (127 - (v)) + 63) / 127)
 #define MW_FORGET() (smk_mw_woke = 0u)
 #else
@@ -306,7 +293,7 @@ static void params_defaults(void)
     set.ver = SET_VER;
     set.flags = 4u | 32u | 64u | 128u;   /* a fresh record: its preset index is already in today's layout (19 factory:
                                     * flags2 1), its PERFORM knobs today's defaults */
-    set.flags2 = 1u | 2u | 4u;
+    set.flags2 = 1u | 2u | 4u | 8u;
     set.reg = 127;
     set.preset = 0;
     set.bpm10 = 1200;
@@ -376,9 +363,26 @@ static void params_sanitize(void)
     }
     if (!(set.flags2 & 2u)) {                        /* records with 19 factory presets: U01 was 19 (F20, F21 the
                                                       * 200A's come before the user bank now) */
-        if (set.preset >= 19u && set.preset < 19u + 16u) set.preset = (uint8_t)(set.preset + PR_NF_SET - 19u);
-        if (set.undo_preset >= 20u && set.undo_preset < 20u + 16u) set.undo_preset = (uint8_t)(set.undo_preset + PR_NF_SET - 19u);
+        if (set.preset >= 19u && set.preset < 19u + 16u) set.preset = (uint8_t)(set.preset + 21u - 19u);   /* (to the
+                                                      * 21-factory layout: flags2 8 below takes it on) */
+        if (set.undo_preset >= 20u && set.undo_preset < 20u + 16u) set.undo_preset = (uint8_t)(set.undo_preset + 21u - 19u);
         set.flags2 |= 2u;
+    }
+    if (!(set.flags2 & 8u)) {                        /* records with 21 factory presets (F13..F16 VIBES and MARIMBA):
+                                                      * U01 was 21; a VIBES or MARIMBA preset loads F01 */
+        uint8_t p[P_SLOTS];
+        if (set.preset >= 12u && set.preset < 16u) set.preset = 0;
+        else if (set.preset >= 16u && set.preset < 21u + 16u) set.preset = (uint8_t)(set.preset - 4u);
+        if (set.undo_preset >= 13u && set.undo_preset < 17u) set.undo_preset = 1;
+        else if (set.undo_preset >= 17u && set.undo_preset < 22u + 16u) set.undo_preset = (uint8_t)(set.undo_preset - 4u);
+        for (i = 0; i < P_SLOTS; i++) p[i] = PV(i);
+        params_retype(p);
+        PV(P_TYPE) = p[P_TYPE];
+        for (i = 0; i < P_SLOTS; i++) p[i] = UV(i);
+        params_retype(p);
+        UV(P_TYPE) = p[P_TYPE];
+        set_retype = 1;
+        set.flags2 |= 8u;
     }
     if (!(set.flags & 64u)) params_perf_update();     /* records up to 0.9.4: the PERFORM defaults (above) */
     if (!(set.flags & 128u)) {                        /* records before the reverb's TYPE: its ids at their defaults
@@ -408,33 +412,28 @@ static void params_sanitize(void)
         if (set.last_on[i] < 1 || set.last_on[i] > (i == 2 ? PARAMS[P_DL_SW].hi : 2u)) set.last_on[i] = 1;   /* (DELAY: TAPE 3) */
 }
 
-/* the TREM/WAH switch and mode as fx.c gets them (records v3: a pure effect on every TYPE; the vibraphone's motor
- * has its own parameters, P_MOT_*, and runs inside the bar engine) */
+/* the TREM/WAH switch and mode as fx.c gets them (records v3: a pure effect on every TYPE; the 200A's vibrato has
+ * its own parameters, P_MOT_*, and runs inside the reed engine) */
 static void tw_apply(void)
 {
     fx_set(FXP_TW_SW, PV(P_TW_SW));
     fx_set(FXP_TW_MODE, PV(P_TW_MODE));
 }
-/* the motor's rate: 0.5 .. 10 Hz (the tremolo's law up to 120 = 10.08 Hz), or MOT SYNC's (tempo.c) */
+/* the vibrato's rate: 0.5 .. 10 Hz (the tremolo's law up to 120 = 10.08 Hz), or MOT SYNC's (tempo.c) */
 #define MOT_RATE_V(v) ((v) > 120 ? 120 : (v))
-static uint32_t mot_sync_inc;                    /* main loop: a synced motor (Q32 step a sample), 0 = free */
+static uint32_t mot_sync_inc;                    /* main loop: a synced vibrato (Q32 step a sample), 0 = free */
 static void mot_rate_apply(void)
 {
-    eng_bar_knob(BK_MOT_INC, mot_sync_inc ? mot_sync_inc : FX_LFO_INC[MOT_RATE_V(PV(P_MOT_RATE))]);
+    eng_vib_knob(VK_INC, mot_sync_inc ? mot_sync_inc : FX_LFO_INC[MOT_RATE_V(PV(P_MOT_RATE))]);
 }
 
 /* ---- apply a parameter to the engine (main loop; volatile one-writer handover). The Rhodes volatiles are written
- * exactly as before; the bar engine gets the same knobs through eng_bar_knob() (each engine reads only its own) */
+ * exactly as before; the reed engine gets the same knobs through re_knob() (each engine reads only its own) */
 static void param_apply(uint32_t id)
 {
     int32_t v = PV(id);
     switch (id) {
-    case P_TYPE: eng_set_type((uint32_t)v); fx_set(FXP_DRIVE_ROW, TYPE_DRIVE_ROW[v]); tw_apply();
-        if (TYPE_IS_BARS(v)) {                       /* the bar type's own MALLET / TUBE / WEIGHT / NOISE maps (C4) */
-            eng_bar_knob(BK_MALLET, PV(P_BARK)); eng_bar_knob(BK_TUBE, PV(P_BELL)); eng_bar_knob(BK_WEIGHT, PV(P_HAMMER));
-            eng_bar_knob(BK_NOISE, PV(P_NOISE));
-        }
-        break;
+    case P_TYPE: eng_set_type((uint32_t)v); fx_set(FXP_DRIVE_ROW, TYPE_DRIVE_ROW[v]); tw_apply(); break;
     case P_DRIVE: fx_set(FXP_DRIVE, v); break;
     case P_TW_SW: tw_apply(); break;
     case P_TW_DEPTH: fx_set(FXP_TW_DEPTH, MW_ADD(v)); break;
@@ -451,13 +450,13 @@ static void param_apply(uint32_t id)
     case P_DL_FDBK: fx_set(FXP_DL_FDBK, v); break;
     case P_RV_DEPTH: fx_set(FXP_RV_DEPTH, v); break;
     case P_TONE:     /* -0.5 gap .. 0 below the middle; above it RH_TONE_UP per step (params.json "tone": short of the axis) */
-        rh_tone_off = v <= 64 ? (v - 64) * (1 << 18) : (v - 64) * RH_TONE_UP; eng_bar_knob(BK_STRIKE, (uint32_t)v); re_knob(RK_TONE, v); break;
-    case P_BARK: rh_bark_s = (int32_t)KN_P64(v); rh_bark_g = (int32_t)KN_P64I(v); eng_bar_knob(BK_MALLET, (uint32_t)v); re_knob(RK_BARK, v); break;
-    case P_BELL: rh_bell = (int32_t)KN_P32(v); eng_bar_knob(BK_TUBE, (uint32_t)v); re_knob(RK_BELL, v); break;
-    case P_HAMMER: rh_ham = (int32_t)KN_HAM(v); eng_bar_knob(BK_WEIGHT, (uint32_t)v); re_knob(RK_HAMMER, v); break;
-    case P_DECAY: rh_k_decay = (int32_t)DECAY_K[v]; eng_bar_knob(BK_RING, (uint32_t)v); re_knob(RK_DECAY, v); break;   /* k = 1/S, S = 2^((v-64)/32): higher = longer */
-    case P_RELEASE: rh_k_rel = (int32_t)DECAY_K[v]; eng_bar_knob(BK_DAMPER, (uint32_t)v); re_knob(RK_RELEASE, v); break;
-    case P_NOISE: rh_thump = KN_THUMP[v]; rh_felt = KN_FELT[v]; rh_knock = KN_KNOCK[v]; rh_pnz = KN_PEDAL[v]; eng_bar_knob(BK_NOISE, (uint32_t)v); re_knob(RK_NOISE, v); break;
+        rh_tone_off = v <= 64 ? (v - 64) * (1 << 18) : (v - 64) * RH_TONE_UP; re_knob(RK_TONE, v); break;
+    case P_BARK: rh_bark_s = (int32_t)KN_P64(v); rh_bark_g = (int32_t)KN_P64I(v); re_knob(RK_BARK, v); break;
+    case P_BELL: rh_bell = (int32_t)KN_P32(v); re_knob(RK_BELL, v); break;
+    case P_HAMMER: rh_ham = (int32_t)KN_HAM(v); re_knob(RK_HAMMER, v); break;
+    case P_DECAY: rh_k_decay = (int32_t)DECAY_K[v]; re_knob(RK_DECAY, v); break;   /* k = 1/S, S = 2^((v-64)/32): higher = longer */
+    case P_RELEASE: rh_k_rel = (int32_t)DECAY_K[v]; re_knob(RK_RELEASE, v); break;
+    case P_NOISE: rh_thump = KN_THUMP[v]; rh_felt = KN_FELT[v]; rh_knock = KN_KNOCK[v]; rh_pnz = KN_PEDAL[v]; re_knob(RK_NOISE, v); break;
     case P_SPREAD: rh_spread = v; break;                              /* (S13; the Rhodes, at each strike) */
     case P_DL_TONE: fx_set(FXP_DL_TONE, v); break;
     case P_PH_SW: fx_set(FXP_PH_SW, v); break;
@@ -487,10 +486,10 @@ static void param_apply(uint32_t id)
     case P_RV_SIZE: fx_set(FXP_RV_SIZE, v); break;
     case P_RV_MOD: fx_set(FXP_RV_MOD, v); break;
     case P_RV_LOCUT: fx_set(FXP_RV_LOCUT, v); break;
-    case P_MOT_ON: eng_bar_knob(BK_MOT_ON, (uint32_t)v); break;        /* the bar engine reads these, the Rhodes not */
-    case P_MOT_DEPTH: eng_bar_knob(BK_MOT_DEPTH, (uint32_t)MW_ADD(v)); break;
+    case P_MOT_ON: eng_vib_knob(VK_ON, (uint32_t)v); break;          /* the 200A reads these, the Rhodes not */
+    case P_MOT_DEPTH: eng_vib_knob(VK_DEPTH, (uint32_t)MW_ADD(v)); break;
     case P_MOT_RATE: mot_rate_apply(); break;
-    case P_MOT_SHAPE: eng_bar_knob(BK_MOT_SHAPE, (uint32_t)v); break;
+    case P_MOT_SHAPE: eng_vib_knob(VK_SHAPE, (uint32_t)v); break;
     default: break;                                                   /* SYNC: tempo.c */
     }
 }
@@ -513,16 +512,9 @@ static void param_set(uint32_t id, int32_t v)
     set_t_change = fm1_ms;
 }
 
-/* a TYPE picked on the panel (the TYPE card, ALGORITHM) or by CC 79, not by a preset load: turning to a TYPE with a
- * motor (VIBES) from one without (a Rhodes type, MARIMBA) starts the motor (VIBES is heard with its motor), unless it
- * was switched off on the MOTOR page (set.mot_user_off, kept until its ON card turns it on again). MARIMBA leaves
- * P_MOT_ON as it is: stored, inaudible (no motor), there for the next VIBES */
-static void type_pick(int32_t t)
-{
-    int was = TYPE_HAS_MOTOR(PV(P_TYPE));
-    param_set(P_TYPE, t);
-    if (!was && TYPE_HAS_MOTOR(PV(P_TYPE)) && !PV(P_MOT_ON) && !set.mot_user_off) param_set(P_MOT_ON, 1);
-}
+/* a TYPE picked on the panel (the TYPE card, ALGORITHM) or by CC 80 / 115, not by a preset load (Frodhes started
+ * VIBES' motor here; the 200A's vibrato stays as the sound has it) */
+static void type_pick(int32_t t) { param_set(P_TYPE, t); }
 
 /* ---- value text (<= 5 chars) */
 static void fmt_r10(char *s, int32_t v)           /* panel 0.0 .. 10.0 */

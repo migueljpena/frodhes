@@ -10,9 +10,9 @@ surface RGB(16,16,18) shows as light teal, a single RGB565 green unit lifts blac
                                        keeping the order surface < track < fill < edge and fill < dim < label < value, each
                                        at least STEP L* above the one before, the fill and the edge within HUE_TOL of
                                        the mock-up's amber hue. Prints ui.c's RGB() values.
-  tools/meters_palettes.py sheet [OUT] every page of both engines (Rhodes ST77, VIBES) in each candidate, in the device
+  tools/meters_palettes.py sheet [OUT] every page of both engines (Rhodes ST77, the 200A) in each candidate, in the device
                                        look: OUT/<candidate>-<page>.png and OUT/sheet.png (candidates as rows, the
-                                       Rhodes pages then the VIBES pages). OUT defaults to private/ui-simplify/palettes.
+                                       Rhodes pages then the 200A pages). OUT defaults to private/ui-simplify/palettes.
 
 The dark end of the model is an extrapolation (the CC 3 test pattern's dark ramp 0 4 8 12 16 20 is the cross-check:
 a photo of it exposed for the dark swatches pins it). The user's eye on the FM-1 decides."""
@@ -120,8 +120,8 @@ def shots(engine, look, pages):
     L, t = [f"100 midi 0xB0 2 {look}", "500 midi 0xC0 3 0"], 1800
     for _, cc, v in SETUP:
         L.append(f"{t} midi 0xB0 {cc} {v}"); t += 20
-    if engine == "vibes":
-        L.append(f"{t} midi 0xB0 79 0"); t += 20
+    if engine == "reed":
+        L.append(f"{t} midi 0xB0 115 0"); t += 20
     t += 1500
     out = []
     for i, name in enumerate(pages):
@@ -144,9 +144,9 @@ def shots(engine, look, pages):
 def cmd_sheet(out):
     subprocess.run(["make", "-C", ROOT, "build/host/frodhes"], check=True, capture_output=True)
     os.makedirs(out, exist_ok=True)
-    pages = {"rhodes": ms.names(ms.walk_pages()), "vibes": ms.names(ms.walk_pages(["100 midi 0xB0 79 0"]), "-vibes")}
+    pages = {"rhodes": ms.names(ms.walk_pages()), "reed": ms.names(ms.walk_pages(["100 midi 0xB0 115 0"]), "-200a")}
     rows = []
-    for engine in ("rhodes", "vibes"):
+    for engine in ("rhodes", "reed"):
         for look, (letter, what) in enumerate(LOOKS):
             ims = shots(engine, look, pages[engine])
             for name, im in ims:

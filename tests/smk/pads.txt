@@ -1,8 +1,8 @@
 # SMK-37 build only (make test-smk): the 16 pads are Frodhes' own controls (smk_pad_events, no notes). Hardware pads:
 # top row 0..7 (pads 1..8), bottom row 8..15 (9..16). 0..5 TYPE, 6 / 7 the previous / next preset, 8 DRIVE, 9 COMP,
-# 10 FILTER, 11 TREM/WAH (VIBES: MOTOR), 12 PHASER, 13 CHORUS, 14 DELAY, 15 SUSTAIN (tests/smk/pedal.txt).
+# 10 FILTER, 11 TREM/WAH, 12 PHASER, 13 CHORUS, 14 DELAY, 15 SUSTAIN (tests/smk/pedal.txt).
 # p.0 TYPE, p.50 DRIVE's switch, p.33 / p.34 COMP's switch / THRESH, p.40 the filter's type, p.2 TREM/WAH, p.28 PHASER,
-# p.8 CHORUS, p.13 DELAY, p.54 MOTOR. "pad.N": its light, 0 off, 1 on, 2 on while sounding.
+# p.8 CHORUS, p.13 DELAY, p.54 the 200A's VIBRATO. "pad.N": its light, 0 off, 1 on, 2 on while sounding.
 100 expect state pad.0 1
 100 expect state pad.4 0
 200 pad 4 100
@@ -67,16 +67,18 @@
 4900 pad 14 100
 4950 pad 14 0
 5000 expect state p.13 1
-# VIBES: pad 12 is its MOTOR (on with the TYPE)
+# pad 5: the 200A (TYPE 4); pad 12 stays TREM/WAH there (its VIBRATO is on VOICE 3/4, not a pad)
 5100 pad 4 100
 5150 pad 4 0
-5200 expect state p.54 1
+5200 expect state p.0 4
+5200 expect state pad.4 1
 5300 pad 11 100
 5350 pad 11 0
 5400 expect state p.54 0
-5400 expect state pad.11 0
+5400 expect state p.2 0
 5500 pad 11 100
 5550 pad 11 0
-5600 expect state p.54 1
+5600 expect state p.54 0
+5600 expect state p.2 1
 5700 shot
 5800 end

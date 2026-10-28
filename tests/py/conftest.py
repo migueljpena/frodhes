@@ -12,14 +12,9 @@ import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 GROUPS = {                         # node id prefix -> group
-    "test_bars_compat.py": "bars_compat",                           # build/bars_compat/ (the old tree, its binaries)
-    "test_vibes_knock_measure.py::test_the_suite_row_on_the_host": "hil_scan_host",   # build/hil/vibes-host.json
-    "test_bars_calib.py": "bars_calib",                             # its va_checks fixture (100 s) computed once
     "test_voice_calib.py": "voice_calib",                           # its vel fixture (13 s) computed once
     "test_uac_ring.py": "uac_ring",                                 # build/uac_test/ (old.tar, old/, the binaries)
 }
-# (build/gen_bars/fe_cache.json is shared by test_gen_bars and test_bars_calib, the two longest, which run apart: a
-# reader that finds it half written recomputes it, and both writers write the same bytes)
 
 
 def pytest_addoption(parser):
@@ -33,14 +28,14 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     """the controller of a parallel run builds the host binary before the workers start (no race on compiling it),
     and gives each worker one OpenBLAS thread (Linux numpy): one worker per core, each with OpenBLAS's default of a
-    thread per core spinning, took test_bar_fe's top octave from 13 s to over 50 min in the arm64 container
+    thread per core spinning, took Frodhes' test_bar_fe from 13 s to over 50 min in the arm64 container
     (2026-10-19). macOS numpy uses Accelerate, which this leaves alone (the generators' byte-exact tables)"""
     if getattr(config.option, "numprocesses", None) and not hasattr(config, "workerinput"):
         os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")          # (the workers inherit the environment)
         subprocess.run(["make", "-s", "-C", ROOT, "build/host/frodhes"], check=True)
 
 
-FIRST = ("test_gen_bars.py", "test_bars_calib.py")  # the longest (160 s each): handed out first, not last
+FIRST = ("test_fuzz.py", "test_control_sweep.py")  # the longest: handed out first, not last
 
 
 @pytest.hookimpl(tryfirst=True)              # (before xdist reads the groups)

@@ -41,7 +41,7 @@ import rhodes_model as gm     # noqa: E402
 FS = 44100
 VELS = [1, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127]
 VELS_QUICK = [1, 8, 24, 40, 56, 72, 88, 100, 104, 120, 127]
-TYPES = ["STAGE77", "SUITCASE", "FELT", "DYNO"]   # the Rhodes TYPEs (CC 80 = index x 32); bar types: tools/bar_scan.py
+TYPES = ["STAGE77", "SUITCASE", "FELT", "DYNO"]   # the Rhodes TYPEs (CC 80 = index x 32); the 200A types: CC 115
 BIN = os.path.join(ROOT, "build", "host", "frodhes")
 
 

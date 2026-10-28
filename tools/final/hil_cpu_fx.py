@@ -105,7 +105,7 @@ def defines(text, defs, want=None):
 
 
 def bands(table):
-    """[(lo, hi)] per TYPE index from a band-start table (the CC 79 / CC 84 way: a TYPE's band runs to the next start)"""
+    """[(lo, hi)] per TYPE index from a band-start table (the CC 84 way: a TYPE's band runs to the next start)"""
     ends = sorted(table) + [128]
     return [(lo, ends[ends.index(lo) + 1] - 1) for lo in table]
 

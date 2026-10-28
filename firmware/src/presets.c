@@ -1,16 +1,17 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Frodhes presets (IMPLEMENTATION-v3 §10.6, §12): 19 factory presets (const; F13 / F14 VIBES, F15 / F16 MARIMBA, F17..F19
- * the Rhodes effect sounds TAPE ECHO, DREAM, RADIO) and 16 user presets in a bank of two
+/* Frodhes presets (IMPLEMENTATION-v3 §10.6, §12): 17 factory presets (const; F01..F15 the Rhodes, F16 / F17 the 200A;
+ * Frodhes' VIBES and MARIMBA presets F13..F16 are not here) and 16 user presets in a bank of two
  * flash sectors written alternately (A 0x97000, B 0x98000): erase the older sector, write the records, the header
  * last; load picks the valid copy with the higher sequence number, so a cut-off save never loses the bank.
  *
- *   PRESETS encoder   browse F01..F19, U01..U16; loads 400 ms after the last detent (the edit goes to undo)
+ *   PRESETS encoder   browse F01..F17, U01..U16; loads 400 ms after the last detent (the edit goes to undo)
  *   SAVE              open the save mode: PRESETS / K1 pick the slot, SAVE again saves (when quiet), HOME cancels
  *   SAVE held 700 ms  undo / redo the last load
- *   MIDI PC           0..15 -> F01..F16, 16..31 -> U01..U16 (as before 0.9.5), 32..36 -> F17..F21 (preset_of_pc) */
+ *   MIDI PC           0..15 -> F01..F16, 16..31 -> U01..U16 (as before 0.9.5), 32 -> F17 (preset_of_pc) */
 
-#define PR_NF 21u                               /* 12 Rhodes (F01..F12, unchanged), the bar types' F13..F16, then
-                                                 * F17..F19 (0.9.5: the starters U10..U12 before), the 200A's F20..F21 */
+#define PR_NF 17u                               /* 12 Rhodes (F01..F12, unchanged), F13..F15 (0.9.5's F17..F19: the
+                                                 * starters U10..U12 before), the 200A's F16..F17 */
+#define PR_F_TAPE 12u                           /* F13 TAPE ECHO, the first of 0.9.5's three (the starters U10..U12) */
 #define PR_NU 16u
 _Static_assert(PR_NF == PR_NF_UI && PR_NF + PR_NU == PR_NALL_UI && PR_NF == PR_NF_SET, "ui.c / params.c preset counts");
 _Static_assert(PR_NF >= 16u && PR_NF <= 16u + 96u, "program changes 0..15: F01..F16, 16..31: U01..U16, 32..: F17..");
@@ -33,11 +34,11 @@ static preset_t pr_user[PR_NU];
 _Static_assert(sizeof pr_user == ST_TAIL_N, "the user presets are the store record's tail (frodhes_store.h ST_TAIL_N)");
 
 /* factory presets (0.9.5): (param id, value) pairs over the defaults, 0xFF ends. Two groups per engine (the user): DRY,
- * each instrument as the model plays it (F01..F04 the four Rhodes TYPEs, F13 VIBES, F15 MARIMBA: the compressor and a
- * trace of room only), and FX (F05..F12 and F17..F19 Rhodes, F14 VIBES, F16 MARIMBA: the compressor, a reverb TYPE with its LOW CUT,
- * echoes on the tempo). LEVEL: the Rhodes presets within 1 LU of F01 on the presets suite's chord
- * (tools/hil_scan.py --host --only presets, plus each preset's critical bands); VIBES ~2.5 LU above, MARIMBA as the
- * MANUAL says. F01 is the boot sound and the level reference.
+ * each instrument as the model plays it (F01..F04 the four Rhodes TYPEs, F16 the 200A: the compressor and a trace of
+ * room only), and FX (F05..F12 and F13..F15 Rhodes, F17 the 200A's vibrato: the compressor, a reverb TYPE with its
+ * LOW CUT, echoes on the tempo). LEVEL: the Rhodes presets within 1 LU of F01 on the presets suite's chord
+ * (tools/hil_scan.py --host --only presets, plus each preset's critical bands). F01 is the boot sound and the level
+ * reference.
  *
  * The drive TYPEs (P_DRV_SW, drive.c: 1 FDRV, 2 KHLON, 3 TSH8, 4 OHCD, 5 BHLUE) in six of them, their LEVELs
  * re-run with the TYPE in (the chord's level moves with it), each one's CPU predicted with its TYPE's own cost in
@@ -47,17 +48,16 @@ _Static_assert(sizeof pr_user == ST_TAIL_N, "the user presets are the store reco
  *   F10 FUNK WAH    TSH8    the mid hump and tight lows into the wah
  *   F11 RESO SWEEP  OHCD    more gain, open, for the resonance to ride on
  *   F12 AUTO WAH    TSH8    mids into the band-pass wah
- *   F19 RADIO       OHCD    the hard drive before the band-pass
+ *   F15 RADIO       OHCD    the hard drive before the band-pass
  * F12's deep 1/4 sweep (the band-pass passes little: LEVEL 127, the compressor's make-up) is a documented exception to
  * the 1.5 LU (hil_scan.py's PRESET_TARGET: 0 +- 2.0) */
 #define PR_FDN 64u                              /* bytes per factory record: up to 31 pairs, then 0xFF */
 /* the compressor on every preset (0.9.5, the user: "always a bit of compression"): glue, not squash. Keys: THR -16 dB,
- * 2:1, ATTACK 80 (5 ms: the hammer and the bark pass before it acts), RELEASE 72 (~230 ms); the mallets (VIBES,
- * MARIMBA): 1.5:1, ATTACK 92 (9 ms), RELEASE 64. LOW CUT 70 (~150 Hz) / 80 (~200 Hz) keeps the bass out of the tails. */
+ * 2:1, ATTACK 80 (5 ms: the hammer and the bark pass before it acts), RELEASE 72 (~230 ms). LOW CUT 70 (~150 Hz) /
+ * 80 (~200 Hz) keeps the bass out of the tails. */
 static const char *const PR_FNAME[PR_NF] = {
     "STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "SUIT TREM", "DRIVEN 77", "BALLAD", "DYNO 80S", "70S PHASER",
-    "FUNK WAH", "RESO SWEEP", "AUTO WAH", "VIBES", "VIBES ECHO", "MARIMBA", "WOOD ECHO", "TAPE ECHO", "DREAM", "RADIO",
-    "WURLI 200A", "200A VIB"};   /* (the header shows 14 characters: names up to 10) */
+    "FUNK WAH", "RESO SWEEP", "AUTO WAH", "TAPE ECHO", "DREAM", "RADIO", "WURLI 200A", "200A VIB"};   /* (the header shows 14 characters: names up to 10) */
 static const uint8_t PR_FDATA[PR_NF][PR_FDN] = {
     /* ---- DRY (F01..F04, F13, F15): each instrument as the model plays it, the compressor and a trace of room only */
     /* F01 STAGE 77: the clean stage piano (the boot sound) */
@@ -111,52 +111,30 @@ static const uint8_t PR_FDATA[PR_NF][PR_FDN] = {
     {P_TYPE, 0, P_BARK, 80, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
      P_DRIVE, 52, P_DRV_SW, 3, P_FL_TYPE, 5, P_FL_FREQ, 70, P_FL_RESO, 84, P_FL_LFO, 50, P_LFO_SHAPE, 0, P_LFO_SYNC, 9,
      P_LFO_RETRIG, 1, P_RV_DEPTH, 14, P_RV_TYPE, 1, P_RV_LOCUT, 80, P_LEVEL, 121, 0xFF},
-    /* F13 VIBES (dry): the vibraphone as the model plays it: STRIKE at L/3, a mallet between YARN and the middle, the
-     * tube a little fuller, the motor at 2.6 Hz a little shallower, the damper and the ring as made, a quiet mallet
-     * contact; the mallet compressor (1.5:1, 9 ms: the strike passes) and a trace of hall */
-    {P_TYPE, 4, P_TONE, 64, P_BARK, 52, P_BELL, 70, P_HAMMER, 64, P_DECAY, 64, P_RELEASE, 64, P_NOISE, 40, P_MOT_ON, 1,
-     P_MOT_DEPTH, 90, P_MOT_RATE, 66, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 46, P_CMP_RATIO, 0, P_CMP_ATK, 92,
-     P_CMP_REL, 64, P_CMP_GAIN, 6, P_RV_DEPTH, 20, P_RV_TYPE, 1, P_RV_PREDLY, 20, P_RV_LOCUT, 70, P_LEVEL, 55, 0xFF},
-    /* F14 VIBES ECHO: the motor off, a cord mallet, a longer ring and a softer damper, a light slow chorus, a dotted-1/8
-     * tape echo on the tempo (darker repeats), a bright plate behind a short pre-delay */
-    {P_TYPE, 4, P_TONE, 64, P_BARK, 82, P_BELL, 64, P_HAMMER, 60, P_DECAY, 72, P_RELEASE, 54, P_NOISE, 36, P_MOT_ON, 0,
-     P_CMP_SW, 1, P_CMP_AMT, 46, P_CMP_RATIO, 0, P_CMP_ATK, 92, P_CMP_REL, 64, P_CMP_GAIN, 6, P_CP_SW, 1,
-     P_CP_DEPTH, 40, P_CP_SPEED, 40, P_DL_SW, 3, P_DL_DEPTH, 20, P_DL_SYNC, 8, P_DL_FDBK, 50, P_DL_TONE, 56,
-     P_RV_DEPTH, 34, P_RV_TYPE, 2, P_RV_DECAY, 70, P_RV_PREDLY, 16, P_RV_LOCUT, 80, P_LEVEL, 59, 0xFF},
-    /* F15 MARIMBA (dry): the default mallet, tube and weight, MUTE 0 (rings out, as the instrument), a soft mallet
-     * tick, the mallet compressor and a trace of hall */
-    {P_TYPE, 5, P_TONE, 64, P_BARK, 64, P_BELL, 64, P_HAMMER, 64, P_DECAY, 64, P_RELEASE, 0, P_NOISE, 40, P_CMP_SW, 1,
-     P_CMP_AMT, 46, P_CMP_RATIO, 0, P_CMP_ATK, 92, P_CMP_REL, 64, P_CMP_GAIN, 6, P_RV_DEPTH, 22, P_RV_TYPE, 1,
-     P_RV_PREDLY, 12, P_RV_LOCUT, 70, P_LEVEL, 59, 0xFF},
-    /* F16 WOOD ECHO: a hard yarn mallet, heavier, MUTE 0, a light chorus, a dotted-1/8 digital echo on the tempo with a
-     * few soft repeats, a hall behind a pre-delay */
-    {P_TYPE, 5, P_TONE, 60, P_BARK, 80, P_BELL, 64, P_HAMMER, 110, P_DECAY, 64, P_RELEASE, 0, P_NOISE, 40, P_CMP_SW, 1,
-     P_CMP_AMT, 46, P_CMP_RATIO, 0, P_CMP_ATK, 92, P_CMP_REL, 64, P_CMP_GAIN, 6, P_CP_SW, 1, P_CP_DEPTH, 40,
-     P_CP_SPEED, 44, P_DL_SW, 1, P_DL_DEPTH, 22, P_DL_SYNC, 8, P_DL_FDBK, 26, P_DL_TONE, 50, P_RV_DEPTH, 38,
-     P_RV_TYPE, 1, P_RV_DECAY, 64, P_RV_PREDLY, 24, P_RV_LOCUT, 80, P_LEVEL, 67, 0xFF},
     /* ---- 0.9.5: TAPE ECHO, DREAM, RADIO (the starters U10..U12 until 0.9.5's RC, the same records: their sound and
-     * their compressor as they were) */
-    /* F17 TAPE ECHO: a warm piano into the tape echo, dotted 1/8 on the tempo, a plate */
+     * their compressor as they were; Frodhes' F17..F19) */
+    /* F13 TAPE ECHO: a warm piano into the tape echo, dotted 1/8 on the tempo, a plate */
     {P_TYPE, 0, P_TONE, 58, P_NOISE, 48, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72,
      P_CMP_GAIN, 8, P_DRIVE, 22, P_DL_SW, 3, P_DL_DEPTH, 29, P_DL_SYNC, 8, P_DL_FDBK, 72, P_DL_TONE, 62,
      P_RV_DEPTH, 22, P_RV_TYPE, 2, P_RV_LOCUT, 80, P_LEVEL, 47, 0xFF},
-    /* F18 DREAM: felt hammers, a slow stereo pan, chorus, a quarter-note analog echo, a long dark hall, more motion */
+    /* F14 DREAM: felt hammers, a slow stereo pan, chorus, a quarter-note analog echo, a long dark hall, more motion */
     {P_TYPE, 2, P_DECAY, 84, P_NOISE, 30, P_CMP_SW, 1, P_CMP_AMT, 46, P_CMP_RATIO, 1, P_CMP_ATK, 90, P_CMP_REL, 80,
      P_CMP_GAIN, 8, P_TW_SW, 1, P_TW_MODE, 0, P_TW_DEPTH, 36, P_TW_RATE, 30, P_CP_SW, 1, P_CP_DEPTH, 60,
      P_CP_SPEED, 30, P_DL_SW, 2, P_DL_DEPTH, 21, P_DL_SYNC, 9, P_DL_FDBK, 30, P_RV_DEPTH, 76, P_RV_TYPE, 1,
      P_RV_DECAY, 104, P_RV_PREDLY, 60, P_RV_TONE, 56, P_RV_MOD, 84, P_RV_LOCUT, 80, P_LEVEL, 55, 0xFF},
-    /* F19 RADIO: a hard drive through a band-pass (a small speaker's band), a short tape slap, a small room */
+    /* F15 RADIO: a hard drive through a band-pass (a small speaker's band), a short tape slap, a small room */
     {P_TYPE, 0, P_NOISE, 48, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
      P_DRIVE, 55, P_DRV_SW, 4, P_DRV_TONE, 76, P_FL_TYPE, 5, P_FL_FREQ, 66, P_FL_RESO, 0, P_DL_SW, 3, P_DL_DEPTH, 15,
      P_DL_TIME, 54, P_DL_FDBK, 30, P_RV_DEPTH, 10, P_RV_TYPE, 1, P_RV_LOCUT, 80, P_LEVEL, 75, 0xFF},
-    /* ---- the 200A (the reed engine, TYPE 6): the play page's v4.3 with its knobs at the centre, NOISE at 64 (the
-     * model's action noise as measured), the Rhodes' dry compressor and room, LEVEL as F01 (the 200A at mf sits
-     * within 0.2 dB of STAGE 77 on average, host) */
-    /* F20 WURLI 200A: dry, no vibrato */
-    {P_TYPE, 6, P_NOISE, 64, P_MOT_ON, 0, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1,
-     P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 18, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 55, 0xFF},
-    /* F21 200A VIB: the vibrato at the factory rate (SPEED 95 = 5.4 Hz, the 200A's oscillator) and its own shape */
-    {P_TYPE, 6, P_NOISE, 64, P_MOT_ON, 1, P_MOT_DEPTH, 72, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50,
+    /* ---- the 200A (the reed engine, TYPE 4): the play page's v4.3 with its knobs at the centre, NOISE at 64 (the
+     * model's action noise as measured), the Rhodes' dry compressor and room. LEVEL: on the presets suite's chord
+     * (tools/hil_scan.py, host) F16 at F01's 55 read +2.7 LU (single notes at mf: within 0.2 dB of STAGE 77, but its
+     * chords sum louder), so 40 (-2.8 dB); F17's vibrato takes its own 2.9 dB off: 55 */
+    /* F16 WURLI 200A: dry, no vibrato */
+    {P_TYPE, 4, P_NOISE, 64, P_MOT_ON, 0, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1,
+     P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 18, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 40, 0xFF},
+    /* F17 200A VIB: the vibrato at the factory rate (SPEED 95 = 5.4 Hz, the 200A's oscillator) and its own shape */
+    {P_TYPE, 4, P_NOISE, 64, P_MOT_ON, 1, P_MOT_DEPTH, 72, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50,
      P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 18, P_RV_TYPE, 1, P_RV_LOCUT, 70,
      P_LEVEL, 55, 0xFF},
 };
@@ -165,7 +143,7 @@ _Static_assert(PR_FDN % 2u == 0u, "id / value pairs");
 /* the user bank's starters (0.9.5): a bank that was never saved (no header in either sector: a new FM-1, or one that
  * never saved a preset) opens with these in U01..U09, in RAM only; the first save writes them with the bank. A bank
  * already saved keeps exactly what it holds, and a damaged one stays empty. Rhodes effect sounds the factory bank does
- * not have (U10..U12 held TAPE ECHO, DREAM and RADIO until 0.9.5's RC: now the factory F17..F19); LEVELs as
+ * not have (U10..U12 held TAPE ECHO, DREAM and RADIO until 0.9.5's RC: now the factory F13..F15); LEVELs as
  * the factory ones (within 1 LU of F01 on the presets suite's chord, tools/hil_scan.py --host --only presets), each
  * one's CPU <= 4200 us (tests/py/test_presets_cpu.py). One string of (id, value) pairs, 0xFF after each starter. */
 #define PR_NS 9u
@@ -264,22 +242,28 @@ static int bank_valid(uint32_t at, bank_hdr_t *h)          /* the records: v3 (9
     return crc32(bank_buf + sizeof(bank_hdr_t), h->len) == h->crc;
 }
 
+static uint8_t pr_old;                          /* the migration found a bank before 0.9.6's (frodhes.c) */
 static void presets_load_bank_in(void);
 static void presets_load_bank(void)
 {
     presets_load_bank_in();
     if (set_pr_from_rc) {                            /* the settings named U10..U12 of 16 factory presets (params.c's
                                                       * conversion) and that slot is empty now: it was the starter that
-                                                      * is F17..F19 today (TAPE ECHO, DREAM, RADIO) */
+                                                      * is F13..F15 today (TAPE ECHO, DREAM, RADIO) */
         uint32_t k = set.preset - PR_NF;
-        if (set.preset >= PR_NF + 9u && set.preset < PR_NF + 12u && !pr_user[k].used) set.preset = (uint8_t)(16u + k - 9u);
+        if (set.preset >= PR_NF + 9u && set.preset < PR_NF + 12u && !pr_user[k].used) set.preset = (uint8_t)(PR_F_TAPE + k - 9u);
         k = set.undo_preset - 1u - PR_NF;
         if (set.undo_preset >= PR_NF + 10u && set.undo_preset < PR_NF + 13u && !pr_user[k].used)
-            set.undo_preset = (uint8_t)(17u + k - 9u);
+            set.undo_preset = (uint8_t)(PR_F_TAPE + 1u + k - 9u);
         set_pr_from_rc = 0;
     }
+    if (set_retype || pr_old) {                      /* user presets saved by Frodhes (or before flags2 8): VIBES and
+                                                      * MARIMBA as STAGE 77, the 200A at TYPE 4 / 5 (params_retype) */
+        uint32_t i;
+        for (i = 0; i < PR_NU; i++) if (pr_user[i].used) params_retype(pr_user[i].p);
+        set_retype = 0;
+    }
 }
-static uint8_t pr_old;                          /* the migration found a bank before 0.9.6's (frodhes.c) */
 static uint32_t pr_old_id(void)                 /* the bank before 0.9.6, the copy the load takes: its id (0: none) */
 {
     bank_hdr_t ha, hb;
@@ -441,7 +425,6 @@ static void preset_autoname(char *n)                     /* TYPE + the effects o
     const char *parts[5];
     uint32_t i = 0, k, np = 0;
     parts[np++] = N_TYPE[PV(P_TYPE)];
-    if (PV(P_MOT_ON) && TYPE_HAS_MOTOR(PV(P_TYPE))) parts[np++] = "MOT";   /* the motor (records v3; VIBES only) */
     if (PV(P_TW_SW) && np < 3u) parts[np++] = N_TW[PV(P_TW_SW)];
     if (PV(P_CP_SW)) parts[np++] = "CHO";
     if (PV(P_PH_SW) && np < 4u) parts[np++] = "PHA";

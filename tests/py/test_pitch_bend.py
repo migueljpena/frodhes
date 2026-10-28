@@ -143,14 +143,6 @@ def test_bend_zero_is_the_unbent_render():
     assert np.array_equal(r.L, a.L) and np.array_equal(r.R, a.R)
 
 
-def test_vibes_ignores_the_bend():
-    ev = ["30 midi 0xB0 79 0"]
-    a = run("bend-vibes-ref", ev + ["40 midi 0xB0 119 127", "200 midi 0x90 60 100", "2500 midi 0x80 60 0"], 3000)
-    b = run("bend-vibes", ev + ["40 midi 0xB0 119 127", "200 midi 0x90 60 100", bend_ev(600, UP), bend_ev(700, DOWN),
-                                 "2500 midi 0x80 60 0"], 3000)
-    assert np.array_equal(a.L, b.L) and np.array_equal(a.R, b.R)
-
-
 # ---- the retune spread: a full chord (one note per voice; no note's low partials near another note's fundamental)
 CHORD = [36, 40, 43, 47, 50, 53, 57, 58]
 BLOCK_MS = 256 * 1000 / FS

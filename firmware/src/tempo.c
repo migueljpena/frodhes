@@ -298,7 +298,7 @@ static uint8_t lk_reset;                                /* CC 10 (frodhes.c): th
 static void lk_st(volatile uint32_t *p, uint32_t v) { *p = v; }
 static uint32_t *lk_phase(uint32_t i)
 {
-    return i == LK_TW ? &tw_ph : i == LK_CP ? &cp_ph : i == LK_PH ? &ph_ph : i == LK_LFO ? &lfo_ph : &bar_mot_ph;
+    return i == LK_TW ? &tw_ph : i == LK_CP ? &cp_ph : i == LK_PH ? &ph_ph : i == LK_LFO ? &lfo_ph : &re_vph;
 }
 static void lk_inc(uint32_t i, uint32_t v)
 {
@@ -306,7 +306,7 @@ static void lk_inc(uint32_t i, uint32_t v)
     else if (i == LK_CP) fx_cp_sync_inc = v;
     else if (i == LK_PH) fx_ph_sync_inc = v;
     else if (i == LK_LFO) fx_lfo_sync_inc = v;
-    else eng_bar_knob(BK_MOT_INC, v);
+    else eng_vib_knob(VK_INC, v);
 }
 static uint32_t lk_div(uint32_t i)                     /* the LFO's SYNC (an index into SYNC_UNITS), 0 = free */
 {

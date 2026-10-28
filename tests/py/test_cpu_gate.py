@@ -147,16 +147,16 @@ def fx_log(wholes, hurt=False, code=0):
 
 def test_summary_cpu_rows(tmp_path):
     rows, md = summarize(tmp_path, [
-        ("cpu_vibes", "0", fx_log([4072, 4150, 4176], hurt=True)),
+        ("cpu_reed", "0", fx_log([4072, 4150, 4176], hurt=True)),
         ("cpu_rhodes_spread_bend", "1", fx_log([4212, 4224, 4260], hurt=True)),
-        ("cpu_marimba", "0", fx_log([4000, 4010, 4020])),
+        ("cpu_rhodes_bend", "0", fx_log([4000, 4010, 4020])),
         ("cpu_rhodes_1", "0", "worst 3700 us with 10 voices\nwhole ISR worst: 4250 us\nhil_cpu: ok\n"),   # older log
         ("cpu_rhodes_2", "0", "worst 3700 us with 10 voices\nwhole ISR worst: 3950 us\nhil_cpu: ok\n"),
     ])
-    assert "| PASS |" in rows["cpu_vibes"] and "whole ISR 4072-4176 us (max 4176; limit 4200 us)" in rows["cpu_vibes"]
-    assert "3 good takes in a row" in rows["cpu_vibes"]
+    assert "| PASS |" in rows["cpu_reed"] and "whole ISR 4072-4176 us (max 4176; limit 4200 us)" in rows["cpu_reed"]
+    assert "3 good takes in a row" in rows["cpu_reed"]
     assert "**FAIL**" in rows["cpu_rhodes_spread_bend"] and "4212-4260" in rows["cpu_rhodes_spread_bend"]
-    assert "| PASS |" in rows["cpu_marimba"]
+    assert "| PASS |" in rows["cpu_rhodes_bend"]
     assert "**FAIL**" in rows["cpu_rhodes_1"] and "the margin rule" in rows["cpu_rhodes_1"]
     assert "| PASS |" in rows["cpu_rhodes_2"]
     assert md.startswith("# ") and ": FAIL" in md.splitlines()[0]
@@ -166,8 +166,8 @@ def test_summary_cpu_rows(tmp_path):
 def test_summary_exit0_with_a_lie_fails(tmp_path):
     """a log whose verdict line says PASS but a take is over the limit (a hand-edited or older tool): FAIL here"""
     log = F.take_line(1, 1, 3900, 4300, "ok", 0) + "\nhil_cpu_fx: verdict: PASS (limit 4200 us, 1 takes)\n"
-    rows, _ = summarize(tmp_path, [("cpu_vibes", "0", log)])
-    assert "**FAIL**" in rows["cpu_vibes"]
+    rows, _ = summarize(tmp_path, [("cpu_reed", "0", log)])
+    assert "**FAIL**" in rows["cpu_reed"]
 
 
 def test_cpu_check_dry_run_and_a_breach(tmp_path, fake_tree):
@@ -175,21 +175,21 @@ def test_cpu_check_dry_run_and_a_breach(tmp_path, fake_tree):
     e = dict(os.environ, DRY_RUN="1", OUT=str(tmp_path / "dry"), PY=sys.executable)
     r = subprocess.run(["bash", sh], capture_output=True, text=True, env=e, cwd=ROOT, timeout=120)
     assert r.returncode == 0 and "cpu_check: PASS" in r.stdout, r.stdout + r.stderr
-    for c in ("cpu_rhodes_spread_bend", "cpu_vibes", "cpu_rhodes_bend", "cpu_marimba"):
+    for c in ("cpu_rhodes_spread_bend", "cpu_reed", "cpu_rhodes_bend"):
         assert f"{c}: PASS" in r.stdout
     # a breach on the fake tree (its hil_cpu scripted; no lock: CPU_CHECK_LOCKED as under tools/lock.py run)
     final = fake_tree / "tools" / "final"
     final.mkdir()
     (final / "hil_cpu_fx.py").write_text(open(os.path.join(FINAL, "hil_cpu_fx.py")).read())
     good = "3900,4100,1"
-    takes = [good] * 3 + ["3900,4224,1", good, good] + [good] * 6       # cpu_vibes' 1st take over the margin
+    takes = [good] * 3 + ["3900,4224,1", good, good] + [good] * 3       # cpu_reed's 1st take over the margin
     e = dict(os.environ, CPU_CHECK_LOCKED="1", TREE=str(fake_tree), OUT=str(tmp_path / "real"), PY=sys.executable,
              FAKE_TAKES=";".join(takes), FAKE_COUNT=str(fake_tree / "count"))
     e.pop("CPU_TAKES", None)
     r = subprocess.run(["bash", sh], capture_output=True, text=True, env=e, cwd=str(fake_tree), timeout=300)
     assert r.returncode == 1, r.stdout + r.stderr
-    assert "cpu_vibes: FAIL" in r.stdout and "cpu_rhodes_spread_bend: PASS" in r.stdout
-    assert "cpu_marimba: PASS" in r.stdout and "take 1: whole ISR 4224 us > 4200 us" in r.stdout
+    assert "cpu_reed: FAIL" in r.stdout and "cpu_rhodes_spread_bend: PASS" in r.stdout
+    assert "cpu_rhodes_bend: PASS" in r.stdout and "take 1: whole ISR 4224 us > 4200 us" in r.stdout
 
 
 def test_cpu_check_only_names(tmp_path):
@@ -202,18 +202,18 @@ def test_cpu_check_only_names(tmp_path):
         return subprocess.run(["bash", sh], capture_output=True, text=True, env=e, cwd=ROOT, timeout=120)
     r = run("rhodes_spread_bnd")
     assert r.returncode == 2 and "unknown case 'cpu_rhodes_spread_bnd'" in r.stderr, r.stdout + r.stderr
-    assert "cpu_rhodes_spread_bend cpu_vibes cpu_rhodes_bend cpu_marimba" in r.stderr and "PASS" not in r.stdout
+    assert "cpu_rhodes_spread_bend cpu_reed cpu_rhodes_bend" in r.stderr and "PASS" not in r.stdout
     r = run("rhodes_spread_bend")                                    # the short name = cpu_rhodes_spread_bend
     assert r.returncode == 0 and "cpu_rhodes_spread_bend: PASS" in r.stdout, r.stdout + r.stderr
-    assert "cpu_vibes: skipped" in r.stdout and "PASS (1 of 4 cases" in r.stdout
-    r = run("cpu_vibes, marimba")
-    assert r.returncode == 0 and "cpu_vibes: PASS" in r.stdout and "cpu_marimba: PASS" in r.stdout, r.stdout
-    r = run(",")                                                     # nothing named: all 4 run
-    assert r.returncode == 0 and "PASS (4 of 4 cases" in r.stdout, r.stdout + r.stderr
+    assert "cpu_reed: skipped" in r.stdout and "PASS (1 of 3 cases" in r.stdout
+    r = run("cpu_reed, rhodes_bend")
+    assert r.returncode == 0 and "cpu_reed: PASS" in r.stdout and "cpu_rhodes_bend: PASS" in r.stdout, r.stdout
+    r = run(",")                                                     # nothing named: all 3 run
+    assert r.returncode == 0 and "PASS (3 of 3 cases" in r.stdout, r.stdout + r.stderr
 
 
 def test_cpu_check_size_cases_only_when_named(tmp_path):
-    """the optional size cases (0.9.6, BUGHUNT #19's fades): not in the default run; ONLY=vibes_size runs both, VIBES
+    """the optional size cases (0.9.6, BUGHUNT #19's fades): not in the default run; ONLY=reed_size runs both, the 200A's
     worst on INFINITE and on PLATE with the reverb SIZE (CC 73) swept every 200 ms"""
     sh = os.path.join(ROOT, "tools", "cpu_check.sh")
 
@@ -221,16 +221,16 @@ def test_cpu_check_size_cases_only_when_named(tmp_path):
         e = dict(os.environ, DRY_RUN="1", OUT=str(tmp_path / out), PY=sys.executable, ONLY=only)
         return subprocess.run(["bash", sh], capture_output=True, text=True, env=e, cwd=ROOT, timeout=120)
     r = run("", "all")
-    assert r.returncode == 0 and "PASS (4 of 4 cases" in r.stdout and "  cpu_vibes_size" not in r.stdout, r.stdout + r.stderr
-    r = run("vibes_size", "size")
-    assert r.returncode == 0 and "PASS (2 of 6 cases" in r.stdout, r.stdout + r.stderr
-    for name, rev in (("cpu_vibes_size_inf", "INF"), ("cpu_vibes_size_plate", "PLATE")):
+    assert r.returncode == 0 and "PASS (3 of 3 cases" in r.stdout and "  cpu_reed_size" not in r.stdout, r.stdout + r.stderr
+    r = run("reed_size", "size")
+    assert r.returncode == 0 and "PASS (2 of 5 cases" in r.stdout, r.stdout + r.stderr
+    for name, rev in (("cpu_reed_size_inf", "INF"), ("cpu_reed_size_plate", "PLATE")):
         assert f"{name}: PASS" in r.stdout
         log = open(tmp_path / "size" / f"{name}.log").read()
         assert f"reverb TYPE: {rev} (" in log and "--rev-type)" in log, log
-        assert "hil_cpu --engine vibes --worst --usb 48000 --cc-sweep 73:1:127:200 (not run)" in log, log
-    r = run("cpu_vibes_size_plate", "plate")
-    assert r.returncode == 0 and "cpu_vibes_size_plate: PASS" in r.stdout and "cpu_vibes_size_inf: skipped" in r.stdout, r.stdout
+        assert "hil_cpu --engine reed --worst --usb 48000 --cc-sweep 73:1:127:200 (not run)" in log, log
+    r = run("cpu_reed_size_plate", "plate")
+    assert r.returncode == 0 and "cpu_reed_size_plate: PASS" in r.stdout and "cpu_reed_size_inf: skipped" in r.stdout, r.stdout
 
 
 def test_hil_cpu_cc_sweep_option():
@@ -247,7 +247,7 @@ def test_hil_cpu_cc_sweep_option():
 def test_cpu_check_zero_cases_is_not_a_pass(tmp_path):
     """the guard itself: with every case skipped (a case list edited out from under ONLY), exit 2, no PASS line"""
     src = open(os.path.join(ROOT, "tools", "cpu_check.sh")).read()
-    for c in ("cpu_rhodes_spread_bend --spread", "cpu_vibes --", "cpu_rhodes_bend --", "cpu_marimba --"):
+    for c in ("cpu_rhodes_spread_bend --spread", "cpu_reed --", "cpu_rhodes_bend --"):
         assert f"case_run {c}" in src
     sh = tmp_path / "cpu_check.sh"
     sh.write_text("\n".join(ln for ln in src.splitlines() if not ln.startswith("case_run ")) + "\n")
@@ -305,11 +305,11 @@ def test_cpu_check_real_path_lock_install_and_cases(tmp_path, fake_tree):
     pkg = real_tree(tmp_path, fake_tree)
     good = "3900,4100,1"
     r = run_real(tmp_path, fake_tree, [good] * 12, pkg)
-    assert r.returncode == 0 and "cpu_check: PASS (4 of 4 cases" in r.stdout, r.stdout + r.stderr
+    assert r.returncode == 0 and "cpu_check: PASS (3 of 3 cases" in r.stdout, r.stdout + r.stderr
     assert (tmp_path / "install.txt").read_text() == f"--yes {pkg}\n"
     assert "lock DEVICE taken" in r.stderr + r.stdout and not os.listdir(tmp_path / "locks" / "build" / "hil")
     r = run_real(tmp_path, fake_tree, [good] * 3, pkg, ONLY="rhodes_spread_bend")
-    assert r.returncode == 0 and "PASS (1 of 4 cases" in r.stdout, r.stdout + r.stderr
+    assert r.returncode == 0 and "PASS (1 of 3 cases" in r.stdout, r.stdout + r.stderr
     r = run_real(tmp_path, fake_tree, [good, "3900,4224,1", good], pkg, ONLY="rhodes_spread_bend")
     assert r.returncode == 1 and "cpu_rhodes_spread_bend: FAIL" in r.stdout, r.stdout + r.stderr
 
@@ -317,9 +317,9 @@ def test_cpu_check_real_path_lock_install_and_cases(tmp_path, fake_tree):
 def test_cpu_check_survives_a_rewrite_while_running(tmp_path, fake_tree):
     """the script rewritten during the install (offsets moved): it runs on as it was parsed"""
     pkg = real_tree(tmp_path, fake_tree)
-    r = run_real(tmp_path, fake_tree, ["3900,4100,1"] * 3, pkg, ONLY="cpu_vibes",
+    r = run_real(tmp_path, fake_tree, ["3900,4100,1"] * 3, pkg, ONLY="cpu_reed",
                  FAKE_REWRITE=str(fake_tree / "tools" / "cpu_check.sh"))
-    assert r.returncode == 0 and "cpu_vibes: PASS" in r.stdout, r.stdout + r.stderr
+    assert r.returncode == 0 and "cpu_reed: PASS" in r.stdout, r.stdout + r.stderr
     assert "command not found" not in r.stderr and "syntax error" not in r.stderr
     assert open(fake_tree / "tools" / "cpu_check.sh").read().startswith("# a longer header")
 

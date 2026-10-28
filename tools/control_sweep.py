@@ -44,7 +44,7 @@ off), which is where a bent tail shows. Each render is cached by the binary's ha
 the pytest workers share them (build/host/ctl_sweep/).
 
 Material: the chord C3 E4 G4 A4 C5 at velocity 100, held by the pedal from 0.5 s (no other harmonic of the chord
-within 4 % of 440 or 880 Hz). MARIMBA rings out within a second, so there the chord is struck again every 800 ms.
+within 4 % of 440 or 880 Hz).
 Setup: every effect off (COMP, DRIVE, FILTER, TREM, CHO/PHA, DELAY, REVERB, SPREAD 0, LEVEL 64), then only the
 control's own effect; CC 10 (the developer reset) at 300 ms makes every render deterministic.
 
@@ -83,7 +83,7 @@ T_FLIP = 2000                                  # the one-move renders: the contr
 # REVERB MIX, TYPE, SIZE AUTO, SPREAD, LEVEL 0 dB, STAGE 77
 BASE = [(106, 0), (107, 0), (84, 0), (81, 0), (70, 0), (72, 0), (17, 0), (85, 0), (12, 0), (88, 0), (89, 0),
         (91, 0), (95, 0), (73, 0), (105, 0), (110, 64), (80, 0)]
-ENGINE = {"rhodes": [], "vibes": [(79, 0), (47, 0)], "marimba": [(79, 127)]}   # (VIBES: the motor off but on MOTOR)
+ENGINE = {"rhodes": [], "reed": [(115, 0), (47, 0)]}   # (the 200A: its vibrato off but on VIBRATO)
 
 
 def bands(hi):
@@ -115,22 +115,18 @@ def _cases():
     C = []
     add = C.append
     # the engines' own cards (VOICE pages; CC 28-31, 102-104), TYPE
-    for eng, labels in (("rhodes", ["TONE", "BARK", "BELL", "HAMMER", "DECAY", "RELEASE", "NOISE"]),
-                        ("vibes", ["STRIKE", "MALLET", "TUBE", "WEIGHT", "RING", "DAMPER", "NOISE"]),
-                        ("marimba", ["STRIKE", "MALLET", "TUBE", "WEIGHT", "RING", "MUTE", "NOISE"])):
-        for lab, cc in zip(labels, (28, 29, 30, 31, 102, 103, 104)):
+    for eng in ("rhodes", "reed"):
+        for lab, cc in zip(["TONE", "BARK", "BELL", "HAMMER", "DECAY", "RELEASE", "NOISE"], (28, 29, 30, 31, 102, 103, 104)):
             sk = set()
-            if cc == 103:                        # RELEASE / DAMPER / MUTE act at the key-up: the pedal holds the
-                sk.add("noeff")                  # chord all through (test_every_control lets go)
-            if eng == "marimba":                 # struck again every 800 ms during the sweep, each strike latching the
-                sk |= {"jump", "stuck", "pitch"}  # knob's value then: the sweep's level and pitch follow the strikes
+            if cc == 103:                        # RELEASE acts at the key-up: the pedal holds the chord all through
+                sk.add("noeff")                  # (test_every_control lets go)
             add(Case(f"{eng} {lab}", cc, engine=eng, page="VOICE", skip=sk))
     add(Case("rhodes TYPE", 80, kind="select", statics=[16, 48, 80, 112], page="FRODHES"))
     add(Case("rhodes TYPE SPREAD", 80, [(105, 100)], kind="select", statics=[16, 48, 80, 112], page="FRODHES"))
     for lab, cc in (("DEPTH", 48), ("SPEED", 49), ("SHAPE", 50)):
-        add(Case(f"vibes MOTOR {lab}", cc, [(47, 127)], engine="vibes", kind="pitch" if lab == "SPEED" else "knob",
-                 page="MOTOR"))
-    add(Case("vibes MOTOR on/off", 47, engine="vibes", kind="mix", statics=[0, 127], page="MOTOR",
+        add(Case(f"reed VIBRATO {lab}", cc, [(47, 127)], engine="reed", kind="pitch" if lab == "SPEED" else "knob",
+                 page="VOICE"))
+    add(Case("reed VIBRATO on/off", 47, engine="reed", kind="mix", statics=[0, 127], page="VOICE",
              skip={"jump"}))                     # (the window-to-window level of a pulsing note: its phase restarts)
     # COMPRESSOR
     on = [(106, 127), (107, 60), (113, 20)]
@@ -226,13 +222,7 @@ def script(case, value=None, sweep=False, off=False, flip=None):
             L.append(f"200 midi 0xB0 {case.cc} {0 if sweep else value}")
     L.append("300 midi 0xB0 10 127")                       # the developer reset: deterministic lines and LFOs
     L.append(f"{T_NOTE} midi 0xB0 64 127")                 # the pedal: the chord rings through the sweep
-    if case.engine == "marimba":                           # (rings out within a second: struck again)
-        t = T_NOTE
-        while t < T_SW1:
-            L += [f"{t} midi 0x90 {n} 100" for n in CHORD] + [f"{t + 100} midi 0x80 {n} 0" for n in CHORD]
-            t += 800
-    else:
-        L += [f"{T_NOTE} midi 0x90 {n} 100" for n in CHORD]
+    L += [f"{T_NOTE} midi 0x90 {n} 100" for n in CHORD]
     if sweep:
         for k, v in enumerate(list(range(1, 128)) + list(range(126, -1, -1))):
             L.append(f"{T_SW0 + k * STEP} midi 0xB0 {case.cc} {v}")

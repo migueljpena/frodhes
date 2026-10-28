@@ -60,7 +60,7 @@ static uint32_t prof_st_max[PROF_NST] __attribute__((section(".bss.prof_st"))); 
 #else
 #define PROF_STAMP(i) ((void)0)
 #endif
-#include "engine.c"     /* the voice engines: rhodes.c (the Rhodes), bars.c (VIBES + MARIMBA), and the dispatcher */
+#include "engine.c"     /* the voice engines: rhodes.c (the Rhodes), reed.c (the 200A), and the dispatcher */
 #include "fx.c"
 #include "rev_types.c"  /* the REVERB's TYPEs: the framework (fx.c's fx_reverb), rev_plate.c, rev_inf.c */
 #include "params.c"
@@ -146,7 +146,6 @@ static int usb_link(void) { return host_usb_link; }
 #include "seq.c"
 #include "ui.c"
 #include "presets.c"
-#include "bars.c"       /* last: the bar engine's code (see bars.c) */
 
 static int32_t voice_mono[256];
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
@@ -157,10 +156,10 @@ static int32_t voice_mono[256];
 static void host_race_check(void)
 {
     static uint8_t bad[16], lost[16];
-    uint32_t i, nv = eng_cur == ENG_BARS ? BAR_NV : eng_cur == ENG_REED ? RE_NV : RH_NV;
+    uint32_t i, nv = eng_cur == ENG_REED ? RE_NV : RH_NV;
     int calm = eq_r == eq_w && engq_r == engq_w && eng_want == eng_cur && !eng_swapping;
     for (i = 0; i < nv && i < 16u; i++) {
-#define HRC(f) (eng_cur == ENG_BARS ? (uint32_t)bv[i].f : eng_cur == ENG_REED ? (uint32_t)re_v[i].f : (uint32_t)rv[i].f)
+#define HRC(f) (eng_cur == ENG_REED ? (uint32_t)re_v[i].f : (uint32_t)rv[i].f)
         uint32_t alive = HRC(alive), held = HRC(held), note = HRC(note), pend = HRC(pend), pn = HRC(pend_note);
 #undef HRC
         int want = (out_ref[note & 127u] && !note_to_arp[note & 127u]) || arp_playing == note;
@@ -204,7 +203,7 @@ static __attribute__((noinline)) void app_audio(int32_t *out, uint32_t n)
         }
     }
 #endif
-    blk_ph[0] = tw_ph; blk_ph[1] = cp_ph; blk_ph[2] = ph_ph; blk_ph[3] = lfo_ph; blk_ph[4] = bar_mot_ph;
+    blk_ph[0] = tw_ph; blk_ph[1] = cp_ph; blk_ph[2] = ph_ph; blk_ph[3] = lfo_ph; blk_ph[4] = re_vph;
     blk_ms = ms0;                                  /* the LFOs at this block's end, for the clock's phase lock (tempo.c) */
     blk_n = blk_n + 1u;
 #ifndef DINGHY_HOST
@@ -258,7 +257,6 @@ static void midi_cc(uint32_t cc, uint32_t v)
     }
     if (cc == 121u) { eng_bend_reset(); return; }               /* reset all controllers: the pitch bend to 0 */
     if (cc == 119u) { fx_set(FXP_RAW, v >= 64u); return; }
-    if (cc == 9u) { bar_budget_force = (uint8_t)v; return; }   /* developer: the bar engine's mode cap (0 = auto) */
     if (cc == 10u) { if (v >= 64u) { fx_reset_req = 1; drv_rst_req = 1; lk_reset = 1; } return; }   /* developer: every LFO / line /
                                                                 * noise to its boot state (fx.c; the drive's TYPEs: drive.c), and
                                                                 * the FM-1's own beat from here (a synced LFO's cycle starts with it) */
@@ -286,9 +284,6 @@ static void midi_cc(uint32_t cc, uint32_t v)
         midi_send(0xB0, 116, mx >> 7); midi_send(0xB0, 117, mx & 127u);
         midi_send(0xB0, 118, prof_us >> 5 > 127u ? 127u : prof_us >> 5);
         midi_send(0xB0, 115, eng_shed_count() & 127u);
-        midi_send(0xB0, 112, bar_prof_cap > 127u ? 127u : bar_prof_cap);   /* the bar engine: the lowest mode cap */
-        midi_send(0xB0, 113, bar_prof_used > 127u ? 127u : bar_prof_used); /* and the most live upper modes */
-        bar_prof_cap = 0xFFFFu; bar_prof_used = 0;
 #ifndef DINGHY_HOST
         usb_health_reply();
 #endif
@@ -336,20 +331,11 @@ static void midi_cc(uint32_t cc, uint32_t v)
         ui_mark(E_CARDS); ui_mark(E_FOOTER);
         return;
     }
-    if (cc == 79u) {                                   /* the bar types: each TYPE of the bar engine (TYPE_ENGINE 1) from
-                                                        * its TYPE_CC79 value up to the next one's: VIBES 0..95 (every
-                                                        * value 0.9.3 used for it up to 95, 0 and 64 included), MARIMBA
-                                                        * 96..127 (0.9.4). CC 80 keeps the four Rhodes types as before */
-        uint32_t t, pick = 4u;
-        for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 1u && v >= TYPE_CC79[t]) pick = t;
-        type_pick((int32_t)pick);                      /* (a TYPE change: the motor starts) */
-        ui_mark_param(P_TYPE);
-        return;
-    }
-    if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 2): 0..63 the 200A, 64..127 200A
-                                                        * AMP (CC 79 and 80 are as before) */
+    if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 1): 0..63 the 200A, 64..127 200A
+                                                        * AMP (CC 80 is as before; Frodhes' CC 79, VIBES / MARIMBA, is
+                                                        * not here) */
         uint32_t t, pick = 0u;
-        for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 2u) { pick = t; break; }
+        for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 1u) { pick = t; break; }
         if (pick && v >= 64u) pick++;
         if (pick) { type_pick((int32_t)pick); ui_mark_param(P_TYPE); }
         return;
@@ -377,7 +363,7 @@ static void midi_cc(uint32_t cc, uint32_t v)
                                                         * TYPE, is the motor's own CC 47 now) */
             else if (id == P_DRV_SW) x = drv_cc84(v);   /* the drive TYPE by band (params.c DRV_CC84) */
             else if (PARAMS[id].hi == 2u) x = v < 43u ? 0 : v < 86u ? 1 : 2;
-            else if (id == P_TYPE) x = (int32_t)(v >> 5);   /* the Rhodes types, as before; bar types: CC 79 */
+            else if (id == P_TYPE) x = (int32_t)(v >> 5);   /* the Rhodes types, as before; the 200A: CC 115 */
             else if (PARAMS[id].hi < 127u) x = (int32_t)(v * (PARAMS[id].hi + 1u) >> 7);
             if (id == P_CMP_SW && x && !PV(P_CMP_SW)) cmp_wake(1);   /* CC 106 on: as the panel (ui.c cmp_wake) */
             else param_set(id, x);
@@ -646,7 +632,7 @@ typedef struct {
     int32_t fx[FXP_N];
     uint32_t sync[5];
     int32_t rh[13];
-    int32_t bar[16];
+    int32_t re[5];
     uint8_t want;
 } host_snd_t;
 static void host_snd(host_snd_t *s)
@@ -660,11 +646,9 @@ static void host_snd(host_snd_t *s)
     s->rh[0] = rh_tone_off; s->rh[1] = rh_bark_s; s->rh[2] = rh_bark_g; s->rh[3] = rh_bell; s->rh[4] = rh_ham;
     s->rh[5] = rh_k_decay; s->rh[6] = rh_k_rel; s->rh[7] = rh_thump; s->rh[8] = rh_felt; s->rh[9] = rh_type;
     s->rh[10] = rh_tune_t; s->rh[11] = rh_knock; s->rh[12] = rh_pnz;
-    s->bar[0] = bar_pos; s->bar[1] = bar_fam; s->bar[2] = bar_tube; s->bar[3] = bar_mass; s->bar[4] = bar_massi;
-    s->bar[5] = bar_nz; s->bar[6] = bar_k_decay; s->bar[7] = bar_k_rel; s->bar[8] = bar_thump; s->bar[9] = bar_felt;
-    s->bar[10] = bar_mot_on; s->bar[11] = bar_mot_depth; s->bar[12] = bar_mot_shape; s->bar[13] = (int32_t)bar_mot_inc;
+    s->re[0] = re_vib_on; s->re[1] = re_vib_depth; s->re[2] = re_vib_shape; s->re[3] = (int32_t)re_vib_inc;
+    s->re[4] = re_amp;
     s->want = eng_want;
-    s->bar[14] = bar_mute; s->bar[15] = eng_want_sub;          /* MUTE, the bar type asked for (MARIMBA) */
 }
 static int host_sound_check(char *msg, unsigned n)
 {
@@ -684,8 +668,8 @@ static int host_sound_check(char *msg, unsigned n)
         if (a.sync[i] != b.sync[i]) { snprintf(msg, n, "synced rate %u is %u, the panel says %u", i, a.sync[i], b.sync[i]); return 1; }
     for (i = 0; i < 13u; i++)
         if (a.rh[i] != b.rh[i]) { snprintf(msg, n, "Rhodes volatile %u is %d, the panel says %d", i, a.rh[i], b.rh[i]); return 1; }
-    for (i = 0; i < 16u; i++)
-        if (a.bar[i] != b.bar[i]) { snprintf(msg, n, "bar knob %u is %d, the panel says %d", i, a.bar[i], b.bar[i]); return 1; }
+    for (i = 0; i < 5u; i++)
+        if (a.re[i] != b.re[i]) { snprintf(msg, n, "200A volatile %u is %d, the panel says %d", i, a.re[i], b.re[i]); return 1; }
     if (a.want != b.want) { snprintf(msg, n, "the engine is %u, TYPE says %u", a.want, b.want); return 1; }
     return 0;
 }
@@ -715,7 +699,7 @@ static int host_state(const char *key, char *v, unsigned n)
     else if (!strcmp(key, "cpph")) snprintf(v, n, "%u", cp_ph);                   /* the chorus' */
     else if (!strcmp(key, "phph")) snprintf(v, n, "%u", ph_ph);                   /* the phaser's */
     else if (!strcmp(key, "lfoph")) snprintf(v, n, "%u", lfo_ph);                 /* the filter LFO's */
-    else if (!strcmp(key, "motph")) snprintf(v, n, "%u", bar_mot_ph);             /* the vibraphone motor's */
+    else if (!strcmp(key, "motph")) snprintf(v, n, "%u", re_vph);                 /* the 200A vibrato's */
     else if (!strcmp(key, "wavn")) snprintf(v, n, "%u", wav_n);                   /* (host.c: the frames rendered) */
     else if (!strcmp(key, "bend")) snprintf(v, n, "%d", (int)eng_bend14 - 8192);   /* the pitch bend (-8192 .. 8191) */
     else if (!strcmp(key, "rtpend")) snprintf(v, n, "%u", (unsigned)rh_rt_pend);   /* voices still to retune (rhodes.c) */
@@ -802,15 +786,19 @@ static int host_state(const char *key, char *v, unsigned n)
     else if (!strcmp(key, "dirty")) snprintf(v, n, "%u", set_pend_new);   /* a setup change waits to be saved */
     else if (!strcmp(key, "saving")) snprintf(v, n, "%u", set_saving);   /* the settings' save runs (settings_poll) */
     else if (!strcmp(key, "ledduty")) snprintf(v, n, "%u %u", fm1_led_duty[0], fm1_led_duty[1]);   /* DISPLAY BRIGHTNESS: the keys', the buttons' lit duty /16 */
-    else if (!strcmp(key, "bars")) snprintf(v, n, "%d", eng_is_bars());
+    else if (!strcmp(key, "reed")) snprintf(v, n, "%d", eng_want == ENG_REED);
     else if (!strcmp(key, "reg")) snprintf(v, n, "%u", (unsigned)set.reg);   /* the 200A's REG (settings) */
-    else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_BARS ? bar_active_bits : rh_active_bits));
-    else if (!strcmp(key, "held")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_BARS ? bar_held_bits : rh_held_bits));
+    else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_REED ? re_active_bits : rh_active_bits));
+    else if (!strcmp(key, "held")) {
+        uint32_t hb = rh_held_bits;
+        if (eng_cur == ENG_REED) for (i = hb = 0; i < RE_NV; i++) hb |= (uint32_t)(re_v[i].alive && re_v[i].held) << i;
+        snprintf(v, n, "%u", host_bits(hb));
+    }
     else if (key[0] == 'v' && key[1] == 'n' && key[2] >= '0' && key[2] <= '9') {   /* vnN: voices sounding note N
                                                            * (alive, not fading out for a steal; BUGHUNT #21) */
         uint32_t nn = (uint32_t)atoi(key + 2) & 127u;
-        for (i = c = 0; i < (eng_cur == ENG_BARS ? BAR_NV : RH_NV); i++)
-            c += eng_cur == ENG_BARS ? bv[i].alive && bv[i].note == nn && bv[i].fade == 32768
+        for (i = c = 0; i < (eng_cur == ENG_REED ? RE_NV : RH_NV); i++)
+            c += eng_cur == ENG_REED ? re_v[i].alive && re_v[i].note == nn && re_v[i].fade == 32768
                                      : rv[i].alive && rv[i].note == nn && rv[i].fade == 32768;
         snprintf(v, n, "%u", c);
     }
@@ -832,7 +820,7 @@ static int host_state(const char *key, char *v, unsigned n)
 static void host_dump(void)
 {
     static const char *const K[] = {"header", "preset", "page", "vpage", "hint", "msg", "oct", "bpm", "sus", "byp", "arp", "hold",
-                                    "arpn", "arpv", "arpends", "chord", "play", "rec", "notes", "savemode", "undo", "dirty", "ledduty", "bars", "reg", "voices", "held", "pitches",
+                                    "arpn", "arpv", "arpends", "chord", "play", "rec", "notes", "savemode", "undo", "dirty", "ledduty", "reed", "reg", "voices", "held", "pitches",
                                     "srcs", "refs", "quiet", "drops", "fxdrv", "label0", "card0", "label1", "card1", "label2", "card2",
                                     "label3", "card3", "bpm10", "setbpm", "pubs", "bpmmarks", "sqtick", "sqreads", "twinc", "lfoinc", "clklock", "beatsmp", "dlysync", "twph", "cpph", "phph", "lfoph", "motph", "wavn"};
     char key[24], v[64];

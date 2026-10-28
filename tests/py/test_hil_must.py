@@ -68,7 +68,7 @@ def test_stim_switch_and_sweep():
     ev, sw, rel = m.stim_switch()
     pcs = [a for t, k, a, b in ev if k == "pc"]
     assert pcs[:16] == list(range(16)) and pcs[-1] == 0
-    types = {(a, b) for t, k, a, b in ev if k == "cc" and a in (79, 80)}
+    types = {(a, b) for t, k, a, b in ev if k == "cc" and a in (80, 115)}
     assert types == set(m.TYPE_SEQ)
     assert len(sw) == 16 + 2 * len(m.TYPE_SEQ) + 1 and max(sw) < rel
     assert not notes_held(ev)[0]
@@ -179,26 +179,6 @@ def test_repeats_detector():
     assert usb_count(z)[1] == 0
 
 
-def test_s4_vibes_restrike_is_no_repeat():
-    """the device's S4 VIBES 'exact repeated frames on a slope' (1-2 on the FM-1, every counter clean): the host
-    render of the same panel and sweep has 2 too (2026-10-24), both in the chord's re-strikes: 2.048 s (48 ms into
-    the strike at 2.0: -5848, -5843, -5843, -5795 on both channels, steps +5 / +48) and 23.997 s (its first frames:
-    795, 802, 802, 864, steps +7 / +62), the attack's own turn. The old check (2 equal frames, > 40 LSB across them)
-    counted them; hil_crackle's repeat does not (steps that unlike are no copy's slope)"""
-    import hil_crackle as hc
-    params = [p for p in hs.param_defaults() if p[0] not in m.SWEEP_SKIP][:5]     # the sweep's first 2.65 s
-    ev, _ = m.stim_sweep(params)
-    ccs = [(c, v) for c, v in m.panel_msgs("vibes") if c != 120]
-    u, _ = hc.host_take("s4-vibes-restrike", ccs, ev, m.dur_of(ev, 0.5), tag="must")
-    q = np.round(u).astype(np.int64)
-    i = np.arange(2, len(q) - 1)                                 # the old criterion, here only as the witness
-    same = np.all(q[i] == q[i - 1], axis=1) & (np.abs(q[i]).max(axis=1) > 300)
-    b, a = q[i - 1] - q[i - 2], q[i + 1] - q[i]
-    old = i[same & np.any((np.abs(q[i + 1] - q[i - 1]) > 40) & ((np.sign(b) == np.sign(a)) | (b == 0)), axis=1)]
-    assert len(old) >= 1 and any(abs(k / hc.FS_HOST - 2.0) < 0.1 for k in old), old / hc.FS_HOST
-    assert usb_count(q, hc.FS_HOST, ev)[1:] == (0, "0", "ok")
-
-
 def test_0_9_4_repeats_still_fail():
     """the 0.9.4 FM-1 snippets hil_crackle saved (build/crkfm1/rel48/*-repeat.wav, 48 kHz, USB left; local files, not
     in git: skipped where missing) fail through T1's USB rows too"""
@@ -261,12 +241,12 @@ def test_cli_dry_run():
 
 
 def test_panel_msgs():
-    msgs = m.panel_msgs("vibes", m.HEAVY, m.HEAVY_CC)
+    msgs = m.panel_msgs("reed", m.HEAVY, m.HEAVY_CC)
     ccs = [c for c, _ in msgs]
     last = {c: i for i, c in enumerate(ccs)}
     assert ccs[0] == 120 and last[85] < last[12]                     # CC 85 before the phaser's switch
-    assert msgs[-1] == (47, 127) and (79, hs.type_cc(4)) in msgs
-    assert m.panel_msgs("marimba")[-1] == (79, 127)
+    assert msgs[-1] == (47, 127) and (115, hs.type_cc(4)) in msgs
+    assert m.panel_msgs("reed")[-1] == (47, 0)                       # (the vibrato off without the effects)
     assert m.panel_msgs("rhodes")[-1] == (80, hs.type_cc(0))
 
 
@@ -578,7 +558,7 @@ def test_s5_old_firmware_44k_only(monkeypatch, tmp_path):
 def test_s5_expects_a_stored_preset(monkeypatch, tmp_path):
     """0.9.5 design: after the update the FM-1 plays a stored preset, not the edited panel. S5: on --prev, F03 by
     Program Change, then the edits; after the install the take with nothing sent, then every factory preset by
-    Program Change (F01..F16 = PC 0..15, F17..F19 = 32..34), no edits; a match passes (the fake's takes are all the
+    Program Change (F01..F16 = PC 0..15, F17 = 32), no edits; a match passes (the fake's takes are all the
     same tone: every preset matches)"""
     w = World()
     done = []
@@ -605,10 +585,10 @@ def test_s5_expects_a_stored_preset(monkeypatch, tmp_path):
     i = next(k for k, e in enumerate(new) if e[0] == "pc")
     assert all(e[0] in ("on", "off") or e[:2] == ("cc", 116) for e in new[:i])     # the take after: nothing set
     j = next(k for k, e in enumerate(new) if k > i and e[0] == "cc" and e[1] == 120)  # (the defaults' panel)
-    assert [e[1] for e in new[i:j] if e[0] == "pc"] == list(range(16)) + [32, 33, 34]
+    assert [e[1] for e in new[i:j] if e[0] == "pc"] == list(range(16)) + [32]
     assert not [e for e in new[i:j] if e[0] == "cc" and e[1] in (81, 70, 74)]       # the references: no edits
     up = {r["check"]: r for r in rows_of(mu, "update")}
-    row = up["after the update vs the factory presets loaded on it (F01..F19, Program Change)"]
+    row = up["after the update vs the factory presets loaded on it (F01..F17, Program Change)"]
     assert row["status"] == "ok" and row["value"].startswith("matches F01, F02"), row
     assert not [r for r in mu.rep.rows if r["status"] == "FAIL"], mu.rep.rows
 
@@ -632,7 +612,7 @@ def test_s5_fails_when_no_preset_matches(monkeypatch, tmp_path):
               installer=inst)
     mu.run()
     up = {r["check"]: r for r in rows_of(mu, "update")}
-    row = up["after the update vs the factory presets loaded on it (F01..F19, Program Change)"]
+    row = up["after the update vs the factory presets loaded on it (F01..F17, Program Change)"]
     assert row["status"] == "FAIL" and row["value"].startswith("matches none"), row
 
 
@@ -676,7 +656,7 @@ def test_s4_keeps_the_take_with_an_event(monkeypatch, tmp_path):
     w = World()
     w.signal = with_repeat
     monkeypatch.setattr(m, "POLL_S", 0.05)
-    mu = must(monkeypatch, tmp_path, w, "--engines", "vibes", "--scenarios", "S4")
+    mu = must(monkeypatch, tmp_path, w, "--engines", "reed", "--scenarios", "S4")
     mu.s4()
     rows = {r["check"]: r for r in mu.rep.rows}
     assert rows[f"USB: {m.USB_ROW}"]["status"] == "FAIL" and rows[f"USB: {m.USB_ROW}"]["value"] == "1"
@@ -689,7 +669,7 @@ def test_s4_keeps_the_take_with_an_event(monkeypatch, tmp_path):
     assert m.tier_main(["--tier", "must", "--rejudge", p]) == 1
     # a clean take keeps nothing
     w.signal = lambda sr: music(4 * sr).astype(float) / 32768
-    mu = must(monkeypatch, tmp_path / "clean", w, "--engines", "vibes", "--scenarios", "S4")
+    mu = must(monkeypatch, tmp_path / "clean", w, "--engines", "reed", "--scenarios", "S4")
     mu.s4()
     rows = {r["check"]: r for r in mu.rep.rows}                  # (the fake answers no counters: those FAIL)
     assert rows[f"USB: {m.USB_ROW}"]["status"] == "ok"

@@ -4,23 +4,19 @@
 firmware for the longest audio block since the last query (frodhes.c midi_cc; replies on CC 116/117 = us / 4).
 The block is 256 frames at 44.1 kHz = 5805 us of real time; the voice shedder starts at 5000 us.
 
-    python3 tools/hil_cpu.py [--engine vibes|marimba] [--voices N] [--worst] [--fx-each] [--calib] [--stages] [--tail]
+    python3 tools/hil_cpu.py [--engine reed] [--voices N] [--worst] [--fx-each] [--stages] [--tail]
                              [--bend-sweep] [--cc-sweep CC[:LO:HI:STEP_MS]]
 
---voices N (default: the engine's own count, rhodes.c RH_VOICES 10 / BAR_VOICES 10) plays N-note chords and N bass
-notes (for a build with -DRH_VOICES=N, -DBAR_VOICES=N or -DFR_VOICES=N; more notes than the firmware's voices steal). The lists: bass 28 31 33 35 36 38 40 41 43 45 47 48,
+--voices N (default: the engine's own count, rhodes.c RH_VOICES 10 / reed.c RE_VOICES 10) plays N-note chords and N bass
+notes (for a build with -DRH_VOICES=N, -DRE_VOICES=N or -DFR_VOICES=N; more notes than the firmware's voices steal). The lists: bass 28 31 33 35 36 38 40 41 43 45 47 48,
 chord 48 52 55 59 62 64 67 71 74 76 79 83 (the first N).
 --scenario TEXT[,TEXT] (with --worst) runs only the scenarios whose name contains one of them (the key ADC gate on
-the worst ones: --keyadc gate --worst --scenario pedal; run_final_rev.sh). --worst runs only the worst-case scenarios (N bass v127 + pedal, every effect; VIBES: its edge-strike versions too)
+the worst ones: --keyadc gate --worst --scenario pedal; run_final_rev.sh). --worst runs only the worst-case scenarios (N bass v127 + pedal, every effect)
 and the idle-with-every-effect one (the fixed part), 3 takes each as usual.
 
---engine vibes selects VIBES (CC 79), with the motor on (CC 47; records v3: the engine's own) wherever the effects
-are on (the tremolo too: it can run on top of the motor), off elsewhere, and adds the bar engine's worst voicings (edge strike, RUBBER, tube and weight at 127). It also prints the
-bar engine's lowest mode cap and most live upper modes per scenario (CC 112 / 113 replies).
+--engine reed selects the 200A (CC 115 0: WURLI 200A), with its vibrato on (CC 47, P_MOT_ON: the engine's own)
+wherever the effects are on (the tremolo too: it can run on top of the vibrato), off elsewhere.
 --fx-each: idle, then each effect alone (minus idle without effects) = the per-effect cost table of fx.c (FX_US_*).
---calib (VIBES): 8 RUBBER edge strikes at v127 with the mode cap forced (developer CC 9) to 0, 8, 16, 24, 32, 40, 48
-upper modes, no effects, then 4 and 1 voices: fits the cost per upper mode-block and the fixed part per voice, for
-bars.c BAR_NS_UNIT / BAR_NS_VOICE + BAR_NS_FORCE + BAR_NS_STRIKE.
 --stages: a developer build (APP_DEFS=-DRH_PROF_STAGES ./build.sh) also answers each stage's longest time (frodhes.c
 PROF_STAMP: 1 the engine, 2..14 fx_process's stages when it is stamped, 15 the rest): printed per scenario.
 --tick: a developer build (APP_DEFS=-DFM1_PROF_TICK ./build.sh) also answers the timer tick's time (platform.c
@@ -32,7 +28,7 @@ whole ISR, us / 4: every build since the USB ring fix answers them; before, only
 conversions, only MASTER's and the battery's slots; idle = NORMAL, variant B, nobody at the keys; STRESS = a key
 conversion, its drive and dark LEDs on every free tick, no key landing) sent after every reset; the run then prints
 the firmware's items (CC 42 0) and fails when the mode is not taken or STRESS did not convert.
---keyadc gate [--engines rhodes,vibes,marimba] [--runs 3]: every engine x run x mode (OFF, idle, STRESS, rotated),
+--keyadc gate [--engines rhodes,reed] [--runs 3]: every engine x run x mode (OFF, idle, STRESS, rotated),
 each a whole run with the other options (--worst, --usb RATE / --no-usb-stream, --voices N: by default each engine's
 own count); the MIDI ports and the USB stream are opened once for all of them. The gates: idle <= OFF + 10 us and
 STRESS <= OFF + 60 us on each engine's worst block over its runs (each scenario's difference printed too); every run
@@ -47,12 +43,12 @@ app_audio and uac_service in the render, was never in the numbers before); --no-
 (the counters then stay 0 and say only that).
 --bend-sweep: while every scenario plays (and idles), a MIDI pitch bend (0xE0) every 5 ms sweeps -2 .. +2 semitones
 and back (a triangle, 0.5 s each way): each block where the bend changed retunes every sounding Rhodes tine (rhodes.c
-rh_retune), so with --worst this is the bend's CPU gate (VIBES / MARIMBA ignore the bend: their numbers must not move).
+rh_retune), so with --worst this is the bend's CPU gate.
 The bend goes back to 0 after each scenario.
 --cc-sweep CC[:LO:HI:STEP_MS] (default LO 0, HI 127, STEP_MS 5): the same for a control change: while every scenario
 plays (and idles), CC moves LO .. HI and back (a triangle, 0.5 s each way), one message every STEP_MS ms (only when its
 value changed). E.g. 73:1:127:200 turns the reverb SIZE every 200 ms, so its fades (0.9.6: 186 ms on PLATE and
-INFINITE) run back to back: tools/cpu_check.sh's vibes_size cases. The CC is not put back after a scenario (the next
+INFINITE) run back to back: tools/cpu_check.sh's size cases. The CC is not put back after a scenario (the next
 one's reset sets it). Works with --bend-sweep (both every pass of the wait).
 Every scenario also asks 0.4 s after its note-offs and 0.4 s after the pedal is let go, before anything resets (the
 release blocks: a damper on every voice). --worst adds 'slow paths': every effect plus the drive's TONE and MIX off
@@ -102,7 +98,7 @@ def usb_line(acc):
             "per_max")
     return "USB " + s + ": " + ", ".join(f"{k} {acc[k]}" for k in keys if k in acc)
 
-CC = dict(CC, TONE=28, BARK=29, BELL=30, HAMMER=31, DRV_TONE=82, DRV_MIX=83, RV_PREDLY=94)
+CC = dict(CC, DRV_TONE=82, DRV_MIX=83, RV_PREDLY=94)
 TARGET_US = 4500
 
 BLOCK_US = 5805
@@ -112,10 +108,10 @@ STAGES = {1: "engine (eng_render)", 2: "fx copy", 3: "compressor", 4: "filter + 
 
 
 def default_voices(eng):
-    """the firmware's voice count for an engine: rhodes.c RH_VOICES (the Rhodes) or BAR_VOICES (VIBES, MARIMBA)"""
+    """the firmware's voice count for an engine: rhodes.c RH_VOICES (the Rhodes) or reed.c RE_VOICES (the 200A)"""
     import re
-    src = open(os.path.join(os.path.dirname(__file__), "..", "firmware", "src", "rhodes.c")).read()
-    key = "RH_VOICES" if eng == "rhodes" else "BAR_VOICES"
+    key, f = ("RH_VOICES", "rhodes.c") if eng == "rhodes" else ("RE_VOICES", "reed.c")
+    src = open(os.path.join(os.path.dirname(__file__), "..", "firmware", "src", f)).read()
     return int(re.search(r"#define " + key + r" (\d+)u", src).group(1))
 
 
@@ -159,7 +155,7 @@ def keyadc_check(mido, out, inp, kmode):
 
 
 def keyadc_gate(argv):
-    """--keyadc gate: each engine (--engines, default rhodes,vibes,marimba) x --runs (default 3) x OFF / idle / STRESS
+    """--keyadc gate: each engine (--engines, default rhodes,reed) x --runs (default 3) x OFF / idle / STRESS
     (the order rotated per run, so a drift spreads over the modes), every measurement a whole hil_cpu run with the
     other options as given (--worst: its scenarios only; the USB stream, open by default, stays open for all of them;
     --voices: by default each engine's own count). Per engine and mode the worst block over the runs; the gates:
@@ -167,7 +163,7 @@ def keyadc_gate(argv):
     too. Returns (True when every engine passes, the worst exit code of the runs' own verdicts)"""
     i = argv.index("--keyadc")
     base = argv[:i] + argv[i + 2:]
-    engines = ["rhodes", "vibes", "marimba"]
+    engines = ["rhodes", "reed"]
     runs = 3
     for flag in ("--engines", "--runs", "--engine"):
         if flag in base:
@@ -279,8 +275,7 @@ def run_cpu(argv):  # noqa: C901
     key converter's items or None), code (the verdict: 0, or 1 over 4500 us / a shed voice / a USB fault))"""
     sys.argv = list(argv)                             # (the options as the command line's: main() restores it)
     eng = sys.argv[sys.argv.index("--engine") + 1] if "--engine" in sys.argv else "rhodes"
-    marimba = eng == "marimba"                        # the second bar TYPE (CC 79 96..127): no motor
-    vibes = eng in ("vibes", "marimba") or "--calib" in sys.argv
+    reed = eng == "reed"                              # the 200A (CC 115 0..63)
     kmode = sys.argv[sys.argv.index("--keyadc") + 1] if "--keyadc" in sys.argv else None
     if kmode is not None and kmode not in KEYADC:
         sys.exit("--keyadc: off, idle, stress or gate")
@@ -299,11 +294,9 @@ def run_cpu(argv):  # noqa: C901
             cc(CC["CP_SW"], d.pop("CP_SW"))
         for k, v in d.items():
             cc(CC[k], v)
-        if marimba:
-            cc(79, 127)                              # MARIMBA (no motor; CC 47 is inert)
-        elif vibes:
-            cc(79, 0)                                # VIBES (the motor starts with the TYPE change)
-            cc(47, 127 if d.get("TW_SW") else 0)      # the motor with the effects (records v3: its own CC), else off
+        if reed:
+            cc(115, 0)                               # WURLI 200A
+            cc(47, 127 if d.get("TW_SW") else 0)      # the vibrato with the effects (P_MOT_ON: its own CC), else off
             if d.get("TW_SW"):
                 cc(17, 64)
         if kmode is not None:                         # the key converter's developer mode (keyvel.h CC 41), again
@@ -317,11 +310,11 @@ def run_cpu(argv):  # noqa: C901
         got, st = {}, dict(cur=None, msb=0)
         usb, uid = {}, dict(id=None, msb=0)
 
-        def take():                                        # every reply: the profiler (115-118), the bar engine's
-            for m in inp.iter_pending():                   # cap / live modes (112 / 113), the ISR tail (107-110),
-                if m.type != "control_change":             # the stage profiler (97 stage, 98 / 99 us)
+        def take():                                        # every reply: the profiler (115-118), the ISR tail
+            for m in inp.iter_pending():                   # (107-110), the stage profiler (97 stage, 98 / 99 us)
+                if m.type != "control_change":
                     continue
-                if m.control in (115, 116, 117, 118, 112, 113, 107, 108, 109, 110):
+                if m.control in (115, 116, 117, 118, 107, 108, 109, 110):
                     got[m.control] = m.value
                 elif m.control == 100:
                     uid["id"] = m.value
@@ -348,7 +341,6 @@ def run_cpu(argv):  # noqa: C901
         while time.monotonic() - t0 < (0.15 if "--stages" in sys.argv or "--tick" in sys.argv else 0.08):   # the replies after 115-118
             take()
             time.sleep(0.005)
-        query.bars = (got.get(112), got.get(113))
         usb_merge(query.usb, usb)
         if {107, 108, 109, 110} <= got.keys():
             query.tail = (max(query.tail[0], (got[110] << 7 | got[109]) * 4),
@@ -391,7 +383,7 @@ def run_cpu(argv):  # noqa: C901
         """returns the longest block of the attack (first 0.3 s) and of the rest: the held part, the release (0.4 s
         after the note-offs) and, with the pedal, the pedal's release (0.4 s after letting it go). bypass: the FX
         bypass switched on and off during the chord (the crossfade's blocks); release=False: no release queries (the
-        repeated chords, the calibration: their timing as before)"""
+        repeated chords: their timing as before)"""
         if pedal:
             cc(64, 127)
         for n in notes:
@@ -418,7 +410,6 @@ def run_cpu(argv):  # noqa: C901
             held = max(held, query()[0])                   # the pedal's release: a damper on every voice at once
         return attack, held
 
-    query.bars = (None, None)
     query.st, query.tail, query.usb, query.whole, query.tick = {}, (0, 0), {}, 0, {}
     usb_bad = []                                      # this run's scenarios with a USB fault (also USB_BAD_RUNS)
     if "--no-usb-stream" not in sys.argv:             # a DAW-like USB audio stream for the whole run (the default)
@@ -491,9 +482,8 @@ def run_cpu(argv):  # noqa: C901
         shed = (query()[2] - shed0) % 128
         sheds.append(shed)
         rows.append((name, max(att, held)))
-        extra = f"   modes cap/live {query.bars[0]}/{query.bars[1]}" if vibes and query.bars[0] is not None else ""
         print(f"{name:44s} attack {att:5d} us ({100 * att / BLOCK_US:4.1f} %)   held {held:5d} us "
-              f"({100 * held / BLOCK_US:4.1f} %)   voices shed {shed}{extra}")
+              f"({100 * held / BLOCK_US:4.1f} %)   voices shed {shed}")
         if "--tail" in sys.argv or query.tail[1]:
             print(f"{'':44s} ISR tail after app_audio {query.tail[0]:4d} us, whole ISR {query.tail[1]:5d} us")
         print(f"{'':44s} {usb_line(query.usb)}")
@@ -524,45 +514,10 @@ def run_cpu(argv):  # noqa: C901
             print(f"{name:24s} {max(v):5d} us   cost {max(v) - b:5d} us   (fx.c FX_US_*)")
         reset()
         return dict(rows=[], worst=None, keyadc=keyadc_check(mido, out, inp, kmode), code=0)
-    if "--calib" in sys.argv:
-        edge = dict(TONE=127, BARK=127, BELL=127, HAMMER=127)
-        bass8 = [28, 31, 33, 35, 36, 38, 40, 41]                         # the fit is for 8 voices
-        pts = []
-        for nv, notes in ((8, bass8), (4, bass8[:4]), (1, bass8[:1])):
-            for cap in ((0, 8, 16, 24, 32, 40, 48) if nv == 8 else (0, 24)):
-                worst = 0
-                for _ in range(3):
-                    reset(**edge)
-                    cc(9, cap + 1)
-                    query()
-                    a, h = play(notes, 127, 1.0, release=False)
-                    worst = max(worst, a)
-                    cc(64, 0)
-                cc(9, 0)
-                pts.append((nv, cap, worst, query.bars))
-                print(f"{nv} voices, cap {cap:2d} upper modes: attack {worst:5d} us   (bars cap / live: {query.bars})")
-        import numpy as np
-        p8 = [(c, w) for nv, c, w, _ in pts if nv == 8]
-        k, c0 = np.polyfit([c for c, _ in p8], [w for _, w in p8], 1)
-        print(f"\nper upper mode-block (attack, the force on): {k:.1f} us -> BAR_NS_UNIT + BAR_NS_UNITF = {k / 8 * 1000:.0f} ns")
-        v = {nv: w for nv, c, w, _ in pts if c == 0}
-        per = (v[8] - v[1]) / 7
-        print(f"per voice at the strike (pair, pulse, note-on, gain): {per:.0f} us -> BAR_NS_VOICE + FORCE + STRIKE")
-        print(f"fixed (idle + noise + 1 voice): {v[1]:.0f} us; the model's base is BAR_NS_BASE + BAR_NS_NOISE")
-        reset()
-        return dict(rows=[], worst=None, keyadc=keyadc_check(mido, out, inp, kmode), code=0)
     N = str(nv)
     print(f"{nv} voices (--voices {nv}): bass {bass8}, chord {chord8}" +
           (", a pitch bend sweep every 5 ms (--bend-sweep)" if bend_on else "") +
           (f", CC {ccs[0]} swept {ccs[1]}..{ccs[2]} every {round(ccs[3] * 1000)} ms (--cc-sweep)" if ccs else ""))
-    if vibes:
-        edge = dict(TONE=127, BARK=127, BELL=127, HAMMER=127)
-        if not worst_only:
-            run(N + " bass v127, edge strike, rubber, no effects", edge, bass8, 127)
-        run(N + "-note chord v127, edge, every effect + motor", dict(heavy, **edge), chord8, 127)
-        run(N + " bass v127, edge + pedal, every effect + motor", dict(heavy, **edge), bass8, 127, pedal=True, hold=3.0)
-        query.bars = (None, None)
-        heavy = dict(heavy, **edge)               # the repeated-chord test at the worst voicing too
     if not worst_only:
         run("idle, no effects", {})
     run("idle, every effect on (heaviest)", heavy)

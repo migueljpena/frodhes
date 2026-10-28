@@ -10,7 +10,7 @@ A MIDI note-off's velocity reaches the Rhodes (notes.c src_off_v -> engine.c eng
 - the knock (NOISE's thump) is louder on a quick lift, softer on a slow one;
 - no click: hil_scan's detector finds none, and what the release adds above 8 kHz (the release render minus the same
   note held, high-passed) stays under -50 dBFS on every key and release speed (NOISE 0: the damper alone);
-- VIBES and MARIMBA ignore it (byte-identical at 1 and 127).
+- the 200A's (reed.c re_note_off: the same rh_rel_gain): tests/py/test_reed_engine.py.
 The engine alone (CC 119 RAW)."""
 import os
 import sys
@@ -26,10 +26,8 @@ NOTES = {"C3": 48, "C4": 60, "C5": 72}
 RAW = "40 midi 0xB0 119 127"
 
 
-def take(tag, n, rv, noise=None, engine=None, off=True, vel=100):
+def take(tag, n, rv, noise=None, off=True, vel=100):
     ev = [RAW, f"{T_ON} midi 0x90 {n} {vel}"]
-    if engine is not None:
-        ev.insert(0, f"30 midi 0xB0 79 {engine}")
     if noise is not None:
         ev.insert(0, f"35 midi 0xB0 104 {noise}")
     if off:
@@ -120,9 +118,3 @@ def test_no_click(name, rv):
     c = clicks(t.L) + clicks(full.L)
     print(f"{name} rv {rv}: the release's content above 8 kHz peaks at {peak:.1f} dBFS; clicks {c}")
     assert peak < -50.0 and c == 0
-
-
-@pytest.mark.parametrize("engine", [0, 127])
-def test_bars_ignore_it(engine):
-    a, b = take(f"bar{engine}-1", 60, 1, engine=engine), take(f"bar{engine}-127", 60, 127, engine=engine)
-    assert np.array_equal(a.L, b.L) and np.array_equal(a.R, b.R)

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""rhodes.c rh_coef (the resonator coefficients at note-on and on a bend; VIBES / MARIMBA call it too) against a
-double-precision reference of its own formula: every mode of every key (RH_KEYS, BAR_KEYS) x TUNE -200..+200 cents
+"""rhodes.c rh_coef (the resonator coefficients at note-on and on a bend) against a
+double-precision reference of its own formula: every mode of every key (RH_KEYS) x TUNE -200..+200 cents
 (1-cent steps) and the pitch bend's +-2 semitones on top of TUNE -50 / 0 / +50 (rh_tune_now, engine.c ENG_BEND_T) x
-five DECAY / RELEASE k (DECAY_K), both decays (d, drel); VIBES / MARIMBA only where bars.c can go (reach). The C
+five DECAY / RELEASE k (DECAY_K), both decays (d, drel). (Frodhes' VIBES / MARIMBA called it too; not here.) The C
 function itself runs (copied out of rhodes.c into tests/c/rh_coef.c), so the test sees the firmware's integers.
 
 The cr term (cr (1 - 2t + 3t^2), cr = 1 / (8 sin^2(theta / 2)) in Q16) exceeds int32 for the lowest modes tuned
@@ -50,9 +50,8 @@ def build(src_text, tag, extra=()):
 
 
 def modes():
-    """every live mode word set (th != 0): RH_KEYS (5 per key) and BAR_KEYS (8 slots per key per type)"""
+    """every live mode word set (th != 0): RH_KEYS (5 per key)"""
     rt, _ = table_ab.parse(os.path.join(ROOT, "firmware", "gen", "rhodes_tables.h"))
-    bt, _ = table_ab.parse(os.path.join(ROOT, "firmware", "gen", "bars_tables.h"))
     out, names = [], []
     rk = rt["RH_KEYS"]["vals"]
     per = len(rk) // 88
@@ -61,13 +60,6 @@ def modes():
             w = rk[k * per + 7 * m: k * per + 7 * m + 7]
             if w[2]:
                 out.append(w); names.append(f"{table_ab.note_name(21 + k)} {['V1', 'V2', 'O1', 'O2', 'X'][m]}")
-    bk = bt["BAR_KEYS"]["vals"]
-    per = len(table_ab.KEY_F)
-    for i in range(len(bk) // per):
-        for s in range(8):
-            w = bk[i * per + 7 * s: i * per + 7 * s + 7]
-            if w[2]:
-                out.append(w); names.append(f"bar{i // 88} {table_ab.note_name(21 + i % 88)} {table_ab.SLOTS[s]}")
     return np.array(out, dtype=np.int64), names
 
 
@@ -129,20 +121,9 @@ def theta(E, eps):
 
 
 def reach(names, T, K, tune_t):
-    """the cases the firmware can form: the Rhodes every t and k; VIBES / MARIMBA (bars.c) only TUNE (no bend: the
-    TUNE_T values), the decay scaled except in the TUBE slot, the mute (drel) scaled only on VIBES (the damper) and
-    never in the TUBE slot (the TUBE's decay: scaled on MARIMBA, key flag bit3, here every MARIMBA key). Shaped as run_c's output (mode, t, k, decay)."""
-    r = np.ones((len(names), len(T), len(K), 2), bool)
-    tune = np.isin(T, tune_t)
-    for i, nm in enumerate(names):
-        if not nm.startswith("bar"):
-            continue
-        r[i, ~tune] = False
-        if nm.endswith(" TUBE") or nm.startswith("bar1"):
-            r[i][:, K != 65536, 1] = False
-        if nm.endswith(" TUBE") and nm.startswith("bar0"):
-            r[i][:, K != 65536, 0] = False
-    return r
+    """the cases the firmware can form: the Rhodes every t and k (Frodhes' bar engine formed fewer: only TUNE).
+    Shaped as run_c's output (mode, t, k, decay)."""
+    return np.ones((len(names), len(T), len(K), 2), bool)
 
 
 @pytest.fixture(scope="module")
@@ -164,7 +145,7 @@ def test_grid_covers_the_overflow(grid):
     t = T / Q30
     crt = W[:, 5][:, None] * (1 - 2 * t + 3 * t * t)[None, :]
     assert (crt[grid["ok"][:, :, 0, 0]] > 2 ** 31 - 1).sum() > 100
-    assert len(W) > 1000 and len(T) > 500 and grid["ok"].sum() > 2_000_000
+    assert len(W) > 250 and len(T) > 500 and grid["ok"].sum() > 1_000_000   # (286 Rhodes modes)
 
 
 def test_corr_fits(grid):

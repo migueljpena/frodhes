@@ -31,7 +31,7 @@ P = dict(TYPE=0, DRIVE=1, TW_SW=2, TW_DEPTH=3, TW_RATE=4, TW_MODE=6, CP_SW=8, CP
 
 # a record that names an empty user slot (U16, never a starter): the boot plays the record's own sound (snd_base:
 # the last preset loaded or saved), so the record's panel and its conversions are what the tests see
-NO_PRESET = 36
+NO_PRESET = 32
 
 
 def flash_file(tag):
@@ -115,17 +115,15 @@ def boot(tag, flash, lines=(), end=400, check_preset=True):
     return run(tag, first + list(lines), end, flash=flash, check=False)
 
 
-# VIBES with NOISE 0: a short VIBES note with the damper noise on can leave a voice alive in exact silence, and then
-# nothing saves (test_vibes_notes_let_go_so_it_saves, reported)
-ENGINES = {"rhodes": [], "vibes": [cc(10, 79, 0), cc(11, 104, 0)]}
+# the 200A with NOISE 0 (as the Rhodes' runs: nothing but the notes)
+ENGINES = {"rhodes": [], "reed": [cc(10, 115, 0), cc(11, 104, 0)]}
 
 
-def test_vibes_notes_let_go_so_it_saves():
-    """VIBES: a C4 held 200 ms, let go: the engine goes quiet (no voice left) and a change made then is saved 2 s
-    later, as on the Rhodes. (A released note used to keep a silent voice alive forever, so nothing ever saved; fixed
-    by the bar engine's kill under 1 LSB and the noise envelope reaching zero, 5bce504.)"""
-    r = run("vibes-quiet", [cc(10, 79, 0), "300 midi 0x90 60 100", "500 midi 0x80 60 0", "3000 dump", cc(3000, 114, 127)],
-            6000, flash=flash_file("vibes-quiet"))
+def test_reed_notes_let_go_so_it_saves():
+    """the 200A: a C4 held 200 ms, let go: the engine goes quiet (no voice left) and a change made then is saved 2 s
+    later, as on the Rhodes (Frodhes' VIBES once kept a silent voice alive forever, so nothing ever saved)"""
+    r = run("reed-quiet", [cc(10, 115, 0), "300 midi 0x90 60 100", "500 midi 0x80 60 0", "3000 dump", cc(3000, 114, 127)],
+            6000, flash=flash_file("reed-quiet"))
     assert r.state(3000)["voices"] == "0" and r.state(3000)["quiet"] == "1", (r.state(3000)["voices"], r.state(3000)["quiet"])
     assert any(5000 <= t <= 5300 for t in r.saves), r.saves
 
@@ -147,12 +145,12 @@ def test_power_cycle_keeps_everything(eng):
     lines += [cc(700, 63, 0), "6000 dump"]
     r1 = run(f"pc1-{eng}", lines, 6500, flash=fl)
     s1 = r1.state(6000)
-    assert s1["header"] == "U03 " + ("VIBE MOT" if eng == "vibes" else "ST77") and s1["notes"] == "9"   # (VIBES: the motor on)
+    assert s1["header"] == "U03 " + ("200A" if eng == "reed" else "ST77") and s1["notes"] == "9"
     assert r1.saves and r1.bank_saves and r1.seq_saves, (r1.saves, r1.bank_saves, r1.seq_saves)
     r2 = boot(f"pc2-{eng}", fl, ["150 keys 0x80", "600 keys 0", "700 expect rms > -45"], 900)
     assert not r2.fails, r2.fails
     s2 = r2.state(100)
-    for k in ("header", "oct", "bpm", "notes", "bars", "u.3", "vcard.1.3", "card.15.1", "card.13.0", "card.14.0",
+    for k in ("header", "oct", "bpm", "notes", "reed", "u.3", "vcard.1.3", "card.15.1", "card.13.0", "card.14.0",
               "card.14.2"):
         assert s2[k] == s1[k], (k, s1[k], s2[k])
     assert all(s2[k] == s1[k] for k in s1 if k.startswith("p."))
@@ -283,7 +281,7 @@ def defaults():
 
 def test_old_settings_records_convert():
     """version 1 (0.1-0.3: 32 parameters, the phaser as CHO/PHA = 2 sharing the chorus' knobs, 12 factory presets):
-    the phaser is split out, the new parameters get their defaults, the preset index moves past F13..F19 (U01 19), the
+    the phaser is split out, the new parameters get their defaults, the preset index moves past F13..F17 (U01 17), the
     undo copy is dropped. Version 2 records from before 0.8 / 0.9.3 / VIBES (flags bits 1, 2, 8, 4 clear): LEVEL, the
     compressor's ratio and makeup and the filter get their defaults, the index is moved once."""
     dflt = defaults()
@@ -319,10 +317,11 @@ def test_old_settings_records_convert():
 
 def test_094_settings_record_preset_index():
     """a 0.9.4 / 0.9.5-RC settings record (16 factory presets: U01 = 16; flags2 0) on 0.9.5 (19: F17..F19 before the
-    user bank; 21 since the 200A's F20, F21): F01..F16 stay, U01..U16 move by 5, once; the preset it names then plays as stored (an empty one: the
-    record's panel)"""
+    user bank), then 21 (the 200A's F20, F21), then 17 (without VIBES and MARIMBA): F01..F12 stay, F13..F16 (VIBES,
+    MARIMBA) load F01, U01..U16 move by 1, once; the preset it names then plays as stored (an empty one: the record's
+    panel)"""
     fl = flash_file("v094")
-    for pre, want in ((0, 0), (15, 15), (16, 21), (31, 36)):   # (and REG, new since: as measured, 127)
+    for pre, want in ((0, 0), (11, 11), (12, 0), (15, 0), (16, 17), (31, 32)):   # (and REG, new since: 127)
         img = bytearray(b"\xff" * 5 * SECTOR)
         r = v1_record({P["TYPE"]: 1, P["DRIVE"]: 20}, preset=pre)
         r[O_VER], r[O_FLAGS] = 2, 255                       # every flag up to 0.9.5's RC, flags2 (0.9.5) clear
@@ -415,9 +414,9 @@ def motor_v2(p, type_):
     p[P["TYPE"]], p[P["TW_SW"]], p[P["TW_MODE"]], p[P["TW_DEPTH"]], p[P["TW_RATE"]], p[7] = type_, 1, 2, 90, 70, 30
 
 
-def test_v2_motor_becomes_the_motor_page():
-    """records v3: a v2 settings record or user preset whose TREM/WAH was MOTOR on VIBES gets MOT_ON with that depth
-    / rate / shape, and TREM/WAH off; on a Rhodes TYPE (where MOTOR played the AM tremolo) it stays the AM tremolo"""
+def test_v2_motor_becomes_the_am_tremolo():
+    """records v3: a v2 settings record or user preset whose TREM/WAH was MOTOR plays it as the AM tremolo, on a
+    Rhodes TYPE as before and on VIBES too (VIBES itself plays as STAGE 77 here: params_retype)"""
     dflt = defaults()
     fl = flash_file("motv2")
     img = bytearray(b"\xff" * 5 * SECTOR)
@@ -438,24 +437,38 @@ def test_v2_motor_becomes_the_motor_page():
     open(fl, "wb").write(img)
     b = boot("motv2", fl, ["150 dump", "200 midi 0xC0 16 0", "300 dump", "400 midi 0xC0 17 0", "500 dump"], 600,
              check_preset=False)
-    want = {MOT_ON: 1, MOT_DEPTH: 90, MOT_RATE: 70, MOT_SHAPE: 30, MOT_SYNC: 0, P["TW_SW"]: 0}
-    for t in (150, 300):                                       # the panel, then U01 (VIBES)
+    for t, ty in ((150, "0"), (300, "0"), (500, "2")):         # the panel and U01 (VIBES: STAGE 77), U02 (FELT)
         s = b.state(t)
-        assert {k: int(s[f"p.{k}"]) for k in want} == want, (t, {k: s[f"p.{k}"] for k in want})
-        assert s["vcard.2.0"] == "ON" and s["card.7.0"] == "OFF"
-    s = b.state(500)                                           # U02, FELT with MOTOR: still the AM tremolo
-    assert (s["p.0"], s[f"p.{P['TW_SW']}"], s[f"p.{P['TW_MODE']}"], s["card.7.0"]) == ("2", "1", "1", "TREM")
+        assert (s["p.0"], s[f"p.{P['TW_SW']}"], s[f"p.{P['TW_MODE']}"], s["card.7.0"]) == (ty, "1", "1", "TREM"), t
+        assert s[f"p.{MOT_ON}"] == str(dflt[MOT_ON]), (t, s[f"p.{MOT_ON}"])
 
 
-def test_motor_off_by_hand_survives_a_power_cycle():
-    """the MOTOR page's ON card switched off is kept (a setup choice: no motor when the TYPE turns to VIBES again)"""
-    fl = flash_file("motoff")
-    lines = ["100 turn 1 1", "110 turn 1 1", "120 turn 1 1", "130 turn 1 1", "200 turn 0 1", "250 turn 0 1", "300 turn 0 1",
-             "400 turn 0 1", "500 turn 2 -1", "600 turn 1 -1", "700 dump"]
-    r1 = run("motoff-1", lines, 4000, flash=fl)
-    assert r1.state(700)[f"p.{MOT_ON}"] == "0" and r1.saves             # (a Rhodes TYPE now: no VOICE 3)
-    r2 = boot("motoff-2", fl, [cc(200, 79, 0), "300 dump"], 400)          # (F01 plays: VIBES by CC 79)
-    assert r2.state(300)["bars"] == "1" and r2.state(300)["vcard.2.0"] == "OFF"
+O_FLAGS2 = 234                                              # settings_t flags2 (bit 8: TYPE 4 / 5 the 200A, 17 factory)
+
+
+def test_records_with_vibes_marimba_convert():
+    """a record and user presets from before flags2 8 (Frodhes' TYPE 4 VIBES, 5 MARIMBA; this firmware's 6 / 7 the
+    200A; 21 factory presets): VIBES and MARIMBA play as STAGE 77, the 200A moves to TYPE 4 / 5, the preset index to
+    the 17-factory layout (F20 -> F16; F13..F16 -> F01; U16 36 -> 32), once"""
+    fl, img = saved_flash("retype", ["100 btn 9", "140 btn 9", "200 btn 9", "220 turn 2 1", "240 btn 9"])   # U01, U02
+    for pre, panel, want_pre, want_type in ((19, 0, "15", "4"), (13, 0, "0", "0"), (36, 7, str(NO_PRESET), "5"),
+                                            (36, 4, str(NO_PRESET), "0")):
+        k, data = newest_record(img)
+        d = bytearray(data)
+        d[O_FLAGS2] = 1 | 2 | 4                             # the 21-factory layout, REG there
+        d[O_PRESET], d[O_PANEL] = pre, panel
+        d[256 + 16] = 4                                     # U01: VIBES
+        d[256 + 96 + 16] = 6                                # U02: the 200A (its TYPE before)
+        img2 = bytearray(img)
+        put_record(img2, k, d, record_at(img, k)[0])
+        open(fl, "wb").write(img2)
+        b = boot(f"retype-{pre}-{panel}", fl, ["200 midi 0xC0 16 0", "300 dump", "400 midi 0xC0 17 0", "500 dump"], 600,
+                 check_preset=want_pre != str(NO_PRESET))
+        s = b.state(100)
+        assert (s["preset"], s["p.0"]) == (want_pre, want_type), (pre, panel, s["preset"], s["p.0"])
+        assert (b.state(300)["p.0"], b.state(500)["p.0"]) == ("0", "4"), (b.state(300)["p.0"], b.state(500)["p.0"])
+        if pre == 19:
+            assert s["header"] == "F16 WURLI 200A", s["header"]
 
 
 O_PANEL3 = 141                                              # settings_t panel3 (records v3: ids 48..63)
@@ -513,7 +526,7 @@ def test_record_naming_an_empty_slot_runs_its_synced_rates():
     fl, img = saved_flash("emptyslot", [cc(20, 17, 64), cc(21, 18, 100), cc(22, 20, 64),   # TREM on, DEPTH, SYNC
                                         "100 btn 9", "140 btn 9", "3000 dump"])          # SAVE to U01
     rec = settings_record(img)
-    assert rec[O_PRESET] == 21 and rec[O_PANEL + 2] == 1, (rec[O_PRESET], rec[O_PANEL + 2])   # U01, its sound
+    assert rec[O_PRESET] == 17 and rec[O_PANEL + 2] == 1, (rec[O_PRESET], rec[O_PANEL + 2])   # U01, its sound
     rec[O_PRESET] = NO_PRESET                                       # the record names U16: empty (never a starter)
     put_settings(img, rec)
     open(fl, "wb").write(img)

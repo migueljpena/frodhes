@@ -1,22 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Fuzz (PLAN P11.5): seeded random streams of MIDI (notes with lost note-offs, CCs, program changes, clock, start /
 stop / continue, SysEx and garbage), the FM-1's keys, buttons (taps and holds) and knobs, for 3 s, on the Rhodes
-and on VIBES; then the panic every DAW sends (CC 123 and the transport off, on all 16 channels) and two probes.
+and on the 200A; then the panic every DAW sends (CC 123 and the transport off, on all 16 channels) and two probes.
 Each seed must:
 
   - run to the end without a crash, and without any undefined behaviour or memory error (a second build with
     UBSan + ASan runs a share of the seeds; left shifts of negative numbers are allowed: the chip shifts
     arithmetically), and without the host's event ring dropping an event;
   - never put out more than the limiter's ceiling (24576 = the master clip's knee; CC 119 RAW is not fuzzed);
-  - go silent after the panic (the engine alone, RAW, within 3 s), with no voice left (the Rhodes; VIBES can keep a
-    silent voice, a reported bars.c bug, test_persistence.py);
+  - go silent after the panic (the engine alone, RAW, within 3 s), with no voice left;
   - sound when a note is played afterwards over MIDI (and from a key when KEY VEL allows), without a click (the
     second-difference detector of tools/bar_measure.py / hil_scan) and nothing near clipping;
   - keep each engine's CPU proxy under the block: the Rhodes' (the host's estimate of the voices alone, engine.c,
-    at the P0 costs) + 1700 us for every effect and the rest under the 5805 us block; VIBES' (bars.c's cost model,
-    the whole block with the effects already in it) under its own 4800 us gate (BAR_NS_GATE). Until 2026-10-18 the
-    VIBES proxy got the 1700 us a second time, and a run that switched engines (program changes) compared one
-    maximum for both.
+    at the P0 costs) + 1700 us for every effect and the rest under the 5805 us block; the 200A's the same way (an
+    estimate until the FM-1 measures it). A run that switches engines (program changes) compares each engine's own
+    maximum.
 
 200 seeds per engine by default (the sanitizer build runs every 5th); --long: 2000 per engine, all sanitized;
 --fuzz-seeds N sets the count. A failing seed prints its script (build/host/py/fz-*.txt) to replay it."""
@@ -36,17 +34,17 @@ SAN_FLAGS = ["-fsanitize=undefined,address", "-fno-sanitize=shift-base", "-fno-o
 CHAOS_MS = 3000
 KNOWN_CC = sorted({int(c) for c in re.findall(r'\[P_\w+\] = \{"[^"]*", \d+, \d+, F_\w+, (\d+)',
                                                open(os.path.join(ROOT, "firmware", "src", "params.c")).read())}
-                  | {64, 85, 86, 87, 111, 114, 120, 123, 43, 44, 45, 46, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 79})
+                  | {64, 85, 86, 87, 111, 114, 120, 123, 43, 44, 45, 46, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 115})
 ALL16 = range(16)
 
 
 def chaos(seed, eng):
     """the random part: (t, line) events, t in 50..CHAOS_MS"""
-    rng = random.Random(seed * 7919 + (eng == "vibes"))
+    rng = random.Random(seed * 7919 + (eng == "reed"))
     ev = []
     held, t, pressed = [], 50, set()
-    if eng == "vibes":
-        ev.append((10, "midi 0xB0 79 0"))
+    if eng == "reed":
+        ev.append((10, "midi 0xB0 115 0"))
 
     def ch():
         return 0 if rng.random() < 0.7 else rng.randrange(16)
@@ -66,14 +64,14 @@ def chaos(seed, eng):
             num = rng.choice(KNOWN_CC) if rng.random() < 0.7 else rng.randrange(128)
             if num == 119:
                 num = 118                                             # (RAW: the developer's bypass, not fuzzed)
-            if eng == "vibes" and num == 80:
-                num = 79
+            if eng == "reed" and num == 80:
+                num = 115
             val = rng.randrange(128) if rng.random() < 0.95 else rng.randrange(128, 256)
             ev.append((t, f"midi 0x{0xB0 | ch():02X} {num} {val}"))
         elif k < 0.61:                                                # a program change
             p = rng.randrange(40) if rng.random() < 0.9 else rng.randrange(256)
-            if eng == "vibes" and p < 12:
-                p = 12 + p % 2
+            if eng == "reed" and p < 12:
+                p = 15 if p % 2 else 32                               # F16 / F17: the 200A's
             ev.append((t, f"midi 0x{0xC0 | ch():02X} {p} 0"))
         elif k < 0.64:                                                # MIDI clock for a while, start / stop
             gap = rng.randint(8, 40)
@@ -115,11 +113,11 @@ def settle(eng):
     for c in ALL16:                                                   # transport, arp, sustain, bypass off; all off
         for num, v in ((64, 0), (60, 0), (63, 0), (45, 0), (52, 0), (111, 0), (123, 0)):
             L.append((t, f"midi 0x{0xB0 | c:02X} {num} {v}"))
-        L.append((t, f"midi 0x{0xC0 | c:02X} {12 if eng == 'vibes' else 0} 0"))   # F13 / F01: the effects' tails go
+        L.append((t, f"midi 0x{0xC0 | c:02X} {15 if eng == 'reed' else 0} 0"))   # F16 / F01: the effects' tails go
         t += 1
     for c in ALL16:
         L.append((t0 + 1000 + c, f"midi 0x{0xB0 | c:02X} 123 0"))      # (a strum still starting notes)
-        L.append((t0 + 1000 + c, f"midi 0x{0xC0 | c:02X} {12 if eng == 'vibes' else 0} 0"))   # (after a PRESETS
+        L.append((t0 + 1000 + c, f"midi 0x{0xC0 | c:02X} {15 if eng == 'reed' else 0} 0"))   # (after a PRESETS
                                                                        # turn's pending load, 400 ms)
         L.append((t0 + 1500 + c, f"midi 0x{0xB0 | c:02X} 119 127"))    # RAW: the engine alone
     quiet = (t0 + 4000, t0 + 4500)                                    # silent (a damped note at RELEASE 10 still
@@ -181,8 +179,8 @@ def one(seed, eng, sanitized):
         bad.append(f"{r.state(mk['dump'])['drops']} note / pedal events dropped")
     if r.cpu_proxy_rh is not None and r.cpu_proxy_rh + 1700 > 5805:         # (program changes switch engines:
         bad.append(f"Rhodes CPU proxy {r.cpu_proxy_rh} + 1700 us over the block")   # each engine's own proxy)
-    if r.cpu_proxy_bars is not None and r.cpu_proxy_bars > 4800:            # the effects are in the bars model
-        bad.append(f"VIBES CPU proxy {r.cpu_proxy_bars} us over the bars gate (4800)")
+    if r.cpu_proxy_reed is not None and r.cpu_proxy_reed + 1700 > 5805:     # (the 200A's: an estimate until the
+        bad.append(f"200A CPU proxy {r.cpu_proxy_reed} + 1700 us over the block")   # FM-1 measures it)
     if not bad:                                                     # a passing seed keeps nothing (3.4 MB a WAV:
         for ext in (".wav", ".txt", "-1000.ppm", "-3000.ppm"):   # (the host's two screenshots too)                                # 10,000 seeds filled the disk, 2026-10-18)
             try:
@@ -202,7 +200,7 @@ def sanitizer_build():
     return build(SAN, SAN_FLAGS)
 
 
-@pytest.mark.parametrize("eng", ["rhodes", "vibes"])
+@pytest.mark.parametrize("eng", ["rhodes", "reed"])
 def test_fuzz(eng, request, sanitizer_build):
     long = request.config.getoption("--long")
     jobs = [(s, eng, long or s % 5 == 0) for s in seeds(request, 200)]
@@ -233,7 +231,7 @@ HOT_DELAY = ["808 btn 3", "1042 midi 0xC0 12 0", "1771 keys 48", "1783 midi 0xB0
 
 
 def test_delay_hot_line(sanitizer_build):
-    """fuzz vibes 4300-san (10,000 seeds, 2026-10-18), minimised: F13, the DELAY page and its K1 turned (TAPE), the
+    """fuzz vibes 4300-san (10,000 seeds, 2026-10-18, Frodhes' VIBES), minimised: F13, the DELAY page and its K1 turned (TAPE), the
     compressor, chord mode MIN6, a v125 chord: a full-scale swing in the delay line made r - lp (its tone filter) and
     f (the feedback) reach 2^17, and their products with TONE / FEEDBACK overflowed int32 (fx.c, 124921 * 18800); fx.c
     mulq15w gives the same bits without the overflow"""
@@ -247,7 +245,7 @@ def test_fuzz_reaches_every_drive_type():
     on both engines, so the checks above run with each type on"""
     lo = [int(x) for x in re.search(r"DRV_CC84\[\d*\] = \{([^}]*)\}",
                                     open(os.path.join(ROOT, "firmware", "src", "params.c")).read()).group(1).split(",")]
-    for eng in ("rhodes", "vibes"):
+    for eng in ("rhodes", "reed"):
         hit = set()
         for seed in range(200):
             for _, line in chaos(seed, eng):

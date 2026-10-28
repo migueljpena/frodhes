@@ -29,7 +29,7 @@ run ~15 min) and hil_cpu's --help (no MIDI, no audio).
 
 The ready-to-run commands (FM-1, sandbox off, the coordinator's slot; build/hil/DEVICE.lockdir held):
   every engine x every TYPE, the worst case, USB at 48 kHz, 3 takes each (hil_cpu's own):
-    for e in rhodes vibes marimba; do tools/hil_cpu_rev.py --rev-type all -- --engine $e --worst --usb 48000; done
+    for e in rhodes reed; do tools/hil_cpu_rev.py --rev-type all -- --engine $e --worst --usb 48000; done
   the tight case first (the plan): the Rhodes, SPREAD 127, the bend, INFINITE frozen:
     tools/hil_cpu_rev.py --rev-type infinite --rev-decay 127 --spread 127 -- --worst --usb 48000 --bend-sweep
 """
@@ -108,7 +108,7 @@ def defines(text, defs, want=None):
 
 
 def bands(table):
-    """[(lo, hi)] per TYPE index from a band-start table (the CC 79 / CC 84 way: a TYPE's band runs to the next start)"""
+    """[(lo, hi)] per TYPE index from a band-start table (the CC 84 way: a TYPE's band runs to the next start)"""
     ends = sorted(table) + [128]
     return [(lo, ends[ends.index(lo) + 1] - 1) for lo in table]
 

@@ -4,7 +4,7 @@ an all-off in the same audio block: the note started held for good) hunted on pu
 (each engine's own count, hostrun.voices; held, under the pedal, or half held and half let go), optionally strikes one more note so a steal is
 pending, then puts two (or three) events into the same audio block (0 / 1 / 3 ms apart: a block is 5.8 ms) or into
 adjacent ones (6 / 12 ms): note-ons, the note-off of the pending or of the stolen note, CC 120 / 123, the pedal (down,
-up, half), program changes (the other engine and the same one), CC 79 / 80 TYPE, the arpeggiator (on, off, HOLD),
+up, half), program changes (the other engine and the same one), CC 115 / 80 TYPE, the arpeggiator (on, off, HOLD),
 chord mode, the sequencer (play, stop, REC), tap tempo, MIDI clock start / stop (CLOCK EXT is on), the FM-1's keys,
 REC (the sustain button) and other panel buttons. Then everything is let go the normal way (no all-off), and:
 
@@ -36,7 +36,7 @@ FILL = [33, 40, 47, 54, 61, 68, 75, 82, 89, 94, 99, 52, 57, 64, 71, 78]
 
 
 def fill(eng):
-    """the setup's notes, one per voice of the engine (the Rhodes 9, VIBES 9)"""
+    """the setup's notes, one per voice of the engine (hostrun.voices)"""
     return FILL[:voices(eng)]
 PEND, NEW, KEY = 96, 98, 7                     # the note that waits for a steal; a new note; the key (C4 at OCT 0)
 T0 = 700                                       # the burst
@@ -47,8 +47,8 @@ SETUPS = ["held", "pedal", "mixed"]
 def ev_lines(name, t, eng):
     """the script lines of one burst event at t ms"""
     N9 = fill(eng)
-    other = 0 if eng == "vibes" else 12        # a program change to the other engine's first preset
-    same = 13 if eng == "vibes" else 1
+    other = 0 if eng == "reed" else 15         # a program change to the other engine's first preset
+    same = 32 if eng == "reed" else 1
     E = {
         "on": [f"{t} midi 0x90 {NEW} 100"],
         "on_pend": [f"{t} midi 0x90 {PEND} 90"],                 # the pending note again
@@ -60,7 +60,7 @@ def ev_lines(name, t, eng):
         "cc120": [cc(t, 120, 0)], "cc123": [cc(t, 123, 0)],
         "ped_dn": [cc(t, 64, 127)], "ped_up": [cc(t, 64, 0)], "ped_half": [cc(t, 64, 50)],
         "pc_other": [f"{t} midi 0xC0 {other} 0"], "pc_same": [f"{t} midi 0xC0 {same} 0"],
-        "cc79": [cc(t, 79, 0)], "cc80": [cc(t, 80, 0)],
+        "cc115": [cc(t, 115, 0)], "cc80": [cc(t, 80, 0)],
         "arp_on": [cc(t, 52, 1)], "arp_off": [cc(t, 52, 0)],
         "hold": [f"{t} btn 3"],                                  # SEL: HOLD while the arp is on (else DELAY's page)
         "chord_on": [cc(t, 56, 6)], "chord_off": [cc(t, 56, 0)], # (MAJ7: four notes)
@@ -76,7 +76,7 @@ def ev_lines(name, t, eng):
 
 
 EVENTS = ["on", "on_pend", "off_pend", "off_stolen", "off_quiet", "cc120", "cc123", "ped_dn", "ped_up", "ped_half",
-          "pc_other", "pc_same", "cc79", "cc80", "arp_on", "arp_off", "hold", "chord_on", "chord_off", "seq_play",
+          "pc_other", "pc_same", "cc115", "cc80", "arp_on", "arp_off", "hold", "chord_on", "chord_off", "seq_play",
           "seq_stop", "rec_on", "rec_off", "tap", "clk_start", "clk_stop", "key_on", "key_off", "sus_tap", "oct_up",
           "edit", "arp_btn", "home", "on_held"]
 
@@ -84,7 +84,7 @@ EVENTS = ["on", "on_pend", "off_pend", "off_stolen", "off_quiet", "cc120", "cc12
 def case_lines(eng, setup, steal, burst):
     """burst: [(event, t)]; returns (lines, marks)"""
     N9 = fill(eng)
-    L = [cc(5, 79, 0), cc(6, 47, 0)] if eng == "vibes" else []           # VIBES, its motor off
+    L = [cc(5, 115, 0), cc(6, 47, 0)] if eng == "reed" else []          # the 200A, its vibrato off
     L += ["20 btn 7", "40 btn 7", "60 btn 7", "80 turn 4 1", "100 btn 8"]  # GLO x3: MIDI, CLOCK EXT; HOME
     if setup == "pedal":
         L.append(cc(110, 64, 127))
@@ -165,15 +165,15 @@ def run_cases(cases):
         return [x for x in ex.map(go, cases) if x[1]]
 
 
-@pytest.mark.parametrize("eng", ["rhodes", "vibes"])
+@pytest.mark.parametrize("eng", ["rhodes", "reed"])
 def test_race_fuzz(eng, request):
     n = request.config.getoption("--race-cases")
     full = all_cases(eng)
     if request.config.getoption("--long") and not n:
-        cases = full + triples(eng, 2000, 1 + (eng == "vibes")) + triples(eng, 3000, 5 + (eng == "vibes"), 6)
+        cases = full + triples(eng, 2000, 1 + (eng == "reed")) + triples(eng, 3000, 5 + (eng == "reed"), 6)
     else:
-        rng = random.Random(7 + (eng == "vibes"))
-        cases = rng.sample(full, n or 64) + triples(eng, (n or 64) // 4, 3 + (eng == "vibes"))
+        rng = random.Random(7 + (eng == "reed"))
+        cases = rng.sample(full, n or 64) + triples(eng, (n or 64) // 4, 3 + (eng == "reed"))
     failed = run_cases(cases)
     msg = "\n".join(f"{tag}: {'; '.join(bad)}" for tag, bad in failed)
     os.makedirs(OUT, exist_ok=True)
@@ -183,13 +183,14 @@ def test_race_fuzz(eng, request):
     assert not failed, f"{len(failed)} of {len(cases)} cases failed:\n{msg}"
 
 
-# A note held across a TYPE change that stops the voices (to the other engine, VIBES <-> MARIMBA), pressed again with
+# A note held across a TYPE change that stops the voices (to the other engine), pressed again with
 # no note-off between (a MIDI note-on) or by a second source on that pitch (an FM-1 key let go and pressed while the
 # MIDI note holds it), sounds on the new TYPE (notes.c out_resound; 0.9.3: silent until every source let it go).
-# Within the Rhodes (ST77 -> SUITCASE) the held voice rings on, as before. CC 79 / 80 and program changes.
-TYPESW = {"ST77": ("80 0", "0 0"), "SUITCASE": ("80 40", None), "VIBES": ("79 0", "12 0"), "MARIMBA": ("79 127", "14 0")}
-PAIRS = [("ST77", "VIBES"), ("VIBES", "ST77"), ("VIBES", "MARIMBA"), ("MARIMBA", "VIBES"), ("MARIMBA", "ST77"),
-         ("ST77", "MARIMBA"), ("ST77", "SUITCASE")]
+# Within one engine (ST77 -> SUITCASE, 200A -> 200A AMP) the held voice rings on, as before. CC 115 / 80 and program
+# changes.
+TYPESW = {"ST77": ("80 0", "0 0"), "SUITCASE": ("80 40", None), "200A": ("115 0", "15 0"), "2AMP": ("115 127", None)}
+PAIRS = [("ST77", "200A"), ("200A", "ST77"), ("200A", "2AMP"), ("2AMP", "200A"), ("2AMP", "ST77"),
+         ("ST77", "2AMP"), ("ST77", "SUITCASE")]
 
 
 def _type_sw(t, ty, how):

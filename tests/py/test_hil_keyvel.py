@@ -352,9 +352,9 @@ def test_hil_cpu_keyadc_modes(monkeypatch, clock, capsys):
 
 
 def test_hil_cpu_full_run_keeps_its_rows(monkeypatch, clock):
-    r, _ = cpu_run(monkeypatch, clock, ["--keyadc", "idle", "--engine", "vibes"])
+    r, _ = cpu_run(monkeypatch, clock, ["--keyadc", "idle", "--engine", "reed"])
     names = [n for n, _ in r["rows"]]
-    assert "idle, no effects" in names and "repeated" in names and len(names) == 11   # + the slow paths
+    assert "idle, no effects" in names and "repeated" in names and len(names) == 8    # + the slow paths
     assert any(n.startswith("slow paths") for n in names) and r["code"] == 0 and hc.exit_code(r) == 0
 
 
@@ -373,11 +373,11 @@ def test_hil_cpu_exit_code_combines_the_verdict_and_the_key_check(monkeypatch, c
 
 
 def test_hil_cpu_voices_default_per_engine(monkeypatch, clock, capsys):
-    """--voices defaults to the engine's own count (rhodes.c RH_VOICES / BAR_VOICES), in the gate too"""
-    cpu_run(monkeypatch, clock, ["--worst", "--keyadc", "gate", "--engines", "rhodes,vibes", "--runs", "1"])
+    """--voices defaults to the engine's own count (rhodes.c RH_VOICES / reed.c RE_VOICES), in the gate too"""
+    cpu_run(monkeypatch, clock, ["--worst", "--keyadc", "gate", "--engines", "rhodes,reed", "--runs", "1"])
     out = capsys.readouterr().out
     assert f"{hc.default_voices('rhodes')} voices (--voices {hc.default_voices('rhodes')})" in out
-    assert f"{hc.default_voices('vibes')} voices (--voices {hc.default_voices('vibes')})" in out
+    assert f"{hc.default_voices('reed')} voices (--voices {hc.default_voices('reed')})" in out
 
 
 def test_hil_cpu_keyadc_gate(monkeypatch, clock, capsys):
@@ -385,8 +385,8 @@ def test_hil_cpu_keyadc_gate(monkeypatch, clock, capsys):
     out = capsys.readouterr().out
     assert not hc.KEYADC_BAD and "key ADC gate: PASS" in out
     s = hc.keyadc_gate.summary
-    assert set(s) == {"rhodes", "vibes", "marimba"} and all(all(e["ok"].values()) for e in s.values())
-    assert out.count("=== key ADC gate: run") == 27                     # 3 engines x 3 runs x 3 modes
+    assert set(s) == {"rhodes", "reed"} and all(all(e["ok"].values()) for e in s.values())
+    assert out.count("=== key ADC gate: run") == 18                     # 2 engines x 3 runs x 3 modes
     assert all(abs(e["delta"]["stress"] - 40) <= 4 for e in s.values())
     runs = [l.split("--keyadc ")[1] for l in out.splitlines() if l.startswith("=== key ADC gate: run 2/3, rhodes")]
     assert runs == ["idle", "stress", "off"]                             # rotated per run

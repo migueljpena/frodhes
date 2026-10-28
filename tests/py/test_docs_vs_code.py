@@ -76,21 +76,6 @@ def test_manual_links_resolve():
     assert not bad, bad
 
 
-def test_cc79_row_matches_the_bar_type_bands():
-    """the CC table's row 79 names every bar TYPE with its band (params.c TYPE_CC79 / TYPE_ENGINE: VIBES 0-95, MARIMBA
-    96-127; MARIMBA PLAN §9.4)"""
-    pc = src("params.c")
-
-    def arr(name):
-        return [int(x) for x in re.search(name + r"\[N_TYPE_N\] = \{([^}]*)\}", pc).group(1).split(",")]
-    names = re.findall(r'"([^"]+)"', re.search(r"N_TYPE_LONG\[\] = \{([^}]*)\}", pc).group(1))
-    bars = [t for t, e in enumerate(arr("TYPE_ENGINE")) if e == 1]
-    lo = arr("TYPE_CC79")
-    want = [f"{lo[t]}–{(lo[bars[i + 1]] - 1) if i + 1 < len(bars) else 127} {names[t]}" for i, t in enumerate(bars)]
-    row = next(ln for ln in section("## 12. MIDI").splitlines() if ln.startswith("| 79 |"))
-    assert ", ".join(want) in row, (want, row)
-
-
 def test_cc84_row_matches_the_drive_type_bands():
     """the CC table's row 84 names every drive TYPE with its band, as the card shows it (params.c DRV_CC84 / N_DRV:
     0–63 OFF, 64–75 KHLON, ..., 112–127 FDRV), and the DRIVE page says the same"""

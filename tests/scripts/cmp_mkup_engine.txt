@@ -1,6 +1,6 @@
 # The compressor switched on from the panel (THRESH up from 0) gets its engine's level-neutral make-up: the Rhodes
-# 15 (+2.8 on the card, as before), VIBES 28 (+5.3: a struck bar is peakier, the same threshold takes ~2.5 dB more;
-# FM-1 vibes_jump read -2.5 LU with the Rhodes value). ui.c ENG_HEAD.cmp_mkup.
+# 15 (+2.8 on the card, as before), the 200A the Rhodes' 15 until it is measured on the FM-1 (eng_pages.h
+# ENG_UI.cmp_mkup). The 200A has four VOICE pages: SELECT takes six steps to the COMPRESSOR.
 # (F01 has the compressor on since 0.9.5: off and THRESH 0 first)
 50 midi 0xB0 106 0
 60 midi 0xB0 107 0
@@ -14,7 +14,7 @@
 500 expect state card.5.3 +2.8
 600 turn 2 -40
 700 midi 0xB0 113 0
-800 midi 0xB0 79 0
+800 midi 0xB0 115 0
 850 midi 0xB0 106 0
 860 midi 0xB0 107 0
 870 midi 0xB0 113 0
@@ -24,7 +24,8 @@
 1006 turn 0 1
 1009 turn 0 1
 1012 turn 0 1
+1015 turn 0 1
 1200 turn 2 10
 1400 expect state page COMPRESSOR
-1400 expect state card.5.3 +5.3
+1400 expect state card.5.3 +2.8
 1500 end

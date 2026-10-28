@@ -3,7 +3,7 @@
 and under the pedal while the pedal holds its note: the note was held when the pedal went down, or started while the
 pedal was down, and a voice still sounds it. A note let go before the pedal (its voice in the damped tail, or a
 MARIMBA bar ringing on, no damper) does not light when the pedal goes down (the user, FM-1, 2026-10-20: "the key
-lights again although nothing sounds"). The pedal is REC tapped (the latch). Rhodes, VIBES and MARIMBA alike.
+lights again although nothing sounds"). The pedal is REC tapped (the latch). The Rhodes, the 200A and 200A AMP alike.
 
 And no flicker: with the pedal down and 5-6 notes (fewer than the voices: 9 on every engine) every key, once lit by its press, stays
 lit to the end; with 12-16 notes (voices stolen) a key may go dark once (its voice taken), and never lights again
@@ -13,7 +13,7 @@ import pytest
 
 from hostrun import run, voices
 
-ENGINES = {"rhodes": [], "vibes": ["20 midi 0xB0 79 0"], "marimba": ["20 midi 0xB0 79 127"]}
+ENGINES = {"rhodes": [], "reed": ["20 midi 0xB0 115 0"], "reedamp": ["20 midi 0xB0 115 127"]}
 PEDAL = "btn 13"                                             # REC: a tap latches the sustain
 
 

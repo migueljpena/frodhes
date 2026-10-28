@@ -15,7 +15,7 @@ USB is the output before MASTER.
 
 Each segment, one take (USB recorded at --rate, the device switched to it, as hil_must S1): the stream, then the
 panic (all notes off, all sound off, pedal up, reset controllers, MIDI Stop on all 16 channels), 2 s, then the probe:
-FX bypassed (CC 111 127) and VIBES' motor off (CC 47 0) on every channel, note 60 v100 on every channel for 0.6 s,
+FX bypassed (CC 111 127) and the 200A's vibrato off (CC 47 0) on every channel, note 60 v100 on every channel for 0.6 s,
 then the bypass off again. The gates, per take:
   counters  CC 116 every 0.5 s while it plays (tools/hil_must.py Poller, judged by hil_must.gate_counters): the
             replies come, the USB stream flows at --rate, underruns = missed = overruns = 0, the ring's low point
@@ -104,7 +104,7 @@ def panic_msgs():
 
 
 def probe_msgs(on):
-    """the probe's set-up (on) or its end: FX bypass and the motor on every channel, the note on / off"""
+    """the probe's set-up (on) or its end: FX bypass and the 200A's vibrato on every channel, the note on / off"""
     if on:
         return ([[0xB0 | c, 111, 127] for c in range(16)] + [[0xB0 | c, 47, 0] for c in range(16)])
     return [[0xB0 | c, 111, 0] for c in range(16)]

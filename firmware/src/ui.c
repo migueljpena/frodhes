@@ -113,7 +113,6 @@ static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_COMP, 
                                     * (0.9.5, the user), REVERB the last effect, as in the chain, its second page right
                                     * after it (0.9.5); SEQUENCER after LFO (user, TODO 3) */
 static uint8_t ui_vp;                                   /* the VOICE page shown: 0 .. vp_count() - 1 */
-static int ui_bars(void) { return TYPE_IS_BARS(PV(P_TYPE)); }    /* the main loop's TYPE (not the ISR's latch) */
 static void ui_goto(uint32_t pg);
 static void ui_goto_v(uint32_t pg, uint32_t vp);
 static uint32_t pg_count(void) { return PG_NORD - 1u + vp_count(); }    /* the pages SELECT walks */
@@ -601,7 +600,7 @@ static int32_t slot_val(uint32_t s, int32_t *hi)
 static int slot_is_level(uint32_t s)                    /* a gauge only for amounts, not for choices */
 {
     if (s < P_COUNT) return PARAMS[s].fmt != F_ENUM && PARAMS[s].fmt != F_DIV;
-    return s == S_KVEL || s == S_TUNE || s == S_BPM || s == S_TRANS || s == S_ARPGATE || s == S_CHSTRUM;
+    return s == S_KVEL || s == S_TUNE || s == S_BPM || s == S_TRANS || s == S_ARPGATE || s == S_CHSTRUM || s == S_REG;
 }
 static void fmt_signed(char *s, int32_t v) { if (v > 0) { s[0] = '+'; p_fmt_int(s + 1, v); } else p_fmt_int(s, v); }
 /* a rate / time knob that is synced to the tempo: its SYNC parameter (the knob shows and steps the note value), else 0 */
@@ -700,10 +699,9 @@ static void slot_turn(uint32_t s, int32_t d)
         if (slot_synced(id)) { step = id == P_DL_TIME ? sgn(d) : -sgn(d); id = slot_sync_id(id); }
         v = PV(id) + step;
         if (id != s && v < 1) v = 1;
-        if (id == P_MOT_RATE && v > 120) v = 120;       /* the motor's top speed (10 Hz) */
-        if (id == P_TYPE) type_pick(clampi(v, 0, PARAMS[id].hi));   /* a TYPE change (bar types: the motor on) */
+        if (id == P_MOT_RATE && v > 120) v = 120;       /* the vibrato's top speed (10 Hz) */
+        if (id == P_TYPE) type_pick(clampi(v, 0, PARAMS[id].hi));   /* a TYPE change */
         else param_set(id, clampi(v, 0, PARAMS[id].hi));
-        if (id == P_MOT_ON) set.mot_user_off = !PV(P_MOT_ON);        /* off by hand: no auto-on at TYPE VIBES */
         fx_wake(id);
         if (id == P_CMP_AMT) {                          /* THRESH is the compressor's switch: 0 = OFF, up = on */
             if (PV(P_CMP_AMT) && !PV(P_CMP_SW)) cmp_wake(0);   /* level-neutral */
@@ -1023,9 +1021,9 @@ static void draw_row(uint32_t k)
 #define CD_KTAG_TOP S_TOP(9)
 /* the short forms, used only where the long one does not fit (at 28 px: TYPE 143 px, ASSIGN PLAYS 136; fewer at 25 / 24) */
 static const char *const CD_LONG[] = {"EARLY FELT", "BELL DYNO", "TREM/WAH", "COMP THR", "COMP MKUP", "TREM RATE",
-                                      "TREM SHAPE", "PHA SPEED", "PHA FEEDBK", "CHO SPEED", "DLY FEEDBK"};
+                                      "TREM SHAPE", "PHA SPEED", "PHA FEEDBK", "CHO SPEED", "DLY FEEDBK", "WURLI 200A"};
 static const char *const CD_SHORT[] = {"FELT", "DYNO", "TRM/WAH", "CMP THR", "CMP GAIN", "TRM RATE", "TRM SHP",
-                                       "PHA SPD", "PHA FDBK", "CHO SPD", "DLY FDBK"};
+                                       "PHA SPD", "PHA FDBK", "CHO SPD", "DLY FDBK", "200A"};
 _Static_assert(sizeof CD_LONG == sizeof CD_SHORT, "one short form per long one");
 static int cd_eq(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return *a == *b; }
 /* the value's text, its unit apart (slot_unit, and a number's "%"); 0: none */
@@ -1555,7 +1553,7 @@ static void ui_splash(void)
     cv_blit(0, 46);
     cv_begin(240, 64, C_BLACK);
     ft_big(16, "FRODHES", UI_ACC);
-    ft_c(48, "ELECTRIC PIANO + VIBES + MARIMBA", FC_LAB);
+    ft_c(48, "ELECTRIC PIANO + WURLI 200A", FC_LAB);
     cv_blit(0, 110);
     cv_begin(240, 20, C_BLACK);
     p_strcpy(v, "VERSION ", 8); p_strcpy(v + 8, ui_version(), 10);
@@ -1594,10 +1592,10 @@ static void ui_draw(void)
     mt_update();
     if (ui_look != look_shown) { look_shown = ui_look; cleared = 0; ui_draw_page_change(); }   /* CC 2: all again */
     if (ui_cards != cards_shown) { cards_shown = ui_cards; ui_mark(E_CARDS); }                /* CC 11: the rows */
-    if (eng_ui() != &ENG_UI[eng_shown]) {               /* the TYPE crossed engines (ALGORITHM, CC 80 / 79, a preset):
+    if (eng_ui() != &ENG_UI[eng_shown]) {               /* the TYPE crossed engines (ALGORITHM, CC 80 / 115, a preset):
                                                          * other VOICE pages, names and hints; marked once per change */
         eng_shown = (uint8_t)(eng_ui() - ENG_UI);
-        if (ui_page == PG_VOICE && ui_vp >= vp_count()) ui_goto_v(PG_VOICE, vp_count() - 1u);   /* (VIBES 3/3 ->
+        if (ui_page == PG_VOICE && ui_vp >= vp_count()) ui_goto_v(PG_VOICE, vp_count() - 1u);   /* (200A 4/4 ->
                                                          * the Rhodes' last) */
         ui_mark(E_TITLE); ui_mark(E_CARDS); ui_mark(E_FOOTER);
     }

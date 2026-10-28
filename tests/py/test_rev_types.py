@@ -385,7 +385,7 @@ def test_type_cc_bands():
 def test_factory_presets_are_hall_with_the_defaults():
     """every factory preset loads with the reverb TYPE and LOW CUT its record names (0.9.5, the presets' listening
     round: HALL or PLATE, never INFINITE in the factory bank; LOW CUT OFF or 150 / 200 Hz, values 70 / 80) and SIZE /
-    MOD at their defaults"""
+    MOD at their defaults (F14 DREAM: its moving hall, RV_MOD 84, as its record says)"""
     ids = p_ids()
     d = default_params()
     lines = []
@@ -400,7 +400,7 @@ def test_factory_presets_are_hall_with_the_defaults():
                 assert got in ("1", "2"), (f"F{k + 1:02d}", p, got)
             elif p.endswith("LOCUT"):
                 assert got in ("0", "70", "80"), (f"F{k + 1:02d}", p, got)
-            else:
+            elif not (k == 13 and p.endswith("MOD")):
                 assert got == str(v), (f"F{k + 1:02d}", p, got)
 
 

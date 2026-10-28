@@ -51,7 +51,7 @@
 3200 btn 1
 3300 expect state fbank A
 3300 expect led 1 0
-# VIBES: bank A is STRIKE MALLET TUBE WEIGHT
-3400 midi 0xB0 79 0
-3500 expect state fader.2 TUBE:5.0:WAIT
+# the 200A: bank A is its VOICE 1/4, TONE BARK BELL HAMMER
+3400 midi 0xB0 115 0
+3500 expect state fader.2 BELL:5.0:WAIT
 3600 end

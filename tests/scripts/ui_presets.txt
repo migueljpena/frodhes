@@ -28,63 +28,40 @@
 3200 btn 9
 3300 btn 8
 3400 expect led 5 0
-# the VIBES presets (F13 VIBES: the motor on, the engine's: TREM/WAH stays off, LFO dark; F14 VIBES ECHO:
-# the motor off): program change 12, 13
-3600 midi 0xC0 12 0
+# the 200A presets (F16 WURLI 200A: its VIBRATO off, VOICE 3/4; F17 200A VIB: on, the engine's: TREM/WAH stays
+# off, LFO dark): program change 15, 32 (0..15 F01..F16 and 16..31 U01..U16 as before 0.9.5, 32 F17)
+3600 midi 0xC0 15 0
 3700 expect led 5 0
-3700 expect state vcard.2.0 ON
+3700 expect state vcard.2.0 OFF
 3800 shot
-3900 midi 0xC0 13 0
+3900 midi 0xC0 32 0
 4000 expect led 5 0
-4000 expect state vcard.2.0 OFF
-# PRESETS after F14: F15, F16 (MARIMBA), F17..F19 (0.9.5), F20, F21 (the 200A), then U01 (the user presets follow
-# the factory ones), back: F14, F13
+4000 expect state vcard.2.0 ON
+# PRESETS after F17 (the last factory one): U01 (the user presets follow the factory ones), back: F17, F16
 4100 turn 6 1
-4120 turn 6 1
-4140 turn 6 1
-4160 turn 6 1
-4180 turn 6 1
-4200 turn 6 1
-4220 turn 6 1
-4240 turn 6 1
 4700 expect led 5 1
 4700 expect state header U01_SUIT_TRM
+4700 expect state preset 17
 4800 turn 6 -1
-4820 turn 6 -1
-4840 turn 6 -1
-4860 turn 6 -1
-4880 turn 6 -1
-4900 turn 6 -1
-4920 turn 6 -1
-4940 turn 6 -1
 5400 expect led 5 0
-5400 expect state header F14_VIBES_ECHO
+5400 expect state header F17_200A_VIB
 5500 turn 6 -1
 6000 expect led 5 0
-6000 expect state vcard.2.0 ON
-# F17..F19 by program change 32..34 (0.9.5: 0..15 F01..F16 and 16..31 U01..U16 as before); 35 is no preset
-6100 midi 0xC0 32 0
-6200 expect state header F17_TAPE_ECHO
+6000 expect state header F16_WURLI_200A
+6000 expect state vcard.2.0 OFF
+# F13..F15 by program change 12..14 (0.9.5's three Rhodes sounds); 33 is no preset
+6100 midi 0xC0 12 0
+6200 expect state header F13_TAPE_ECHO
 6200 expect preset
 6200 expect sound
-6300 midi 0xC0 33 0
-6400 expect state header F18_DREAM
+6300 midi 0xC0 13 0
+6400 expect state header F14_DREAM
 6400 expect preset
-6500 midi 0xC0 34 0
-6600 expect state header F19_RADIO
+6500 midi 0xC0 14 0
+6600 expect state header F15_RADIO
 6600 expect preset
 6600 expect sound
-6700 midi 0xC0 37 0
-6800 expect state header F19_RADIO
-6800 expect state preset 18
-# program change 35, 36: F20, F21 (the 200A); from F21: U01 (one detent), back: F21
-6810 midi 0xC0 35 0
-6850 expect state header F20_WURLI_200A
-6860 midi 0xC0 36 0
-6880 expect state header F21_200A_VIB
-6900 turn 6 1
-7400 expect state header U01_SUIT_TRM
-7400 expect state preset 21
-7500 turn 6 -1
-8000 expect state header F21_200A_VIB
+6700 midi 0xC0 33 0
+6800 expect state header F15_RADIO
+6800 expect state preset 14
 8100 end

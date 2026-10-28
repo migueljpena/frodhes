@@ -4,9 +4,9 @@
 (tools/hil_jack.py's recorder). Run it when the device is free, with the firmware under test installed, the sandbox
 off (CoreAudio), MASTER fully up and no headphones in the FM-1.
 
-    tools/hil_drive.py --cpu  [--engines rhodes,vibes,marimba] [--types FDRV,KHLON,...] [--variants base,mix,switch]
+    tools/hil_drive.py --cpu  [--engines rhodes,reed] [--types FDRV,KHLON,...] [--variants base,mix,switch]
                               [--runs 3] [--usb 48000] [--wait-lock 3600] [--dry-run]
-    tools/hil_drive.py --jack [--dev M6] [--ch 5] [--types ...] [--phrases riff,bass,vibes] [--wait-lock 3600]
+    tools/hil_drive.py --jack [--dev M6] [--ch 5] [--types ...] [--phrases riff,bass] [--wait-lock 3600]
                               [--dry-run]
 
 --cpu: for each engine, type and variant, `hil_cpu.py --worst --usb RATE --engine E` RUNS times (every effect on, the
@@ -22,8 +22,8 @@ block are recorded against the 4500 us limit, with hil_cpu's verdict (a shed voi
 run fails. Results: build/hil/drive/cpu-<time>.json and .md, each run's log in build/hil/drive/cpu-<time>/.
 
 --jack: each type at the p1x1 listening grid's settings (private plan: DRIVE low / noon / max at TONE noon, DRIVE
-max at TONE min / max; KHLON also GAIN min and 9 o'clock), on three phrases (an ST77 riff, a chord over a walking
-bass, a VIBES phrase with the pedal: the p0 renders' phrases), plus OFF and FDRV references; every effect but the
+max at TONE min / max; KHLON also GAIN min and 9 o'clock), on two phrases (an ST77 riff, a chord over a walking
+bass: the p0 renders' phrases), plus OFF and FDRV references; every effect but the
 drive off. The headphone jack (the MOTU input --ch) and USB at once: build/hil/drive/jack-<time>/<type>_<phrase>_
 <setting>_{jack,usb}.wav (48 kHz) and levels.json (LUFS re OFF per take, the USB peak). AMOUNT "low" is 1 (AMOUNT 0
 is dry: the circuit's lowest setting is AMOUNT 1). The jack is the reference; the user listens.
@@ -51,7 +51,7 @@ import lock  # noqa: E402
 LIMIT_US = 4500
 SWITCH_S = 0.12
 VARIANTS = ("base", "mix", "switch")
-ENGINES = ("rhodes", "vibes", "marimba")
+ENGINES = ("rhodes", "reed")                     # the Rhodes, the 200A (hil_cpu --engine)
 MIX_LOW = 100                                          # CC 83 for the "mix" variant (10.0 = 127 is all driven)
 
 
@@ -288,20 +288,7 @@ def phrase_bass():
     return ev, (t + 3500) / 1000
 
 
-def phrase_vibes():
-    """VIBES, motor off: a melody with two-mallet double stops, pedal down, then a chord"""
-    ev, t = [(0.25, "cc", 64, 127)], 300
-    for a, b in [(72, 76), (74, None), (76, 79), (79, None), (81, 84), (79, None), (76, 79), (74, None), (72, 76)]:
-        _note(ev, t, a, 100, 300)
-        if b:
-            _note(ev, t, b, 90, 300)
-        t += 330
-    ev.append(((t + 200) / 1000, "cc", 64, 0))
-    _chord(ev, t + 400, [60, 64, 67, 71, 74], 105, 1500)
-    return ev, (t + 3600) / 1000
-
-
-PHRASES = {"riff": phrase_riff, "bass": phrase_bass, "vibes": phrase_vibes}
+PHRASES = {"riff": phrase_riff, "bass": phrase_bass}
 
 
 def jack_plan(names, phrases):
@@ -341,9 +328,6 @@ def run_jack_plan(plan, dev, ch, outdir):
     rows, ref = [], {}
     for k, p in enumerate(plan):
         J.r.dry()
-        if p["phrase"] == "vibes":
-            cc(79, 64)                                 # VIBES, the motor off (it starts with the TYPE change)
-            cc(47, 0)
         cc(84, p["cc84"])                              # the type first, AMOUNT still 0 (no switch fade)
         cc(82, p["tone"])
         cc(83, 127)
@@ -399,7 +383,7 @@ def main(argv=None):
         ap.error(f"--phrases from {tuple(PHRASES)}")
     cp = cpu_plan(engines, names, variants, a.runs, a.usb) if a.cpu else []
     jp = jack_plan(names, phrases) if a.jack else []
-    t_cpu = len(cp) * 40                               # ~40 s a hil_cpu --worst run (VIBES / MARIMBA longer)
+    t_cpu = len(cp) * 40                               # ~40 s a hil_cpu --worst run
     t_jack = sum(p["dur"] + 2.5 for p in jp)
     lock = DeviceLock(main_repo(), "hil_drive", a.wait_lock)
     if a.dry_run:

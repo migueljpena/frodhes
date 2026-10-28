@@ -480,7 +480,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("mode", choices=("stress", "jack"))
     ap.add_argument("--rate", default="48000", choices=("44100", "48000"))
-    ap.add_argument("--engine", default=None, choices=("rhodes", "vibes", "marimba", "all"),
+    ap.add_argument("--engine", default=None, choices=("rhodes", "reed", "all"),
                     help="stress: all (default); jack: rhodes (default)")
     ap.add_argument("--seconds", type=float, default=20.0, help="jack: the music per TYPE x setting take (+ 4 s tail)")
     ap.add_argument("--worst-s", type=float, default=60.0, help="stress: the worst-case time per engine (2 takes)")

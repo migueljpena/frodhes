@@ -39,11 +39,11 @@
 #   ONLY=step,step          run only these steps (the others are listed as skipped)
 #   LOCK_WAIT=600           seconds to wait for build/hil/DEVICE.lockdir
 #   AUTOSAVE_OLD=1          autosave_stream with --old-rule (the save within 70 s: a firmware with the 60 s rule)
-#   CPU_TAKES=3             the takes per worst-case CPU step (cpu_rhodes_bend / _spread / _spread_bend, cpu_vibes,
-#                           cpu_marimba, cpu_<engine>_<type>, the early mode's): hil_cpu_fx --takes, the MAX judged
+#   CPU_TAKES=3             the takes per worst-case CPU step (cpu_rhodes_bend / _spread / _spread_bend, cpu_reed,
+#                           cpu_<engine>_<type>, the early mode's): hil_cpu_fx --takes, the MAX judged
 #   CPU_LIMIT_US=4200       the margin rule (the user's): every CPU step FAILs when a take's whole ISR is over it
 #                           (4500 us stays the design target, hil_cpu's own gate)
-#   CPU_HURT=cpu_rhodes_spread_bend,cpu_vibes   the worst cases that have been over the margin: 3 good takes IN A
+#   CPU_HURT=cpu_rhodes_spread_bend,cpu_reed    the worst cases that have been over the margin: 3 good takes IN A
 #                           ROW (at least 3 whatever CPU_TAKES; one take over = FAIL, every take in the log)
 #   FRODHES_TRS_PORT=NAME   step midi_clock also sends the clock over the TRS jack: NAME = the computer MIDI
 #                           interface's output wired to the FM-1's TRS IN (a substring; tools/hil_clock.py --list);
@@ -84,7 +84,7 @@ its jack takes); -4 when INFINITE is the heaviest TYPE; CROSSCHECK=0 -2; QUICK=1
   release_level            4      no louder after the key-up (hil_release_level.py): the Rhodes TYPEs x NOISE 48 / 127 x
                                   v15 / v60 / v127 x C2 / C4 / C6 held 2 s + the pedal case, USB + jack; QUICK=1: 1.6
   midi_clock               8      every clock-synced item follows an external MIDI clock (hil_clock.py, CLOCK EXT): the
-                                  tremolo, phaser, chorus, filter LFO and VIBES motor at SYNC 1/4 (period 0.5 %, phase
+                                  tremolo, phaser, chorus, filter LFO and the 200A's vibrato at SYNC 1/4 (period 0.5 %, phase
                                   5 % of a beat on the sent beats), the delay DIG / ANA / TAPE and the long echo halved
                                   (1 ms + 0.5 %), the arpeggiator and the sequencer on the 1/16 grid (Start / Continue
                                   from bar 1, Stop), a 120 -> 100 change tracked within 2 beats, a Stop / Start
@@ -98,11 +98,11 @@ its jack takes); -4 when INFINITE is the heaviest TYPE; CROSSCHECK=0 -2; QUICK=1
   cpu_rhodes_1..3          3x0.5m hil_cpu --worst --usb 48000, the Rhodes, every effect (the same choice), 1 take each
   cpu_rhodes_bend          3x0.5m + --bend-sweep (skipped when hil_cpu has none); CPU_TAKES=3 takes, the max judged
   cpu_rhodes_spread(_bend) 6x0.5  SPREAD 127 (CC 105 before the notes), and + the bend: the tight case (3 takes each)
-  cpu_vibes / cpu_marimba  6x0.8m every effect, 3 takes each
-  cpu_<engine>_<type>      18x0.6 every engine x each reverb TYPE beyond the heaviest: --rev-type, 3 takes each
+  cpu_reed                 3x0.5  the 200A, every effect, 3 takes
+  cpu_<engine>_<type>      12x0.6 every engine x each reverb TYPE beyond the heaviest: --rev-type, 3 takes each
                                   Every CPU step: FAIL when a take's whole ISR > CPU_LIMIT_US (4200: the margin rule;
                                   the design target 4500 stays hil_cpu's own gate); CPU_HURT's steps (default
-                                  cpu_rhodes_spread_bend, cpu_vibes: over the margin before): 3 good takes in a row;
+                                  cpu_rhodes_spread_bend, cpu_reed: over the margin before): 3 good takes in a row;
                                   SUMMARY.md: min-max per step. ~22 min of CPU steps (CPU_TAKES=1: ~8)
   keyadc_gate              6      hil_cpu --keyadc gate --worst --runs 3 --scenario pedal: each engine's worst
                                   scenarios only (PLAN 3.4); the whole gate (18m) when the tree's hil_cpu has no
@@ -114,7 +114,7 @@ its jack takes); -4 when INFINITE is the heaviest TYPE; CROSSCHECK=0 -2; QUICK=1
   t1_s3s4                  2.5    T1 S3 S4 (hil_scan --tier must); t1_s2 COVERED by stress_48000's *-no-usb takes
   usb_onset_44100          1.5    hil_usb_onset --rate 44100 (3 takes, USB + jack): the 44.1 kHz MIDI -> sound onset
                                   (the fold below is 48 kHz only)
-  silence, jack_vibes, jack_marimba, tape_jack, usb_onset   COVERED rows: folded into stress_48000 (PASS with it;
+  silence, jack_reed, tape_jack, usb_onset   COVERED rows: folded into stress_48000 (PASS with it;
                                   the numbers in stress_48000-fold.json and SUMMARY.md)
   jack_rhodes              2      hil_jack on the Rhodes: the cross-check of the folded numbers (CROSSCHECK=1)
   rev_jack                 4.5    the reverb on the jack + USB, Rhodes: 3 TYPEs x 3 settings (~16 s each), INFINITE
@@ -130,8 +130,8 @@ the run at once, naming it. RESUME=1 restarts at the first step that did not pas
 The early mode, ONLY=rev_early (a reverb kernel branch's build, PLATE or INFINITE alone, as soon as it compiles;
 ~9 min per TYPE; for each TYPE in REV_TYPE, default every TYPE in the tree but HALL):
   early_install            1.5    fm1_install.py --yes PACKAGE (then fm1_info)
-  early_cpu_vibes_<t>       3x0.8  hil_cpu --engine vibes --worst --usb 48000 (10 voices), every effect with that TYPE,
-                                  CPU_TAKES takes (cpu_vibes in CPU_HURT: 3 in a row), whole ISR <= CPU_LIMIT_US
+  early_cpu_reed_<t>       3x0.5  hil_cpu --engine reed --worst --usb 48000 (10 voices), every effect with that TYPE,
+                                  CPU_TAKES takes (cpu_reed in CPU_HURT: 3 in a row), whole ISR <= CPU_LIMIT_US
   early_cpu_rhodes_spread_bend_<t> 3x0.5  the Rhodes, SPREAD 127 + --bend-sweep (when hil_cpu has it), that TYPE
   early_stress_<t>         2.5    stress_max at 48 kHz with that TYPE in every take, quick (20 s worst + 12 s recipe
                                   per engine; rev_hil.py stress --type T --quick)
@@ -165,7 +165,7 @@ RESUME="${RESUME:-0}"
 CROSSCHECK="${CROSSCHECK:-1}"
 CPU_TAKES="${CPU_TAKES:-3}"
 CPU_LIMIT_US="${CPU_LIMIT_US:-4200}"
-CPU_HURT="${CPU_HURT:-cpu_rhodes_spread_bend,cpu_vibes}"
+CPU_HURT="${CPU_HURT:-cpu_rhodes_spread_bend,cpu_reed}"
 case "$CPU_TAKES$CPU_LIMIT_US" in *[!0-9]*|"") echo "CPU_TAKES / CPU_LIMIT_US: integers" >&2; exit 2 ;; esac
 [ "$CPU_TAKES" -ge 1 ] || { echo "CPU_TAKES >= 1" >&2; exit 2; }
 TIMEOUT_SCALE="${TIMEOUT_SCALE:-1}"
@@ -445,7 +445,7 @@ if [ "$EARLY" = "1" ]; then
     fi
     for t in $ET; do
         lt="$(echo "$t" | tr A-Z a-z)"
-        cpu_step "early_cpu_vibes_$lt" cpu_vibes "${CPUT[@]}" --rev-type "$t" -- --engine vibes --voices 10 --worst --usb 48000
+        cpu_step "early_cpu_reed_$lt" cpu_reed "${CPUT[@]}" --rev-type "$t" -- --engine reed --voices 10 --worst --usb 48000
         if [ "$BEND" = "1" ]; then
             cpu_step "early_cpu_rhodes_spread_bend_$lt" cpu_rhodes_spread_bend "${CPUT[@]}" --rev-type "$t" --spread 127 -- --worst --usb 48000 --bend-sweep
         else
@@ -560,7 +560,7 @@ else
     printf 'midi_parity\tnotrun\t0\trelease\t%s\n' "$([ -n "${FRODHES_TRS_PORT:-}" ] && echo 'this tree has no tools/hil_midi_parity.py' || echo 'FRODHES_TRS_PORT not set (no interface on the TRS IN)')" >> "$OUT/steps.tsv"
 fi
 
-# 3. the CPU: the Rhodes x3 (+ the bend sweep, + SPREAD 127), VIBES, MARIMBA, every effect with the heaviest reverb
+# 3. the CPU: the Rhodes x3 (+ the bend sweep, + SPREAD 127), the 200A, every effect with the heaviest reverb
 # TYPE; then every engine once with each other reverb TYPE
 for k in 1 2 3; do
     step "cpu_rhodes_$k" cpu "${CPU[@]}" --takes 1 -- --worst --usb 48000
@@ -576,16 +576,14 @@ if [ "$BEND" = "1" ]; then
 else
     printf 'cpu_rhodes_spread_bend\tnotrun\t0\tcpu\thil_cpu has no --bend-sweep in this tree (the bend was dropped)\n' >> "$OUT/steps.tsv"
 fi
-cpu_step cpu_vibes cpu_vibes "${CPU[@]}" -- --engine vibes --worst --usb 48000
-cpu_step cpu_marimba cpu_marimba "${CPU[@]}" -- --engine marimba --worst --usb 48000
+cpu_step cpu_reed cpu_reed "${CPU[@]}" -- --engine reed --worst --usb 48000
 if [ -z "$OTHER_REVS" ] && [ "$DRY" != "1" ]; then
     printf 'cpu_rev_types\tnotrun\t0\tcpu\tno reverb TYPEs beyond %s in this tree\n' "${HEAVY_REV:-HALL}" >> "$OUT/steps.tsv"
 fi
 for t in $OTHER_REVS; do
     lt="$(echo "$t" | tr A-Z a-z)"
     cpu_step "cpu_rhodes_$lt" "cpu_rhodes_$lt" "${CPUT[@]}" --rev-type "$t" -- --worst --usb 48000
-    cpu_step "cpu_vibes_$lt" "cpu_vibes_$lt" "${CPUT[@]}" --rev-type "$t" -- --engine vibes --worst --usb 48000
-    cpu_step "cpu_marimba_$lt" "cpu_marimba_$lt" "${CPUT[@]}" --rev-type "$t" -- --engine marimba --worst --usb 48000
+    cpu_step "cpu_reed_$lt" "cpu_reed_$lt" "${CPUT[@]}" --rev-type "$t" -- --engine reed --worst --usb 48000
 done
 
 # 4. the key velocity converter's CPU gate (TEST-PLAN 3b; PLAN 3.4): each engine's worst scenarios only (the pedal
@@ -639,8 +637,7 @@ printf 't1_s2\tnotrun\t0\tmust\tcovered by step stress_48000: T1 S2 (the jack al
 # 7. the folded jack steps (PLAN 3.3 step 3): rows naming stress_48000's fold; one hil_jack on the Rhodes as the
 # cross-check of the folded numbers (CROSSCHECK=1, the plan's P3 side-by-side, until it is proven)
 for f in silence:"hil_scan silence: the USB peak 0 at idle (the jack check's 3 s idle, gated)" \
-         jack_vibes:"hil_jack's silence / hiss / loud chord / harmonics, VIBES (the jack check take)" \
-         jack_marimba:"hil_jack's silence / hiss / loud chord / harmonics, MARIMBA (the jack check take)" \
+         jack_reed:"hil_jack's silence / hiss / loud chord / harmonics, the 200A (the jack check take)" \
          tape_jack:"a TAPE recipe per engine with the moderate effects, judged by every detector" \
          usb_onset:"MIDI -> USB / jack onset at 48 kHz, clock_fit over the jack check and TAPE takes' onsets (44.1 kHz: step usb_onset_44100)"; do
     n="${f%%:*}"; printf '%s\tnotrun\t0\tjack\tcovered by step stress_48000: folded (stress_48000-fold.json): %s\n' "$n" "${f#*:}" >> "$OUT/steps.tsv"

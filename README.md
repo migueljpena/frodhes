@@ -1,24 +1,23 @@
 # Frodhes
 
-**A physically modelled electric piano, vibraphone and marimba for the M-VAVE FM-1.**
+**A physically modelled electric piano and Wurlitzer 200A for the M-VAVE FM-1.**
 
 Frodhes is an independent open-source project, not affiliated with or endorsed by M-VAVE, the Rhodes or Fender trademark owners or any instrument maker. It comes with no warranty: install it at your own risk (M-VAVE's own firmware can always be put back); see [LICENSING.md](LICENSING.md).
 
 <p align="center">
-  <img src="docs/manual/img/thumbnail.png?v=23c51997" width="380" alt="Frodhes: the start screen (FRODHES, ELECTRIC PIANO + VIBES + MARIMBA)">
+  <img src="docs/manual/img/thumbnail.png?v=b66b64bc" width="380" alt="Frodhes: the start screen (FRODHES, ELECTRIC PIANO + WURLI 200A)">
   <img src="docs/manual/img/piano.png?v=904c35f2" width="380" alt="Frodhes on the FM-1: the FRODHES page (TYPE, TONE, BELL, KEY VEL)">
 </p>
 
-Frodhes turns the FM-1 into an electric piano, a vibraphone and a marimba. Every note is computed live from the mechanics of the
+Frodhes turns the FM-1 into an electric piano and a Wurlitzer 200A. Every note is computed live from the mechanics of the
 instrument: on a Rhodes a hammer strikes a tine, the tine rings against its tonebar and a magnetic pickup turns the
 motion into sound, with the bark of hard notes, the bell of the attack, the slow whirl of a held tine and
-keys that each sound a little different; on the vibraphone a mallet strikes a bar,
-its tuned tube rings along and the motor makes it pulse; on the marimba a yarn mallet strikes a rosewood bar whose
-long tube makes the low notes bloom; on the Wurli 200A a felt hammer strikes a steel reed that barks past its pickup.
-Eight instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Vibes, Marimba, Wurli 200A and 200A Amp), a
+keys that each sound a little different; on the Wurli 200A a felt hammer strikes a steel reed that barks past its
+pickup, with the 200A's own vibrato. Six instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Wurli 200A and
+200A Amp), a
 stage-keyboard effects chain (compressor, a drive with five overdrive types, a resonant filter with its LFO, tremolo / wah, phaser, chorus, delay
 with a digital, an analog-style and a tape echo, a reverb with hall, plate and infinite types), tap tempo with MIDI
-clock sync, USB-MIDI in and out and TRS MIDI in, MIDI pitch bend, release velocity and a stereo SPREAD by key on the Rhodes, chord mode, a pattern recorder (1–16 bar loops, quantize, overdub, undo / erase), an arpeggiator, scales, a sustain pedal, velocity from the FM-1's own keys (TOUCH: LIGHT / MEDIUM / HEAVY / FIXED), 10-voice polyphony on every instrument and 21 factory plus 16 user presets. The screen shows one page at a time with
+clock sync, USB-MIDI in and out and TRS MIDI in, MIDI pitch bend, release velocity and a stereo SPREAD by key on the Rhodes, chord mode, a pattern recorder (1–16 bar loops, quantize, overdub, undo / erase), an arpeggiator, scales, a sustain pedal, velocity from the FM-1's own keys (TOUCH: LIGHT / MEDIUM / HEAVY / FIXED), 10-voice polyphony on every instrument and 17 factory plus 16 user presets. The screen shows one page at a time with
 four cards, one for each of the FM-1's four knobs, each read at a glance by its kind (an amount fills its row like a
 fader, a selector lights one block per option up to its choice, an ON / OFF switch shows a lit dot), the value always
 in the same large letters; the instrument brings its own VOICE pages; the first page, PERFORM, puts the drive, the filter's cutoff and the delay's and reverb's dry / wet (or
@@ -74,10 +73,11 @@ the MIDI map.
 | Page | K1 | K2 | K3 | K4 | Button |
 | --- | --- | --- | --- | --- | --- |
 | **PERFORM** | DRIVE | FILTER | DELAY | REVERB | HOME (assignable on ASSIGN) |
-| **FRODHES** (main) | TYPE | TONE (VIBES / MARIMBA: MALLET; 200A: BARK) | BELL (VIBES: MOTOR; MARIMBA: TUBE; 200A: vibrato DEPTH) | KEY VEL | HOME twice |
-| **VOICE 1/2** (VIBES: 1/3) | TONE (VIBES / MARIMBA: STRIKE) | BARK (MALLET) | BELL (TUBE) | HAMMER (WEIGHT) | (SELECT) |
-| **VOICE 2/2** (VIBES: 2/3) | DECAY (VIBES / MARIMBA: RING) | RELEASE (VIBES: DAMPER; MARIMBA: MUTE) | NOISE | TUNE | (SELECT) |
-| **VOICE 3/3** (VIBES: the motor; WURLI 200A: its vibrato) | MOTOR (200A: VIBRATO) (ON / OFF) | DEPTH | SPEED | SHAPE | (SELECT) |
+| **FRODHES** (main) | TYPE | TONE (200A: BARK) | BELL (200A: vibrato DEPTH) | KEY VEL | HOME twice |
+| **VOICE 1/2** (200A: 1/4) | TONE | BARK | BELL | HAMMER | (SELECT) |
+| **VOICE 2/2** (200A: 2/4) | DECAY | RELEASE | NOISE | TUNE | (SELECT) |
+| **VOICE 3/4** (WURLI 200A only: its vibrato) | VIBRATO (ON / OFF) | DEPTH | SPEED | SHAPE | (SELECT) |
+| **VOICE 4/4** (WURLI 200A only) | REG | | | | (SELECT) |
 | **COMPRESSOR** | THRESHOLD (OFF / on) | RATIO | ATTACK | MAKEUP | (SELECT) |
 | **DRIVE** | OFF / FDRV / KHLON / TSH8 / OHCD / BHLUE | AMOUNT | TONE | MIX | (SELECT) |
 | **FILTER** | OFF / LP12 / LP18 (default) / HP12 / HP18 / BP / NOTCH | FREQ | RESO | LFO | (SELECT) |
@@ -126,12 +126,11 @@ the release notes, `?v=`).
 ```
 firmware/src/frodhes.c    <- the app: keys, MIDI, sustain, settings, the main loop
 firmware/src/rhodes.c     <- the voice engine: tine and tonebar, hammer, pickup, damper
-firmware/src/bars.c       <- the bar instruments (VIBES, MARIMBA): bar modes, tube, mallet, damper / hand, motor
 firmware/src/reed.c       <- the WURLI 200A: reed modes, hammer, the bell pickup, damper, preamp, vibrato (tools/gen_reed.py)
 firmware/src/fx.c         <- the effects and the master (limiter, silence gate)
 firmware/src/keyvel.c     <- key velocity: a key's reading once it lands -> its velocity (TOUCH); hal/fm1_keyadc.h the rows
 firmware/src/ui.c         <- the pages;  params.c the parameters;  tempo.c tempo and scales;  presets.c
-firmware/gen/             <- tables generated by tools/gen_rhodes.py, tools/gen_bars.py and tools/gen_fx_tables.py
+firmware/gen/             <- tables generated by tools/gen_rhodes.py, tools/gen_reed.py and tools/gen_fx_tables.py
 firmware/src/platform.c   <- Dinghy's plumbing (boot, USB, updates, audio ISR, settings)
 ```
 
@@ -153,8 +152,8 @@ against the USB audio; `tools/hil_usb_onset.py` checks that every note reaches t
 (after a knob turn and a pause too: the settings save lands there); `tools/hil_autosave.py` lets the settings save land
 while a computer records and checks the USB stream stays clean (missed 0, overruns 0) and the flash write's longest
 interrupts-off stretch; `tools/hil_clock.py` sends MIDI clock (over USB-MIDI, or `--via trs --port NAME` from a MIDI
-interface into the TRS IN) and checks that every synced item follows it (the tremolo, phaser, chorus, filter LFO and
-VIBES motor by their effect on the audio, the delay types' echoes, the arpeggiator and the sequencer on the 1/16 grid),
+interface into the TRS IN) and checks that every synced item follows it (the tremolo, phaser, chorus and filter LFO by
+their effect on the audio, the delay types' echoes, the arpeggiator and the sequencer on the 1/16 grid),
 through a tempo change and a Stop / Start, with CLOCK INT too (`--via int`), and writes one table row | INT | EXT-USB |
 EXT-TRS (`--selftest`, `--dry-run` without the FM-1); `tools/hil_cpu.py` measures the
 audio interrupt's worst block and the USB audio's health (`--usb 44100|48000` holds a DAW-like stream open) and
@@ -170,7 +169,7 @@ fragments in `docs/changes/` well formed: `tools/changes.py`),
 runs the host tests and the release build, installs it on the FM-1 and runs the tiers the change needs
 (`tools/test_map.py` maps every file to them): the must-pass scenarios on every release, `tools/hil_scan.py --tier must`, six
 real-use scenarios judged by the firmware's own CC 116 counters and the audio; the full sound scan, the CPU, scan and jack tests on the
-Rhodes, VIBES and MARIMBA (and the MARIMBA sample-back), only when an engine or the DSP changed or with `--full`
+Rhodes and the WURLI 200A, only when an engine or the DSP changed or with `--full`
 (`--device-done FILE` records FM-1 runs already made on the same build, checked by its sha256), checks the docs' links (no version in them: they link `releases/latest`), assembles the fragments into
 `docs/releases/vX.Y.Z.md` and commits it with the fragments removed, asks before publishing, then pushes `main`,
 waits for CI to pass on that commit, tags, waits for the release workflow and checks that the published `.fwsc` is

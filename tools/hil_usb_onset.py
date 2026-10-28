@@ -16,7 +16,7 @@ ADC time is kept and the MIDI sends are stamped in the same stream clock, so ons
 sample indices (a capture's first sample is not the moment the stream started: by index USB reads ~60-90 ms late,
 the jack ~20-35 ms).
 
-    python3 tools/hil_usb_onset.py [--takes 3] [--rate 44100|48000|both] [--engine rhodes|vibes] [--no-touch]
+    python3 tools/hil_usb_onset.py [--takes 3] [--rate 44100|48000|both] [--engine rhodes|reed] [--no-touch]
                                    [--no-jack] [--settle S]
 
 Per note: the USB onset (the first sample over 8 LSB) and the jack's (1 % of the take's jack peak), ms after the
@@ -117,7 +117,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--takes", type=int, default=3)
     ap.add_argument("--rate", default="44100", choices=("44100", "48000", "both"))
-    ap.add_argument("--engine", default="rhodes", choices=("rhodes", "vibes"))
+    ap.add_argument("--engine", default="rhodes", choices=("rhodes", "reed"))
     ap.add_argument("--no-touch", action="store_true", help="no settings change before the takes")
     ap.add_argument("--no-jack", action="store_true")
     ap.add_argument("--jack-dev", default="M6")
@@ -140,13 +140,13 @@ def main():
         rig.out.send(M("control_change", control=c, value=int(v)))
     cc(120, 0)
     for c, v in H.param_defaults():
-        if c not in (79, 80):
+        if c != 80:
             cc(c, v)
     for k, v in H.DRY.items():
         rig.cc(k, v)
-    if a.engine == "vibes":
-        cc(79, H.VIBES_CC79)
-        cc(47, 0)                                   # the motor off
+    if a.engine == "reed":
+        cc(H.type_ccnum(4), H.type_cc(4))           # WURLI 200A (CC 115 0)
+        cc(47, 0)                                   # its vibrato off
     cc(H.RESET_CC, 127)
     time.sleep(0.3)
     rig.wait_silence(15.0)

@@ -5,7 +5,7 @@
     lengths), 0 events on the clean renders (USB and the simulated jack), and every injected glitch found by its own
     detector, 10 of each kind (a -40 dBFS one-sample click, a repeated frame, an underrun's hold, a 32-frame chunk, a
     stale half block, a repeated block, a 1-5 ms dropout, a clip into full scale, a level step, a lost packet, the jack's
-    click and dropout); the stimulus took every voice of the engine (the Rhodes 9, the bars 9);
+    click and dropout); the stimulus took every voice of the engine (the Rhodes', the 200A's);
   - each detector on a synthetic chord, clean and with its glitch;
   - the dry-run plan, the CC 116 reply parsing, the periodicity check, hil_scan's stress_max entry."""
 import os
@@ -120,11 +120,11 @@ def test_jack_zero_wants_a_cut():
     assert [p for p, _ in C.det_zero(y, fs, exact=False)] == [20000]
 
 
-def test_step_under_a_motor():
+def test_step_under_a_vibrato():
     """a chord out of silence under a 3.5 Hz AM that dips 15 dB: no step with the take's periods (am_periods), a step
     without them; a real -20 dB step under the same AM is found either way"""
     fs = 44100
-    ccs = C.engine_ccs("vibes", C.HEAVY)
+    ccs = C.engine_ccs("reed", C.HEAVY)                     # (the 200A, its vibrato on with the effects)
     per = C.am_periods(ccs)
     assert per and abs(per[0] - 1 / C.lfo_hz(78)) < 1e-9 and abs(per[0] - 0.284) < 0.002
     t = np.arange(int(3 * fs)) / fs
@@ -147,7 +147,7 @@ def test_step_in_a_modulations_first_period():
     0.43 to 0.47 s, then back up. USB alone: a step (as before the fix); with the jack (sim_jack, the same wave): the
     music's own, information; a USB-only step at the same moment (the jack clean): an event, both ways"""
     fs = 44100
-    ccs = C.engine_ccs("marimba", C.HEAVY)
+    ccs = C.engine_ccs("rhodes", C.HEAVY)
     per = C.am_periods(ccs)
     assert per and max(per) > 0.3
     t = np.arange(int(2 * fs)) / fs
@@ -329,7 +329,7 @@ def test_hil_cpu_reads_the_same_counters():
     import hil_cpu
     import hil_must
     assert hil_must.USB_ITEMS is hil_cpu.USB_ITEMS and hil_cpu.TARGET_US == C.CPU_TARGET_US
-    assert hil_cpu.default_voices("rhodes") == C.voices("rhodes") and hil_cpu.default_voices("vibes") == C.voices("vibes")
+    assert hil_cpu.default_voices("rhodes") == C.voices("rhodes") and hil_cpu.default_voices("reed") == C.voices("reed")
 
 
 def test_track_stops_where_usb_ends():

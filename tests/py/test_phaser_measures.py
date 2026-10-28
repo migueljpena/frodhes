@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""tools/hil_scan.py vibes_fx's PHASER measures, proved on synthetic signals of known rate / timbre and on the host
+"""tools/hil_scan.py's PHASER measures (born in its VIBES suite, vibes_fx), proved on synthetic signals of known rate / timbre and on the host
 build's phaser at several tempos (the FM-1 VIBES suite, 2026-10-18, flagged PHASER SYNC and PHASER FDBK on the jack;
 both were the measure, not fx.c):
 
@@ -62,11 +62,11 @@ PB = [("PH_SW", 1), ("PH_DEPTH", 80), ("PH_SPEED", P["PH_SPEED"]["de"]), ("PH_FD
 
 
 def take(tag, settings, bpm=120, stim=h.ST_LONG):
-    """a host take as hil_scan's VRig: the defaults, DRY, VIBES, the motor off, the settings; the TEMPO page's knob
+    """a host take as hil_scan's VRig did it: the defaults, DRY, the 200A, its vibrato off, the settings; the TEMPO page's knob
     to bpm; CC 10 before the chord; 44.1 -> 48 kHz; the Take's 'jack' is the right side (the other listening point)"""
     dur, ev = stim
-    pre = ([(c, v) for c, v in h.param_defaults() if c not in (79, 80)] + [(h.CC[n], v) for n, v in h.DRY.items()]
-           + [(79, h.VIBES_CC79), (P["MOT_ON"]["cc"], 0)] + h.ccs(settings))
+    pre = ([(c, v) for c, v in h.param_defaults() if c not in (80, 115)] + [(h.CC[n], v) for n, v in h.DRY.items()]
+           + [(115, 0), (P["MOT_ON"]["cc"], 0)] + h.ccs(settings))
     lines = [H.cc(5 + k // 16, c, v) for k, (c, v) in enumerate(pre)]
     t0 = 300
     if bpm != 120:
@@ -88,7 +88,8 @@ def take(tag, settings, bpm=120, stim=h.ST_LONG):
 @pytest.mark.parametrize("bpm", [69, 103, 120])
 def test_phaser_sync_runs_at_the_note_values(bpm):
     """fx.c's PH_SYNC: one LFO cycle per note value at any tempo; the measure (vibes_fx phrate: lfo_rate over the
-    300-3000 Hz band re DEPTH 0) reads it on both sides. At 69 BPM the old measure read 1/4 as 1.73 Hz"""
+    300-3000 Hz band re DEPTH 0) reads it on both sides. (At 69 BPM the old measure read VIBES' 1/4 as 1.73 Hz; on the
+    200A's chord it errs less: test_the_old_phaser_rate_picked_a_harmonic keeps the failure)"""
     pb = h.with_(PB, ("PH_DEPTH", 127))
     ref = take(f"ref-{bpm}", h.with_(pb, ("PH_DEPTH", 0)), bpm)
     T = {k: take(f"{k.replace('/', '')}-{bpm}", h.with_(pb, ("PH_SYNC", h.sync_idx(k))), bpm) for k in ("1/4", "1/8")}
@@ -98,8 +99,6 @@ def test_phaser_sync_runs_at_the_note_values(bpm):
             want = bpm / 60 / beats
             got = h.lfo_rate(d, fps, 0.25, 10)
             assert abs(got / want - 1) <= 0.005, (bpm, q, k, want, got)
-            if bpm == 69 and k == "1/4":
-                assert old_phrate(d, fps, 2, 0.2, 5) > 1.3 * want      # the flag, reproduced
 
 
 def test_frame_dist_sees_a_moving_resonance():

@@ -3,8 +3,8 @@
 """Screenshots for the manual: the host build walks every page (and a few states) and saves PNGs to docs/manual/img/,
 then composes overview.png (PERFORM, VOICE, PHASER, COMPRESSOR; the README's Screens section: its intro picture is piano.png, the FRODHES page). The page list is the firmware's: a first host run
 walks SELECT and reads each page's name back (the engine's VOICE pages are dynamic: voice1.png, voice2.png on the
-Rhodes; voice1-vibes.png .. voice3-vibes.png on VIBES; voice1-marimba.png, voice2-marimba.png on MARIMBA, with
-piano-vibes.png / piano-marimba.png their FRODHES page). Files left in the folder from pages that went are listed.
+Rhodes; voice1-200a.png .. voice4-200a.png on the WURLI 200A, with piano-200a.png its FRODHES page). Files left in
+the folder from pages that went are listed.
 Into docs/manual/img/ (the default), it then sets every picture link's ?v= in README.md / docs/MANUAL.md to the
 file's hash (tools/doc_links.py --fix). tests/py/test_manual_shots.py runs it into a temporary folder and fails if
 a committed screenshot differs from what the code draws: a PR that changes the UI re-runs this script (and a
@@ -23,7 +23,7 @@ measured by tools/display_cal.py from two photos of the FM-1 taken 2026-10-17 (p
   1. the colour test pattern (developer CC 3): 39 flat swatches (the 6 palettes, a grey ramp, R G B Y K W), which
      fix the panel's shape: per input channel x ** gamma, a 3 x 3 crosstalk matrix, a flare (rms 15 / 255 over
      the swatches; that photo is exposed for its bright swatches);
-  2. the FRODHES page (TYPE VIBES): mostly black, so the camera, like the eye, opens up; its black and its gauge
+  2. the FRODHES page (TYPE VIBES, Frodhes' bar engine then): mostly black, so the camera, like the eye, opens up; its black and its gauge
      tracks (C_LINE) set the viewing exposure per channel in linear light (k R G B = 4.64 5.53 3.89, f = 0.021
      0.028 0.049); the brighter steps are clipped in that photo (lower bounds only).
 Combined (x = the framebuffer colour 0..1, as host.c's write_ppm expands RGB565):
@@ -67,7 +67,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "manual", "img")
 BIN = os.path.join(ROOT, "build", "host", "frodhes")
 # a page's file name, by its base title (host_state "page"); the VOICE pages are numbered in the SELECT order
-# (voice1.png, voice2.png; VIBES: voice1-vibes.png ...), as the engine's table makes them. (DECAY / MOTOR: the pages
+# (voice1.png, voice2.png; the 200A: voice1-200a.png ...), as the engine's table makes them. (DECAY / MOTOR: the pages
 # of the builds before the dynamic VOICE pages.)
 NAME = {"PERFORM": "perform", "FRODHES": "piano", "DECAY": "decay", "MOTOR": "motor", "COMPRESSOR": "comp",
         "FILTER": "filter", "DRIVE": "drive", "TREM/WAH": "trem", "PHASER": "phaser", "CHORUS": "chorus",
@@ -131,10 +131,8 @@ def main():
     os.makedirs(os.path.join(ROOT, "build", "host"), exist_ok=True)
     tag = os.path.join(ROOT, "build", "host", "manual")
     PAGES = names(walk_pages())                             # the SELECT order, as the firmware has it
-    vibes = names(walk_pages(["100 midi 0xB0 79 0"]), "-vibes")
-    vibes = vibes[vibes.index("piano-vibes") + 1:vibes.index("comp-vibes")]   # VIBES' own pages (VOICE 1..3)
-    mrmb = names(walk_pages(["100 midi 0xB0 79 127"]), "-marimba")             # CC 79 96..127: MARIMBA
-    mrmb = mrmb[mrmb.index("piano-marimba") + 1:mrmb.index("comp-marimba")]   # MARIMBA's own (VOICE 1..2, no motor)
+    reed = names(walk_pages(["100 midi 0xB0 115 0"]), "-200a")               # CC 115 0: the WURLI 200A
+    reed = reed[reed.index("piano-200a") + 1:reed.index("comp-200a")]        # its own pages (VOICE 1..4)
     L, shots, t = ["400 shot"], {400: "splash"}, 100
     if cards is not None:                                   # the rows' design variant (developer CC 11)
         L.insert(0, f"50 midi 0xB0 11 {int(cards)}")           # the start screen, before anything is touched
@@ -200,25 +198,16 @@ def main():
     L.append(f"{t} btn 8"); t += 1800
     L.append(f"{t} btn 2"); t += 300
     L.append(f"{t} shot"); shots[t] = "bypass"; t += 100
-    # VIBES (a bar TYPE): its own VOICE pages from the engine's table (VOICE 1/3 .. 3/3, the motor on the last), after
-    # the shots above, so they stay as they were
+    # the WURLI 200A: its own VOICE pages from the engine's table (VOICE 1/4 .. 4/4: the vibrato on 3/4, REG on 4/4),
+    # after the shots above, so they stay as they were
     L.append(f"{t} btn 2"); t += 100                        # effects on again
-    L.append(f"{t} midi 0xC0 12 0"); t += 100               # F13 VIBES MOTOR (TYPE VIBES, the motor at 3.5 Hz)
-    L.append(f"{t} btn 8"); t += 100                        # HOME: the FRODHES page with TYPE VIBES
+    L.append(f"{t} midi 0xC0 32 0"); t += 100               # F17 200A VIB (TYPE 200A, its vibrato on at 5.4 Hz)
+    L.append(f"{t} btn 8"); t += 100                        # HOME: the FRODHES page with TYPE 200A
     L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700
-    L.append(f"{t} shot"); shots[t] = "piano-vibes"; t += 100
-    for name in vibes:                                      # SELECT through them, a note on each (live readouts)
+    L.append(f"{t} shot"); shots[t] = "piano-200a"; t += 100
+    for name in reed:                                       # SELECT through them, a note on each (live readouts)
         L.append(f"{t} turn 0 1"); t += 100
         L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700   # (the TYPE message has gone)
-        L.append(f"{t} shot"); shots[t] = name; t += 100
-    # MARIMBA (the bar engine's second TYPE): F15 MARIMBA, its FRODHES page (MALLET, TUBE) and VOICE 1/2, 2/2 (MUTE)
-    L.append(f"{t} midi 0xC0 14 0"); t += 100               # F15 MARIMBA (TYPE MARIMBA, MUTE 0)
-    L.append(f"{t} btn 8"); L.append(f"{t + 100} btn 8"); t += 200   # HOME twice: PERFORM, then the FRODHES page
-    L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700
-    L.append(f"{t} shot"); shots[t] = "piano-marimba"; t += 100
-    for name in mrmb:
-        L.append(f"{t} turn 0 1"); t += 100
-        L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700
         L.append(f"{t} shot"); shots[t] = name; t += 100
     L.append(f"{t} end")
     open(tag + ".txt", "w").write("\n".join(L) + "\n")

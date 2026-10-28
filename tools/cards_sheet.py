@@ -12,7 +12,7 @@ Writes to OUT_DIR:
   sheet-<combo>-<px>px.png     the ten pages, one combination at one size (A = SEGMENTS + LED, B = PIPS + LED,
                                C = SEGMENTS + BACK; amounts always the FADER fill)
   choices-<combo>-<px>px.png   the selector / toggle pages (FILTER LFO DELAY CHORUS COMPRESSOR DRIVE MIDI SETUP
-                               ARPEGGIO, VIBES VOICE 3/3)
+                               ARPEGGIO, 200A VOICE 3/4)
   side-by-side-24px.png        one row per page: A | B | C at 24 px
   sizes-A.png                  one row per page: A at 28 | 25 | 24 px
   earlier/                     the first round (0 TODAY, 1 FADER, 2 LINE at 28 px)
@@ -30,11 +30,11 @@ COMBOS = [(3, "A", "A: selectors SEGMENTS, toggles LED"), (4, "B", "B: selectors
 EARLIER = [(0, "0-today", "0 TODAY (the firmware's default)"), (1, "1-fader", "1 FADER: the fill on every card"),
            (2, "2-line", "2 LINE: a meter line under each row")]
 SIZES = [28, 25, 24]
-PAGES = [("piano", "FRODHES (Rhodes)"), ("piano-vibes", "FRODHES (VIBES)"), ("voice1-vibes", "VIBES VOICE 1/3"),
-         ("voice3-vibes", "VIBES VOICE 3/3"), ("voice1", "Rhodes VOICE 1/2"), ("filter", "FILTER"), ("lfo", "LFO"),
+PAGES = [("piano", "FRODHES (Rhodes)"), ("piano-200a", "FRODHES (200A)"), ("voice1-200a", "200A VOICE 1/4"),
+         ("voice3-200a", "200A VOICE 3/4"), ("voice1", "Rhodes VOICE 1/2"), ("filter", "FILTER"), ("lfo", "LFO"),
          ("delay", "DELAY"), ("comp", "COMPRESSOR"), ("midi", "MIDI")]
 CHOICES = [("filter", "FILTER"), ("lfo", "LFO"), ("delay", "DELAY"), ("chorus", "CHORUS"), ("comp", "COMPRESSOR"),
-           ("drive", "DRIVE"), ("midi", "MIDI"), ("setup", "SETUP"), ("arp", "ARPEGGIO"), ("voice3-vibes", "VIBES VOICE 3/3")]
+           ("drive", "DRIVE"), ("midi", "MIDI"), ("setup", "SETUP"), ("arp", "ARPEGGIO"), ("voice3-200a", "200A VOICE 3/4")]
 BG, INK, GAP, CAP = (24, 24, 24), (210, 210, 210), 16, 34
 
 
@@ -70,7 +70,7 @@ def grid(ims, cols, caps, title, w=480):
     return o
 
 
-BREATHE = [("piano", "FRODHES (Rhodes)"), ("piano-vibes", "FRODHES (VIBES)"), ("voice1-vibes", "VIBES VOICE 1/3")] + CHOICES
+BREATHE = [("piano", "FRODHES (Rhodes)"), ("piano-200a", "FRODHES (200A)"), ("voice1-200a", "200A VOICE 1/4")] + CHOICES
 
 
 def breathe(dst):
@@ -84,8 +84,8 @@ def breathe(dst):
          "in, the unit 2 px further out, 14 px after the label)").save(os.path.join(dst, "breathe.png"))
 
 
-FILL_PAGES = [("piano", "FRODHES (Rhodes)"), ("piano-vibes", "FRODHES (VIBES)"), ("voice1-vibes", "VIBES VOICE 1/3"),
-              ("voice3-vibes", "VIBES VOICE 3/3"), ("filter", "FILTER"), ("lfo", "LFO"), ("delay", "DELAY"),
+FILL_PAGES = [("piano", "FRODHES (Rhodes)"), ("piano-200a", "FRODHES (200A)"), ("voice1-200a", "200A VOICE 1/4"),
+              ("voice3-200a", "200A VOICE 3/4"), ("filter", "FILTER"), ("lfo", "LFO"), ("delay", "DELAY"),
               ("comp", "COMPRESSOR")]
 FILLS = [("now", []), ("30 %", ["-DUI_FILL_PCT=30"]), ("45 %", ["-DUI_FILL_PCT=45"]), ("60 %", ["-DUI_FILL_PCT=60"]),
          ("gradient 15-60 %", ["-DUI_FILL_PCT=60", "-DUI_FILL_GRAD=1"])]

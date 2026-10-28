@@ -6,8 +6,9 @@
  * strike's knock: a share of the first that dies in ~20 ms, keys A1..A4), and with BELL over its middle a fourth,
  * the second mode struck again by a short pulse of its own (the ping). Each mode is the two-multiply resonator of
  * bars.c (x' = a1 x - a2 xp with first-order error feedback, the Q32 form while 2 - a1 < 1/2, else Q30). Their sum is
- * the tip's swing u (Q27, 1 = a full strike's first-mode swing x the key's u). The pickup: the bell (1 + z^2)^-p at
- * z = u + d (log2 and exp2 tables), (b0 - bell) x the key's gain. The voices sum; the input is a first difference
+ * the tip's swing u (Q26, 1 = a full strike's first-mode swing x the key's u: 32 of them fit, a single v127 strike at
+ * every knob's top reaches 16; Q27 had no room left, tools/monkey.py seed 1, 2026-10-28). The pickup: the bell
+ * (1 + z^2)^-p at z = 2 u + d (Q27; log2 and exp2 tables), (b0 - bell) x the key's gain. The voices sum; the input is a first difference
  * (the 200A's differentiating pickup input, reed_model fc 1 MHz: y = (s - s1) / 2); the preamp tanh(drive y); the
  * strikes' action noise after it (picked up: in the line).
  *
@@ -79,7 +80,7 @@ static re_rks_t re_rks[2];
 static volatile uint32_t re_pub;              /* the published buffer + 1 (0: none yet) */
 
 typedef struct {
-    int32_t x1, x2, err;                      /* x[n], x[n-1] (Q27), the error-feedback remainder */
+    int32_t x1, x2, err;                      /* x[n], x[n-1] (Q26), the error-feedback remainder */
     int32_t g;                                /* the input weight x the strike level (Q31) */
     uint8_t lo, on;
 } re_ms_t;
@@ -101,7 +102,9 @@ typedef struct {
     uint32_t quiet;                           /* blocks under the floor */
     uint32_t age;
     int32_t fade;                             /* Q15, 32768 = not fading */
-    uint8_t note, vel, alive, held, stage, pend, pend_note, pend_vel;   /* stage: 0 sustain, 1 fast, 2 slow */
+    uint8_t note, vel, alive, held, stage, pend, pend_note, pend_vel;   /* stage: 0 sustain, 1 fast, 2 slow; pend: a
+                                              * note waits for this voice's steal fade: 1 held, 2 let go, 3 let go
+                                              * by an all-off (rhodes.c rh_start_pend) */
     uint8_t rpend;                            /* released: the stage changes after the next sample */
 } re_voice_t;
 
@@ -123,11 +126,12 @@ static uint8_t re_notes[RE_NV];
 static uint32_t re_ages;
 static uint8_t re_hold;                       /* the sustain pedal down */
 static int32_t re_s1;                         /* the first difference's last input (Q22) */
-/* the vibrato (the VIBES motor's controls, engine.c eng_bar_knob): on, depth and shape 0..127, the phase step (Q32) */
+/* the vibrato (the P_MOT_* controls, engine.c eng_vib_knob): on, depth and shape 0..127, the phase step (Q32) */
 static volatile uint8_t re_vib_on, re_vib_depth, re_vib_shape;
 static volatile uint32_t re_vib_inc = 525947u;  /* (5.4 Hz) */
 static uint32_t re_vph;                        /* its phase (Q32) */
 static int32_t re_vdb, re_vlp;                 /* the LDR's lagged gain (dB, Q16), the darkening low-pass (Q30) */
+static int32_t re_vfull;                       /* the trough's depth (dB, Q16) as it glides to DEPTH's (re_vibrato) */
 static uint32_t re_quiet_blocks;
 static uint32_t re_shed_count;
 #ifdef RE_TAP
@@ -353,6 +357,22 @@ static void re_vwords(re_voice_t *v, uint32_t st)
     v->dirty &= (uint8_t)~(1u << st);
 }
 
+/* each running mode in the form (Q32 / Q30) of stage st's words: x1, x2 are Q26 in both, the error feedback's
+ * remainder moves by 2 bits. Every time a sounding stage's words are made again (a bend, a damper weight) the form
+ * may change (a mode crossing 2 - a1 = 1/2, ~4.9 kHz): words of one form run on a state of the other went unstable
+ * (tools/monkey.py seed 0, 2026-10-28: chord mode, the bend at -2, an int32 overflow in re_run) */
+static void re_form(re_voice_t *v, uint32_t st)
+{
+    uint32_t j;
+    for (j = 0; j < RE_NM; j++) {
+        re_ms_t *s = &v->m[j];
+        uint8_t lo = (uint8_t)(v->rk.m[j].lo >> st & 1u);
+        if (!s->on || lo == s->lo) continue;
+        s->err = lo ? (int32_t)((uint32_t)s->err << 2) : (int32_t)((uint32_t)s->err >> 2);
+        s->lo = lo;
+    }
+}
+
 /* the damper's stage (0 sustain, 1 fast, 2 slow): the older state rescaled so the motion goes on as the float
  * model's x[k] env[k] does (reed-worklet.js: the states scaled by the step each sample). r30: the step before over
  * the step after (Q30) */
@@ -360,14 +380,8 @@ static void re_set_stage(re_voice_t *v, uint32_t st, int32_t r30)
 {
     uint32_t j;
     if (v->dirty >> st & 1u) re_vwords(v, st);
-    for (j = 0; j < RE_NM; j++) {
-        re_ms_t *s = &v->m[j];
-        uint8_t lo = (uint8_t)(v->rk.m[j].lo >> st & 1u);
-        if (!s->on) continue;
-        if (lo != s->lo) s->err = lo ? (int32_t)((uint32_t)s->err << 2) : (int32_t)((uint32_t)s->err >> 2);
-        s->lo = lo;
-        s->x2 = (int32_t)(((int64_t)s->x2 * r30) >> 30);
-    }
+    re_form(v, st);
+    for (j = 0; j < RE_NM; j++) if (v->m[j].on) v->m[j].x2 = (int32_t)(((int64_t)v->m[j].x2 * r30) >> 30);
     v->stage = (uint8_t)st;
 }
 
@@ -393,16 +407,21 @@ static int32_t re_level(const re_key_t *K, const re_rk_t *r, uint32_t vel, int32
 }
 
 /* a half-sine of n samples, area 1 (Q30: sin((i + .5) pi / n) sin(pi / 2n)), x r15, added to what is left of buf from
- * at (of had), delayed one sample (reed-worklet.js Mode.step's x1); the new length */
-static uint32_t re_join(int32_t *buf, uint32_t at, uint32_t had, uint32_t n, int32_t r15, uint32_t cap)
+ * at (of had), delayed one sample (reed-worklet.js Mode.step's x1); the new length. mx: the hammer is still on the
+ * reed (the last contact not over): one contact, the larger force of the two at each sample, not their sum (a hammer
+ * cannot strike twice while it touches the reed; MIDI can: two v127 note-ons of A1 in one sample, every knob at its
+ * top, took the swing past 32, tools/monkey.py seed 1, 2026-10-28) */
+static uint32_t re_join(int32_t *buf, uint32_t at, uint32_t had, uint32_t n, int32_t r15, uint32_t cap, int mx)
 {
     uint32_t i, rest = had > at ? had - at : 0u, len = rest > n + 1u ? rest : n + 1u, step = 67108864u / n;
     int32_t sc = re_sin_ph(step);                                 /* sin(pi / 2n) */
     if (len > cap) len = cap;
     for (i = 0; i < len; i++) {
         int32_t a = i < rest ? buf[at + i] : 0;
-        if (i >= 1u && i - 1u < n)
-            a += (int32_t)(((((int64_t)re_sin_ph((2u * (i - 1u) + 1u) * step) * sc) >> 30) * r15) >> 15);
+        if (i >= 1u && i - 1u < n) {
+            int32_t b = (int32_t)(((((int64_t)re_sin_ph((2u * (i - 1u) + 1u) * step) * sc) >> 30) * r15) >> 15);
+            a = mx ? (b > a ? b : a) : a + b;
+        }
         buf[i] = a;
     }
     return len;
@@ -433,7 +452,7 @@ static void re_start(re_voice_t *v, uint32_t note, uint32_t vel)
         s->g = (int32_t)(((int64_t)v->rk.m[j].b * v->lvl) >> 24);   /* the input weight x the level, Q31 */
     }
     v->stage = 0;
-    v->pn = re_join(v->pbuf, 0, 0, re_contact(K, &v->rk, vel, R->lhx, 0), 32768, RE_PBUF); v->pi = 0;
+    v->pn = re_join(v->pbuf, 0, 0, re_contact(K, &v->rk, vel, R->lhx, 0), 32768, RE_PBUF, 0); v->pi = 0;
     v->bn = v->bi = v->blen = 0;
     if (v->m[3].on) {                                             /* the ping's pulse: min(0.25 ms, half its period) */
         int32_t l = RE_L_PING, lh = v->rk.ltcap - RE_L_TCPER - RE_L_R2 - (1 << 26);
@@ -441,7 +460,7 @@ static void re_start(re_voice_t *v, uint32_t note, uint32_t vel)
         if (lh < l) l = lh;
         nb = (re_exp2(l, 16) + 32768) >> 16;
         v->blen = nb < 2 ? 2u : nb > (int64_t)(RE_BBUF - 2u) ? RE_BBUF - 2u : (uint32_t)nb;
-        v->bn = re_join(v->bbuf, 0, 0, v->blen, 32768, RE_BBUF);
+        v->bn = re_join(v->bbuf, 0, 0, v->blen, 32768, RE_BBUF, 0);
     }
     v->b0 = re_bell((uint64_t)((int64_t)v->rk.d * v->rk.d) + ((uint64_t)1 << 54), v->p16);
     v->rel = 0; v->rpend = 0; v->quiet = 0; v->fade = 32768; v->held = 1; v->alive = 1; v->pend = 0;
@@ -481,16 +500,21 @@ static int re_strike(uint32_t note, uint32_t vel)
             int32_t lv = re_level(K, &v->rk, vel, R->bark, R->w2f);
             int32_t r15 = (int32_t)re_exp2(re_log2((uint64_t)(lv > 0 ? lv : 1), 0) - re_log2((uint64_t)(v->lvl > 0 ? v->lvl : 1), 0), 15);
             re_noise(note, vel, &v->rk);
-            v->pn = re_join(v->pbuf, v->pi, v->pn, re_contact(K, &v->rk, vel, R->lhx, 0), r15, RE_PBUF); v->pi = 0;
-            if (v->m[3].on) { v->bn = re_join(v->bbuf, v->bi, v->bn, v->blen, r15, RE_BBUF); v->bi = 0; }
+            v->pn = re_join(v->pbuf, v->pi, v->pn, re_contact(K, &v->rk, vel, R->lhx, 0), r15, RE_PBUF, v->pi < v->pn);
+            v->pi = 0;
+            if (v->m[3].on) { v->bn = re_join(v->bbuf, v->bi, v->bn, v->blen, r15, RE_BBUF, v->bi < v->bn); v->bi = 0; }
             if (v->stage) re_set_stage(v, 0, re_ex(-re_ad(v, v->stage)));
             v->rel = 0; v->rpend = 0; v->quiet = 0; v->held = 1; v->age = ++re_ages;
             return 1;
         }
     for (i = 0; i < RE_NV; i++) if (!re_v[i].alive) { best = i; break; }
-    if (best == RE_NV) {                                          /* every voice taken: the oldest fades in 5 ms */
-        for (i = 0; i < RE_NV; i++) if (re_v[i].pend) return 0;   /* one steal at a time */
-        for (i = 0; i < RE_NV; i++) if (re_v[i].age < old) { old = re_v[i].age; best = i; }
+    if (best == RE_NV) {                                          /* every voice taken: the oldest not already
+                                                                  * given a note fades in 5 ms (as rhodes.c: a steal
+                                                                  * per voice at once; one at a time spread a chord
+                                                                  * over the pedal's full voices across ~10 blocks,
+                                                                  * tools/hil_crackle.py, 2026-10-28) */
+        for (i = 0; i < RE_NV; i++) if (!re_v[i].pend && re_v[i].age < old) { old = re_v[i].age; best = i; }
+        if (best == RE_NV) return 0;                              /* every voice waits for a note: next block */
         re_v[best].pend = 1; re_v[best].pend_note = (uint8_t)note; re_v[best].pend_vel = (uint8_t)vel;
         if (re_v[best].fade == 32768) re_v[best].fade = 32767;
         re_shed_count++;
@@ -525,6 +549,7 @@ static void re_damp(re_voice_t *v, uint32_t w15)
         if (v->stage) {
             int64_t a1;
             re_vwords(v, v->stage);
+            re_form(v, v->stage);
             a1 = re_ad(v, v->stage);
             {   uint32_t j;
                 int32_t r30 = re_ex(a1 - a0);                     /* the step before (e^-a0) over the one after */
@@ -575,6 +600,8 @@ static void re_note_off(uint32_t note, uint32_t rv)
             re_v[i].rg = (uint16_t)rh_rel_gain(rv);
             re_damp(&re_v[i], re_key_w(&re_v[i]));
         }
+    for (i = 0; i < RE_NV; i++)                                   /* let go while it waits for a steal's fade */
+        if (re_v[i].alive && re_v[i].pend == 1u && re_v[i].pend_note == note) re_v[i].pend = 2;
 }
 
 static void re_pedal(uint32_t cc)
@@ -589,7 +616,10 @@ static void re_all_off(void)
 {
     uint32_t i;
     re_hold = 0; re_pedal_cc = 0;
-    for (i = 0; i < RE_NV; i++) { re_v[i].held = 0; re_v[i].rg = 32768; re_damp(&re_v[i], 32768u); }
+    for (i = 0; i < RE_NV; i++) {
+        re_v[i].held = 0; re_v[i].rg = 32768; re_damp(&re_v[i], 32768u);
+        if (re_v[i].pend) re_v[i].pend = 3;                       /* the waiting note starts damped (fuzz 513) */
+    }
 }
 
 static void re_kill_all(void)
@@ -603,7 +633,7 @@ static void re_kill_all(void)
 
 static int re_quiet(void) { return re_active_bits == 0 && re_quiet_blocks >= 2u; }
 
-/* one mode, n samples, its sum into u (Q27); the force f (or none) */
+/* one mode, n samples, its sum into u (Q26); the force f (or none) */
 static void re_run(re_ms_t *s, const re_mw_t *w, uint32_t st, const int32_t *f, int32_t *u, uint32_t n)
 {
     int32_t x1 = s->x1, x2 = s->x2, err = s->err, k1 = w->k[st][0], k2 = w->k[st][1], g = s->g;
@@ -611,15 +641,16 @@ static void re_run(re_ms_t *s, const re_mw_t *w, uint32_t st, const int32_t *f, 
     if (s->lo)
         for (i = 0; i < n; i++) {
             int64_t a = (int64_t)(uint32_t)err - (int64_t)k1 * x1 + (int64_t)k2 * x2;
-            if (f) a += ((int64_t)g * f[i]) >> 2;             /* Q31 x Q30 >> 2 = Q59: x 2^32 of Q27 */
-            x2 = 2 * x1 - x2 + (int32_t)(a >> 32); err = (int32_t)a;
+            if (f) a += ((int64_t)g * f[i]) >> 3;             /* Q31 x Q30 >> 3 = Q58: x 2^32 of Q26 */
+            x2 = (int32_t)(2u * (uint32_t)x1 - (uint32_t)x2 + (uint32_t)(int32_t)(a >> 32)); err = (int32_t)a;   /* (mod
+                                                          * 2^32: 2 x1 may pass int32, the result fits) */
             { int32_t t = x1; x1 = x2; x2 = t; }
             u[i] += x1;
         }
     else
         for (i = 0; i < n; i++) {
             int64_t a = (int64_t)(uint32_t)err + (int64_t)k1 * x1 - (int64_t)k2 * x2;
-            if (f) a += ((int64_t)g * f[i]) >> 4;             /* Q31 x Q30 >> 4 = Q57: x 2^30 of Q27 */
+            if (f) a += ((int64_t)g * f[i]) >> 5;             /* Q31 x Q30 >> 5 = Q56: x 2^30 of Q26 */
             x2 = (int32_t)(a >> 30); err = (int32_t)a & 0x3FFFFFFF;
             { int32_t t = x1; x1 = x2; x2 = t; }
             u[i] += x1;
@@ -653,17 +684,24 @@ static inline int32_t re_cos32(uint32_t ph)
 
 /* the 200A's vibrato on the line (reed_model.trem_stage, the set's trem_ldr): in dB -depth 20 C dip, dip =
  * (1 + cos x + h2d (cos 2x - 1)) / 2 (0 at the top, 1 in the trough), through the LDR's lag (on fast, off slow); the
- * loud phase darker: a 1 kHz low-pass mixed in by 1 - gmin / g. SHAPE 0 the 200A's own cycle, 127 a smooth sine */
+ * loud phase darker: a 1 kHz low-pass mixed in by 1 - gmin / g. SHAPE 0 the 200A's own cycle, 127 a smooth sine.
+ * DEPTH (and VIBRATO on / off) glides in over ~6 ms (1/256 a sample), and the low-pass follows the line while the
+ * vibrato is off: a jump of either clicked (the darkening's mix stepped at once, from a stale low-pass;
+ * tools/control_sweep.py, 2026-10-28) */
 static void re_vibrato(int32_t *o, uint32_t n)
 {
     int32_t dep = re_vib_on ? re_vib_depth : 0, sh = re_vib_shape;
     int32_t c16 = RE_TR_C0 + (RE_TR_C1 - RE_TR_C0) * sh / 127, h2d = RE_TR_HD0 + (RE_TR_HD1 - RE_TR_HD0) * sh / 127;
-    int32_t full = (int32_t)(((int64_t)RE_TR_DB * dep) / 127);    /* the trough at no lag: -depth 20 dB, Q16 */
-    int32_t amp = (int32_t)(((int64_t)full * c16) >> 16);
+    int32_t full0 = (int32_t)(((int64_t)RE_TR_DB * dep) / 127);   /* the trough at no lag: -depth 20 dB, Q16 */
     uint32_t i, inc = re_vib_inc;
-    if (!dep && re_vdb == 0) { re_vph += inc * n; return; }       /* off and settled: the phase runs on */
+    if (!dep && re_vdb == 0 && re_vfull == 0) {                   /* off and settled: the phase runs on, the */
+        re_vph += inc * n; re_vlp = o[n - 1u]; return;            /* low-pass with the line */
+    }
     for (i = 0; i < n; i++) {
-        int32_t c1, c2, dip, tgt, g, m;
+        int32_t c1, c2, dip, tgt, g, m, full, amp;
+        re_vfull += (full0 - re_vfull + (full0 > re_vfull ? 255 : 0)) >> 8;   /* (rounded up: it reaches full0) */
+        full = re_vfull;
+        amp = (int32_t)(((int64_t)full * c16) >> 16);
         re_vph += inc;
         c1 = re_cos32(re_vph); c2 = re_cos32(re_vph << 1);
         dip = (int32_t)(((int64_t)(1 << 30) + c1 + (((int64_t)h2d * (c2 - (1 << 30))) >> 16)) >> 1);   /* Q30 */
@@ -724,6 +762,7 @@ static void re_render(int32_t *mono, uint32_t n)
             v->lb = re_bend_l;
             v->dirty = 7u;
             re_vwords(v, v->stage);
+            re_form(v, v->stage);
         }
         for (j = 0; j < n; j++) u[j] = 0;
         j = 0;
@@ -745,7 +784,7 @@ static void re_render(int32_t *mono, uint32_t n)
             j += seg;
         }
         for (j = 0; j < n; j++) {
-            int64_t z = (int64_t)u[j] + d;
+            int64_t z = (int64_t)u[j] * 2 + d;                /* (Q26 -> the pickup's Q27) */
             int32_t o = (int32_t)(((int64_t)(b0 - re_bell((uint64_t)(z * z) + ((uint64_t)1 << 54), p16)) * gout) >> 30);
             int32_t a = u[j] < 0 ? -u[j] : u[j];
             if (a > peak) peak = a;
@@ -759,10 +798,14 @@ static void re_render(int32_t *mono, uint32_t n)
                 sr[j] += (int32_t)(((int64_t)o * (256 - v->pan)) >> 10);
             }
         }
-        v->quiet = peak < 1342 && v->pi >= v->pn ? v->quiet + 1u : 0u;   /* |u| < 1e-5 (Q27) */
+        v->quiet = peak < 671 && v->pi >= v->pn ? v->quiet + 1u : 0u;    /* |u| < 1e-5 (Q26) */
         if (v->quiet > 8u || (v->fade != 32768 && v->fade <= 0)) {
             v->alive = 0;
-            if (v->pend) { v->pend = 0; re_start(v, v->pend_note, v->pend_vel); }
+            if (v->pend) {                                    /* the waiting note: let go meanwhile, it starts damped */
+                uint32_t rel = v->pend;
+                v->pend = 0; re_start(v, v->pend_note, v->pend_vel);
+                if (rel >= 2u) { v->held = 0; v->rg = 32768; re_damp(v, rel == 3u ? 32768u : re_key_w(v)); }
+            }
         }
         if (v->alive) { act |= 1u << i; re_notes[i] = v->note; }
     }

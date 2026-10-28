@@ -156,14 +156,14 @@ def test_user_preset_with_tape_round_trips():
 
 def test_factory_presets_unchanged():
     """the factory presets store the delay type (DIG 1 / ANA 2 / TAPE 3), not a CC value, so the new CC bands change
-    none of them; the 0.9.5 presets F06 DRIVEN 77, F14 VIBES ECHO, F17 TAPE ECHO and F19 RADIO (the starters U10 / U12
-    until 0.9.5's RC) use TAPE. The user bank's starters (PR_SDATA, 0.9.5) store the type the same way: U04 DREAM PAD
+    none of them; the 0.9.5 presets F06 DRIVEN 77, F13 TAPE ECHO and F15 RADIO (the starters U10 / U12 until 0.9.5's
+    RC) use TAPE. The user bank's starters (PR_SDATA, 0.9.5) store the type the same way: U04 DREAM PAD
     and U08 REEDY use TAPE"""
     import re
     src = open(tp.os.path.join(tp.os.path.dirname(__file__), "..", "..", "firmware", "src", "presets.c")).read()
     fac = re.search(r"PR_FDATA\[[^=]*= \{(.*?)\n\};", src, re.S).group(1)
     sta = re.search(r"PR_SDATA\[[^=]*= \{(.*?)\n\};", src, re.S).group(1)
-    for block, n_tape in ((fac, 4), (sta, 2)):
+    for block, n_tape in ((fac, 3), (sta, 2)):
         vals = [int(v) for v in re.findall(r"P_DL_SW, (\d+)", block)]
         assert vals and all(v in (1, 2, 3) for v in vals) and vals.count(3) == n_tape, vals
     assert src.count("P_DL_SW, ") == len(re.findall(r"P_DL_SW, (\d+)", fac + sta))   # (no third table missed)

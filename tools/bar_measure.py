@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Shared pieces of the bar-engine scans (tools/bar_scan.py, tools/bar_freq_scan.py): rendering through the host build
+"""Shared pieces of the host scans (born with Frodhes' bar-engine scans; the name stays): rendering through the host build
 (build/host/frodhes, the tests/host.c script interface), the CC map, and the measurements (clicks, HP bursts,
 loudness, band envelopes, frequency, T60, t_90, AM depth). Everything at the host's 44.1 kHz; nothing here reads
 recordings."""
@@ -22,8 +22,6 @@ CC = dict(TYPE=80, DRIVE=81, TW_SW=17, TW_DEPTH=18, TW_RATE=19, TW_SYNC=20, TW_M
           FL_LFO=72, SUS=64, RAW=119, ARP_MODE=52, ARP_RATE=53, ARP_OCT=54, SEQ_PLAY=60, SEQ_BARS=61, SEQ_QUANT=62,
           SEQ_REC=63, SEQ_CLEAR=43)
 CARDS = ["TONE", "BARK", "BELL", "HAMMER", "DECAY", "RELEASE", "NOISE"]      # (+ TUNE, set from the panel)
-BAR_NAME = dict(TONE="STRIKE", BARK="MALLET", BELL="TUBE", HAMMER="WEIGHT", DECAY="RING", RELEASE="DAMPER",
-                NOISE="NOISE", TUNE="TUNE")
 
 
 def n_types():
@@ -33,15 +31,14 @@ def n_types():
 
 def type_cc(t):
     """the CC value selecting TYPE t on the CC that type_ccnum(t) names: CC 80 (by 32) for the Rhodes types 0..3 as
-    before, CC 79 for the bar types (frodhes.c midi_cc, params.c TYPE_CC79): VIBES 0..95, MARIMBA 96..127; VIBES is
-    sent as 64 (its 0.9.3 value), MARIMBA as 127"""
+    before, CC 115 for the 200A's two (frodhes.c midi_cc): 0 the 200A, 127 200A AMP"""
     if t < 4:
         return t * 32 + 8
-    return {4: 64, 5: 127}[t]
+    return {4: 0, 5: 127}[t]
 
 
 def type_ccnum(t):
-    return 80 if t < 4 else 79
+    return 80 if t < 4 else 115
 
 
 def type_name(t):
@@ -271,46 +268,6 @@ def load_design(path):
     if not path or not os.path.exists(path):
         return []
     return json.load(open(path)).get("design", [])
-
-
-BAR_SPECS = ["bars_spec.json", "marimba_spec.json"]   # per bar type (params.c TYPE_SUB): VIBES, MARIMBA
-BAR_DATA = ["vibes.json", "marimba.json"]             # their data files (calib.st77_offset_db)
-
-
-def _type_arr(name):
-    src = open(os.path.join(ROOT, "firmware", "src", "params.c")).read()
-    m = re.search(name + r"\[N_TYPE_N\] = \{([^}]*)\}", src)
-    return [int(v) for v in m.group(1).split(",")] if m else None
-
-
-def type_has_motor(t):
-    """params.c TYPE_FLAGS bit0 (VIBES; MARIMBA has none: CC 47-51 stored, inert)"""
-    fl = _type_arr("TYPE_FLAGS")
-    return bool(fl and fl[t] & 1)
-
-
-def data_for_type(t):
-    """a bar type's data file (docs/model/data/vibes.json, marimba.json), None for a Rhodes type"""
-    eng, sub = _type_arr("TYPE_ENGINE"), _type_arr("TYPE_SUB")
-    if not eng or not eng[t]:
-        return None
-    return os.path.join(ROOT, "docs", "model", "data", BAR_DATA[sub[t] if sub else 0])
-
-
-def spec_for_type(t):
-    """the spec file for TYPE t: a bar type's own (TYPE_SUB: VIBES bars_spec.json, MARIMBA marimba_spec.json), the
-    Rhodes types' rhodes_spec.json (STAGE 77)"""
-    d = os.path.join(ROOT, "docs", "model", "data")
-    src = open(os.path.join(ROOT, "firmware", "src", "params.c")).read()
-
-    def arr(name):
-        m = re.search(name + r"\[N_TYPE_N\] = \{([^}]*)\}", src)
-        return [int(v) for v in m.group(1).split(",")] if m else None
-    eng, sub = arr("TYPE_ENGINE"), arr("TYPE_SUB")
-    bars = bool(eng) and eng[t] != 0
-    if not bars:
-        return os.path.join(d, "rhodes_spec.json"), False
-    return os.path.join(d, BAR_SPECS[sub[t] if sub else 0]), True
 
 
 # ---------------------------------------------------------------- small PNG plots (Pillow; no matplotlib here)

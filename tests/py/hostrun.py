@@ -20,16 +20,15 @@ _built = {}
 
 
 def voices(engine="rhodes"):
-    """the host build's voice count for an engine ("rhodes", or "bars" / "vibes" / "marimba"): HOST_DEFS
-    -DRH_VOICES=N / -DBAR_VOICES=N (one engine), -DFR_VOICES=N (both), else rhodes.c's defaults (10 on
-    every engine)"""
-    key = "RH_VOICES" if engine == "rhodes" else "BAR_VOICES"
+    """the host build's voice count for an engine ("rhodes", or "reed": the 200A): HOST_DEFS -DRH_VOICES=N /
+    -DRE_VOICES=N (one engine), -DFR_VOICES=N (both), else the engine's default (rhodes.c, reed.c: 10 on both)"""
+    key, f = ("RH_VOICES", "rhodes.c") if engine == "rhodes" else ("RE_VOICES", "reed.c")
     defs = os.environ.get("HOST_DEFS", "")
     for name in (key, "FR_VOICES"):
         m = re.search(r"-D" + name + r"=(\d+)", defs)
         if m:
             return int(m.group(1))
-    src = open(os.path.join(ROOT, "firmware", "src", "rhodes.c")).read()
+    src = open(os.path.join(ROOT, "firmware", "src", f)).read()
     return int(re.search(r"#define " + key + r" (\d+)u", src).group(1))
 
 
@@ -95,8 +94,8 @@ class Run:
         self.seq_saves = [int(t) for t in re.findall(r"^\s*(\d+) ms  pattern . erased", out, re.M)]
         m = re.search(r"cpu-proxy max (\d+) us", out)
         self.cpu_proxy = int(m.group(1)) if m else None
-        m = re.search(r"cpu-proxy-each rhodes (\d+) bars (\d+)", out)   # each engine's own (a run can use both)
-        self.cpu_proxy_rh, self.cpu_proxy_bars = (int(m.group(1)), int(m.group(2))) if m else (None, None)
+        m = re.search(r"cpu-proxy-each rhodes (\d+) reed (\d+)", out)   # each engine's own (a run can use both)
+        self.cpu_proxy_rh, self.cpu_proxy_reed = (int(m.group(1)), int(m.group(2))) if m else (None, None)
 
     def state(self, t):
         """the dump taken at t ms"""

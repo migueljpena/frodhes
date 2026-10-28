@@ -6,7 +6,7 @@
   tools/gate_r.py --save     render the list and write the baseline (only from committed code, on purpose)
 
 The list: every tests/scripts/*.txt WAV (as `make test` renders them), the default run (`make host`), 36 effect
-combinations (Rhodes and VIBES: every effect, the filter types, 8 bass notes v127, a chord, the pedal) and
+combinations (Rhodes and the 200A: every effect, the filter types, 8 bass notes v127, a chord, the pedal) and
 tools/calib_report.py --host's renders (the 4 Rhodes TYPEs, keys 28-103 at v100). The host binary is built here
 (build/gate_r/frodhes) with the Makefile's flags. A change that may not move the sound (a CPU rewrite, a refactor)
 must leave every sha256 equal; a change that moves it on purpose re-saves the baseline in the same commit and says so.
@@ -50,11 +50,11 @@ def fx_scripts():
     for t in (14, 30, 45, 60, 75, 90, 110):
         cases[f'filt{t}'] = dict(FL_TYPE=t, FL_FREQ=50 + t // 3, FL_RESO=90, FL_LFO=100, PH_SW=127, PH_DEPTH=90)
     res = {}
-    for vib in (0, 1, 2):                         # the Rhodes (F01), VIBES (CC 79 0), MARIMBA (CC 79 127: Gate M)
+    for vib in (0, 1):                            # the Rhodes (F01), the 200A (CC 115 0)
         for name, fx in cases.items():
             ev, t = [], 50
             if vib:
-                ev.append(f'{t} midi 0xB0 79 {0 if vib == 1 else 127}'); t += 10
+                ev.append(f'{t} midi 0xB0 115 0'); t += 10
             d = dict(fx)
             if 'CP_SW' in d:
                 ev.append(f'{t} midi 0xB0 85 {d.pop("CP_SW")}'); t += 5
@@ -73,7 +73,7 @@ def fx_scripts():
                 t += 600
             ev.append(f'{t} midi 0xB0 64 0'); t += 2500
             ev.append(f'{t} end')
-            res[f'fx/{("", "v_", "m_")[vib]}{name}'] = '\n'.join(ev) + '\n'
+            res[f'fx/{("", "r_")[vib]}{name}'] = '\n'.join(ev) + '\n'
     return res
 
 

@@ -16,9 +16,9 @@
 #define DINGHY_HOST 1
 #define FS 44100u
 #include "fxp.h"
-static uint32_t rh_lfsr, bar_lfsr, bar_mot_ph;
+static uint32_t rh_lfsr, re_vph;
 static void eng_rh_kill_all(void) {}
-static void bar_kill_all(void) {}
+static void re_kill_all(void) {}
 /* fx.c's SPREAD (S13) mixes rhodes.c's side signal: none here (rh_side_on 0) */
 #define RH_SP_SEC(s)
 static int32_t rh_side[256];

@@ -297,8 +297,7 @@ if (location.search.includes("selftest")) {
   const t0 = performance.now();
   const wait = () => {
     if (!M || performance.now() - t0 < 1500) return setTimeout(wait, 100);
-    if (location.search.includes("vibes")) M._web_midi(0xB0, 79, 0);   // ?selftest&vibes: TYPE VIBES (CC 79)
-    if (location.search.includes("marimba")) M._web_midi(0xB0, 79, 127);   // ?selftest&marimba: TYPE MARIMBA (96..127)
+    if (location.search.includes("reed")) M._web_midi(0xB0, 115, 0);   // ?selftest&reed: TYPE WURLI 200A (CC 115)
     M._web_keys(1 << 7);                               // C4
     setTimeout(() => {
       const p = M._web_audio(16) >> 2, f = M.HEAPF32;

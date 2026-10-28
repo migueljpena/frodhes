@@ -11,14 +11,14 @@ tiers, the T1 scenarios, the T2 suites and the host extras, and why (each group 
  T1 must-pass   the real-use scenarios on the FM-1 (`hil_scan.py --tier must`), the firmware's counters gated:
                 1 DAW recording, stress_max (USB 44.1 + 48 kHz)   2 live on the jack   3 preset / TYPE switching
                 4 controls under load   5 update / rescue   6 CPU per engine
- T2 full scans  an engine or the DSP changed: today's hil_scan suites, VIBES / MARIMBA scans, sample-back, the jack
+ T2 full scans  an engine or the DSP changed: today's hil_scan suites, the 200A's checks, sample-back, the jack
 
 The map (first match wins; a firmware file no rule names -> T1 all + T2, so nothing new slips through untested):
  fm1_adc.h, fm1_keyadc.h, fm1_input.h, keyvel.c / .h -> T1 all + the USB counters + the key velocity checks
  usb.c, platform.c, hal/*, the startup  -> T1 all + the USB counters at both rates
  frodhes.c, libc.c, build.sh, build.py  -> T1 all (the glue; T2 waits for a DSP change: Gate R proves the renders)
  ota.c, recovery.c, loader/*, packaging -> T1 5
- rhodes.c, bars.c, engine.c, the tables -> T1 all + T2 (that engine's scans + sample-back)
+ rhodes.c, reed.c, engine.c, the tables -> T1 all + T2 (that engine's scans + sample-back)
  fx.c, fx_tables.h                      -> T1 1/4/6 + T2 effects suites
  drive.c, drv_*.c, drive_tables.h       -> T1 1/4/6 + T2 effects suites (the DRIVE's TYPEs)
  rev_types.c, rev_*.c                   -> T1 1/4/6 + T2 effects suites (the REVERB's TYPEs)
@@ -38,7 +38,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENARIOS = {1: "DAW recording: stress_max (USB 44.1 + 48 kHz)", 2: "live on the jack", 3: "preset / TYPE switching",
              4: "controls under load", 5: "update / rescue", 6: "CPU per engine"}
 ALL = (1, 2, 3, 4, 5, 6)
-ENGINES_T2 = ("rhodes", "vibes", "marimba", "reed")
+ENGINES_T2 = ("rhodes", "reed")
 SHOTS = "the screenshots / docs tests (tools/manual_shots.py, test_manual_shots, test_docs_vs_code)"
 SEQ = "the sequencer / arp scripts (tests/scripts/seq.txt, arp*.txt; tools/hil_seq.py)"
 USB2 = "the USB counters at both rates (44.1 and 48 kHz)"
@@ -58,14 +58,12 @@ RULES = [
     ("platform", ["firmware/src/platform.c", "firmware/src/store.h", "firmware/src/frodhes_store.h",
                   "firmware/src/set_store.c", "firmware/src/smk_wheel.h", "firmware/hal/*", "firmware/crt0.S", "firmware/app.ld"], ALL, (),
      (USB2,), "the platform: the ISRs, the clocks, the memory map (every scenario rides on it)"),
-    # (the app's glue, not its DSP: the voices and effects are rhodes.c / bars.c / fx.c, and Gate R on the host
+    # (the app's glue, not its DSP: the voices and effects are rhodes.c / reed.c / fx.c, and Gate R on the host
     # proves every render byte-identical, so the full scans wait for a DSP change)
     ("app", ["firmware/src/frodhes.c", "firmware/src/frodhes_smk.h", "firmware/src/libc.c"], ALL, (), (USB2,),
      "the app's glue: the audio ISR's wiring, the main loop, the MIDI CC map"),
     ("engine:rhodes", ["firmware/src/rhodes.c", "firmware/gen/rhodes_tables.h", "firmware/gen/rhodes_phim.h", "firmware/gen/rh_tone_g.h"], ALL, ("rhodes",), (),
      "the Rhodes engine (its DSP or tables)"),
-    ("engine:bars", ["firmware/src/bars.c", "firmware/src/bars.h", "firmware/gen/bars_tables.h"], ALL,
-     ("vibes", "marimba"), (), "the bar engine (VIBES, MARIMBA: its DSP or tables)"),
     ("engine:reed", ["firmware/src/reed.c", "firmware/gen/reed_tables.h"], ALL, ("reed",), (),
      "the reed engine (the Wurlitzer 200A: its DSP or tables)"),
     ("engine:dispatch", ["firmware/src/engine.c", "firmware/src/fxp.h"], ALL, ENGINES_T2 + ("effects",), (),

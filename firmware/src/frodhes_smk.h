@@ -12,16 +12,16 @@
  *               G#5..C6) are the sources SRC_EXT 156..165 (notes.c); through SCALE and chord mode as the FM-1's keys.
  *               Each key strikes at its own velocity (the unit's factory curve, smk_input.h) through the touch curve
  *               (smk_vel): KEY VEL is a medium press, as on the FM-1 with key velocity
- *   pads        top row 1..6 the TYPE (ST77 SUIT FELT DYNO VIBE MRMB), 7 / 8 the previous / next preset; bottom row
- *               9 DRIVE, 10 COMP, 11 FILTER, 12 TREM/WAH (VIBES: its MOTOR), 13 PHASER, 14 CHORUS, 15 DELAY on / off,
+ *   pads        top row 1..6 the TYPE (ST77 SUIT FELT DYNO 200A 2AMP), 7 / 8 the previous / next preset; bottom row
+ *               9 DRIVE, 10 COMP, 11 FILTER, 12 TREM/WAH, 13 PHASER, 14 CHORUS, 15 DELAY on / off,
  *               16 SUSTAIN (held: down; a tap latches, as REC). Lights: off dark orange, on light blue, bright while
  *               sounding; at DISPLAY BRIGHTNESS
- *   faders      FADER BANK switches (its light: bank B). A: the engine's first VOICE page (Rhodes TONE BARK BELL
- *               HAMMER; VIBES / MARIMBA STRIKE MALLET TUBE WEIGHT). B: the PERFORM knobs' four (ASSIGN sets them).
+ *   faders      FADER BANK switches (its light: bank B). A: the engine's first VOICE page (TONE BARK BELL
+ *               HAMMER). B: the PERFORM knobs' four (ASSIGN sets them).
  *               Soft takeover: a fader takes over once it reaches the value (after a bank change, a preset, a knob or
  *               MIDI moved it), the footer says where to go until then
  *   wheels      pitch: the bend, +-2 semitones (engine.c eng_bend_set, as MIDI pitch bend: the Rhodes); mod: the
- *               TREM/WAH depth (VIBES: the motor's depth), switching the effect on as a PERFORM knob does
+ *               TREM/WAH depth (and the 200A vibrato's DEPTH), switching TREM/WAH on as a PERFORM knob does
  *   pedal jack  a sustain pedal, either polarity: its reading at power-on is "up" (plug it in before switching on)
  *   < >         the previous / next page (as SELECT); KNOB BANK held: the panel check (the readings, for bring-up)
  *   lights      KNOB BANK while held, FADER BANK on bank B, < > where there is a page that way; DISPLAY BRIGHTNESS
@@ -154,10 +154,6 @@ static void smk_pad_hit(uint32_t p)
         if (PV(P_FL_TYPE)) { smk_mem_flt = (uint8_t)PV(P_FL_TYPE); param_set(P_FL_TYPE, 0); }
         else param_set(P_FL_TYPE, smk_mem_flt ? smk_mem_flt : 2);
         smk_say_onoff("FILTER", PV(P_FL_TYPE) != 0);
-    } else if (p == SP_TREM && TYPE_HAS_MOTOR(PV(P_TYPE))) {   /* VIBES: its motor */
-        param_set(P_MOT_ON, !PV(P_MOT_ON));
-        set.mot_user_off = !PV(P_MOT_ON);
-        smk_say_onoff("MOTOR", PV(P_MOT_ON) != 0);
     } else if (p >= SP_TREM && p <= SP_DLY)
         smk_fx_switch(p == SP_TREM ? 0u : p == SP_PHA ? 3u : p == SP_CHO ? 1u : 2u);
     ui_mark(E_CARDS);
@@ -269,7 +265,7 @@ static void smk_wheels(void)
         smk_bend16 = b;
         eng_bend_set(8192 + (b > 8191 ? 8191 : b));   /* (the MIDI bend's scale: 8192 = 2 semitones) */
     }
-    /* the mod wheel (up = a lower reading): more TREM/WAH depth, on VIBES more motor depth, once it moves: on top of
+    /* the mod wheel (up = a lower reading): more TREM/WAH depth (and vibrato depth on the 200A), once it moves: on top of
      * the DEPTH as set (params.c MW_ADD; 0.9.6, #29: it wrote DEPTH, its rest was DEPTH 0); moved up it switches the
      * effect on, back at rest off again if it did that (and nothing else switched it since) */
     if (!mhi) { mlo = m < MOD_LO ? m : MOD_LO; mhi = m > MOD_HI ? m : MOD_HI; }
@@ -283,15 +279,10 @@ static void smk_wheels(void)
             param_apply(P_TW_DEPTH);
             param_apply(P_MOT_DEPTH);
             if (mw && !smk_mw_woke) {
-                if (TYPE_HAS_MOTOR(PV(P_TYPE))) {
-                    if (!PV(P_MOT_ON)) { smk_mw_uoff = set.mot_user_off; param_set(P_MOT_ON, 1); set.mot_user_off = 0; smk_mw_woke = P_MOT_ON; }
-                } else if (!PV(P_TW_SW)) { param_set(P_TW_SW, set.last_on[0]); smk_mw_woke = P_TW_SW; }
+                if (!PV(P_TW_SW)) { param_set(P_TW_SW, set.last_on[0]); smk_mw_woke = P_TW_SW; }
                 smk_mw_wv = smk_mw_woke ? PV(smk_mw_woke) : 0;
             } else if (!mw && smk_mw_woke) {
-                if (PV(smk_mw_woke) == smk_mw_wv) {      /* (still as the wheel left it) */
-                    param_set(smk_mw_woke, 0);
-                    if (smk_mw_woke == P_MOT_ON) set.mot_user_off = smk_mw_uoff;
-                }
+                if (PV(smk_mw_woke) == smk_mw_wv) param_set(smk_mw_woke, 0);   /* (still as the wheel left it) */
                 smk_mw_woke = 0;
             }
             ui_mark(E_CARDS);
@@ -342,7 +333,7 @@ static void smk_buttons(uint32_t *pressed, uint32_t *released)
 }
 
 /* ---- the lights: the pads, the SMK's own buttons (ui_leds sets the LEDs from smk_btn_leds) */
-static int smk_sounding(void) { return (eng_cur == ENG_BARS ? bar_active_bits : rh_active_bits) != 0u; }
+static int smk_sounding(void) { return (eng_cur == ENG_REED ? re_active_bits : rh_active_bits) != 0u; }
 static void smk_pad_rgb(uint32_t p, int on, int act)
 {
     const uint8_t *c = !on ? SMK_OFF : act ? SMK_ACT : SMK_ON;
@@ -360,7 +351,7 @@ static void smk_leds(void)
     smk_pad_rgb(SP_DRIVE, PV(P_DRV_SW) && PV(P_DRIVE), (int)fx);
     smk_pad_rgb(SP_COMP, PV(P_CMP_SW) != 0, (int)fx);
     smk_pad_rgb(SP_FILTER, PV(P_FL_TYPE) != 0, (int)fx);
-    smk_pad_rgb(SP_TREM, TYPE_HAS_MOTOR(PV(P_TYPE)) ? PV(P_MOT_ON) != 0 : PV(P_TW_SW) != 0, (int)fx);
+    smk_pad_rgb(SP_TREM, PV(P_TW_SW) != 0, (int)fx);
     smk_pad_rgb(SP_PHA, PV(P_PH_SW) != 0, (int)fx);
     smk_pad_rgb(SP_CHO, PV(P_CP_SW) != 0, (int)fx);
     smk_pad_rgb(SP_DLY, PV(P_DL_SW) != 0, (int)fx);
@@ -428,7 +419,7 @@ static int smk_host_state(const char *key, char *v, unsigned n)
     unsigned a;
     if (!strcmp(key, "fbank")) snprintf(v, n, "%c", smk_bank ? 'B' : 'A');
     else if (!strcmp(key, "twdepth")) snprintf(v, n, "%d", (int)fx_p[FXP_TW_DEPTH]);   /* the depth TREM/WAH runs at */
-    else if (!strcmp(key, "motdepth")) snprintf(v, n, "%u", (unsigned)bar_mot_depth);  /* the motor's (engine.c) */
+    else if (!strcmp(key, "motdepth")) snprintf(v, n, "%u", (unsigned)re_vib_depth);   /* the 200A vibrato's (reed.c) */
     else if (sscanf(key, "fader.%u", &a) == 1 && a < 4u) {   /* fader a: the card it drives, OWN or WAIT */
         char t[16];
         slot_text(smk_fad_slot(a), t);

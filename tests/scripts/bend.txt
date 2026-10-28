@@ -1,6 +1,6 @@
 # MIDI pitch bend (0xE0, +-2 semitones): the Rhodes engine only (engine.c eng_bend_set, rhodes.c rh_retune).
 # tests/py/test_pitch_bend.py measures the pitch; this script checks the state: the MIDI CHANNEL filter, CC 121, the
-# USB cable out, a preset change, a TYPE change to VIBES and back.
+# USB cable out, a preset change, a TYPE change to the 200A and back.
 100 midi 0x90 60 100
 200 expect state bend 0
 300 midi 0xE0 127 127
@@ -26,9 +26,9 @@
 1210 expect state bend 4096
 1220 expect state preset 1
 1300 expect rms > -60
-# TYPE VIBES (CC 79 0): the bend is kept, VIBES plays unbent; back on the Rhodes (CC 80 0) it bends again
+# TYPE 200A (CC 115 0): the bend is kept (the 200A plays bent too); back on the Rhodes (CC 80 0) it bends again
 1400 midi 0x80 60 0
-1500 midi 0xB0 79 0
+1500 midi 0xB0 115 0
 1600 midi 0x90 64 100
 1700 midi 0xE0 0 32
 1710 expect state bend -4096

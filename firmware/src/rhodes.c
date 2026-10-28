@@ -57,23 +57,16 @@ typedef struct {              /* physical voicing per TYPE (params.json "types")
 #define RH_O1 2u
 #define RH_O2 3u
 /* voices per engine: the Rhodes 10 (RH_VOICES; 8 for a while after 0.9.4's crackles with the pedal and every effect,
- * 9 again once 0.9.5's CPU work made room, the user 2026-10-24; 10 with 0.9.5's exact engine savings), the bar
- * engine 10 too (BAR_VOICES, bars.h BAR_NV: bars-10's loops and cost model, no upper mode trimmed in
- * tests/py/test_bars_engine.py test_no_trim_in_the_hil_cpu_worst). A build may set another count: -DRH_VOICES=N or
- * -DBAR_VOICES=N for one engine, -DFR_VOICES=N for both (APP_DEFS / HOST_DEFS; make testv V=N) */
+ * 9 again once 0.9.5's CPU work made room, the user 2026-10-24; 10 with 0.9.5's exact engine savings), the 200A 10
+ * too (reed.c RE_VOICES). A build may set another count: -DRH_VOICES=N or -DRE_VOICES=N for one engine, -DFR_VOICES=N
+ * for both (APP_DEFS / HOST_DEFS; make testv V=N) */
 #ifdef FR_VOICES
 #ifndef RH_VOICES
 #define RH_VOICES FR_VOICES
 #endif
-#ifndef BAR_VOICES
-#define BAR_VOICES FR_VOICES
-#endif
 #endif
 #ifndef RH_VOICES
 #define RH_VOICES 10u
-#endif
-#ifndef BAR_VOICES
-#define BAR_VOICES 10u
 #endif
 #define RH_NV RH_VOICES
 _Static_assert(RH_NV >= 1u && RH_NV <= 32u, "summaries are 32-bit masks");

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The design pass's rows (developer CC 11, ui.c draw_row_cards), checked on host screenshots of every page of three
-TYPEs (STAGE 77, EARLY FELT, VIBES), at their defaults and with every knob turned, at the large face's sizes (host
+TYPEs (STAGE 77, EARLY FELT, WURLI 200A), at their defaults and with every knob turned, at the large face's sizes (host
 builds with -DUI_VAL_PX=28 / 25 / 24). Variants: 1 FADER, 2 LINE (one meter for every card); 3 A, 4 B, 5 C (the card
 kinds told apart: an amount the FADER fill; a selector SEGMENTS (A, C) or PIPS (B); a toggle LED (A, B) or BACK (C)).
 The rules (private/ui-simplify/design-pass; the user 2026-10-18: "a clean, solid and elegant ui", "not clear what is
@@ -31,7 +31,7 @@ import test_ui_meters as M
 from hostrun import cc
 
 NAMES = {1: "FADER", 2: "LINE", 3: "A", 4: "B", 5: "C"}
-TYPES3 = [M.TYPES[0], M.TYPES[2], M.TYPES[4]]                     # ST77, FELT (the longest name), VIBE
+TYPES3 = [M.TYPES[0], M.TYPES[2], M.TYPES[4]]                     # ST77, FELT, the 200A
 W, RH = 228, 38                                                   # ui.c RW_W, RW_H (row x / y)
 STYLE = {1: {"amount": "F", "select": "F", "toggle": "F"}, 2: {"amount": "L", "select": "L", "toggle": "L"},
          3: {"amount": "F", "select": "S", "toggle": "D"}, 4: {"amount": "F", "select": "P", "toggle": "D"},
@@ -39,7 +39,7 @@ STYLE = {1: {"amount": "F", "select": "F", "toggle": "F"}, 2: {"amount": "L", "s
 # every value written in its short form (ui.c CD_LONG / CD_SHORT) in the default build (24 px, breathing):
 # (page, label, short form); the other sizes: no value that does not fit
 SHORT = {("ASSIGN", "PLAYS", s) for s in ("TRM/WAH", "CMP GAIN", "TRM RATE", "TRM SHP", "PHA SPD", "PHA FDBK",
-                                          "CHO SPD", "DLY FDBK")}
+                                          "CHO SPD", "DLY FDBK")} | {("FRODHES", "TYPE", "200A")}   # (WURLI 200A)
 DEF_PX = 24                                                       # aatext.c UI_VAL_PX
 KEYS = M.KEYS + [f"rowbox{k}" for k in range(4)] + ["cards"]
 SYNC_NAMES = {"1/32", "16T", "1/16", "8T", "16D", "1/8", "4T", "8D", "1/4", "4D", "1/2", "1/1", "2BAR", "4BAR"}
@@ -263,7 +263,7 @@ def test_cards_every_page(name, cc_n, v, variant):
 
 @pytest.mark.parametrize("px", [25, 28])
 @pytest.mark.parametrize("variant", [3, 4, 5], ids=["A", "B", "C"])
-@pytest.mark.parametrize("name,cc_n,v", [M.TYPES[2], M.TYPES[4]], ids=["FELT", "VIBE"])
+@pytest.mark.parametrize("name,cc_n,v", [M.TYPES[2], M.TYPES[4]], ids=["FELT", "200A"])
 def test_cards_every_page_small_faces(name, cc_n, v, variant, px):
     """the same with the other value faces (25, 28 px)"""
     every_page(name, cc_n, v, variant, px)
@@ -313,15 +313,15 @@ def test_cards_every_choice_option(variant, px):
 @pytest.mark.parametrize("look", [1, 2], ids=["B", "C"])
 @pytest.mark.parametrize("variant", [1, 2, 3, 4, 5], ids=[NAMES[i] for i in range(1, 6)])
 def test_cards_other_looks(variant, look):
-    """the colour candidates B and C (developer CC 2) with each variant: the same rules on every page (VIBES, turned)"""
-    ps = pages("VIBE", 79, 0, variant)
+    """the colour candidates B and C (developer CC 2) with each variant: the same rules on every page (the 200A, turned)"""
+    ps = pages("200A", 115, 0, variant)
     LOOK_C[0] = look == 2
     a_lab = np.array(M.look_tokens(0)[1]["lab"], float)
     lab = np.array(M.look_tokens(look)[1]["lab"], float)
     try:
         errs = []
         M.NORM = a_lab / np.maximum(lab, 1)                       # (look C's text tint undone, as test_ui_meters)
-        for t, im, s in walk(f"cards{variant}_look{look}", 79, 0, variant, M.turns_for(ps), look=look):
+        for t, im, s in walk(f"cards{variant}_look{look}", 115, 0, variant, M.turns_for(ps), look=look):
             errs += check_page(im, s, f"{NAMES[variant]} look {'BC'[look - 1]} {M.title_of(s)} @{t}", variant)
     finally:
         LOOK_C[0] = False

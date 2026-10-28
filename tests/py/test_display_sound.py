@@ -2,9 +2,9 @@
 """What the screen says is what the sound does (PLAN P11.1; added 2026-10-17 after the CHORUS / PHASER SPEED cards
 showed twice the real rate). Every card with a unit is read through the firmware's own slot_text ("T dump" on the
 host build, or tests/c/cards.c for every value) and the quantity is measured from the rendered audio at three
-settings, on the Rhodes and on VIBES (TYPE by CC 79 0):
+settings, on the Rhodes and on the 200A (TYPE by CC 115 0):
 
-  tremolo rate and depth, MOTOR rate, chorus and phaser speed, delay time (free and synced), the filter's LFO rate,
+  tremolo rate and depth, the 200A VIBRATO's rate, chorus and phaser speed, delay time (free and synced), the filter's LFO rate,
   the filter's cutoff, TUNE, TRANSP and OCT, BPM by knob / tap / MIDI clock with the tremolo synced, arpeggiator
   RATE, sequencer SWING, compressor THRESH and MAKEUP, LEVEL.
 
@@ -20,7 +20,7 @@ import pytest
 
 from hostrun import FS, ROOT, card_hz, cc, env_rms, note, once, rate_of, rms_db, run
 
-ENGINES = {"rhodes": [], "vibes": [cc(10, 79, 0), cc(11, 47, 0)]}   # VIBES: its motor (on with it) off
+ENGINES = {"rhodes": [], "reed": [cc(10, 115, 0), cc(11, 47, 0)]}   # the 200A, its vibrato off
 CLEAN = [cc(20, 81, 0), cc(21, 91, 0), cc(23, 106, 0), cc(24, 110, 64)]   # F01's drive, reverb, comp off; 0 dB
 PEDAL = [cc(22, 64, 127)]
 PG = {"TREM": 7, "PHA": 8, "CHO": 9, "DELAY": 10, "TEMPO": 11, "FILTER": 6, "LFO": 16, "COMP": 5, "SETUP": 17,
@@ -137,8 +137,8 @@ def test_tremolo_rate_and_depth(eng):
 
 
 def test_motor_rate():
-    """VIBES MOTOR (its own page): the tubes' discs modulate the sound at the SPEED card's rate ("3.5HZ"), 0.5-10 Hz"""
-    pre = ENGINES["vibes"] + CLEAN + PEDAL
+    """the 200A's VIBRATO (VOICE 3/4): it modulates the sound at the SPEED card's rate ("3.5HZ"), 0.5-10 Hz"""
+    pre = ENGINES["reed"] + CLEAN + PEDAL
     ref = run("ds-mot-ref", pre + restruck(CHORD), 10500)
     for v in (20, 78, 127):
         w = run(f"ds-mot{v}", pre + [cc(30, 47, 127), cc(32, 48, 127), cc(33, 49, v), "100 dump"]
@@ -172,12 +172,11 @@ def band_share(x, hop=256, n=1024, lo=300, hi=3000):
     return np.array(out), FS / hop
 
 
-@pytest.mark.parametrize("eng,fx", [("rhodes", "chorus"), ("rhodes", "phaser"), ("vibes", "phaser")])
+@pytest.mark.parametrize("eng,fx", [("rhodes", "chorus"), ("rhodes", "phaser"), ("reed", "phaser")])
 def test_chorus_phaser_speed(eng, fx):
     """CHORUS / PHASER SPEED: the sweep runs at the card's rate (0.25-6 Hz; the bug of 0.9.2 showed twice that). A
     chord held under the pedal with DECAY / RING at 10 (a steady sound). The chorus is measured on the Rhodes only:
-    VIBES' few pure partials make the left / right level difference a mix of the rate and its double (the chorus
-    code is the same for both engines; its card text is checked at every value above)"""
+    the chorus code is the same for both engines (its card text is checked at every value above)"""
     chord = (48, 55, 60, 64, 67, 72, 76, 79)
     for v in (20, 64, 127):
         if fx == "chorus":
@@ -298,25 +297,33 @@ C4_KEY = ["30 keys 0x80", "1800 keys 0"]            # key 7 = C4
 @pytest.mark.parametrize("eng", ENGINES)
 def test_tune_transpose_octave(eng):
     """TUNE (DECAY K4) in cents, TRANSP (SCALE K4) in semitones, OCT- / OCT+ (the header, the LEDs): the key's pitch
-    moves by exactly that (+-1 cent)"""
+    moves by exactly that (+-1 cent). The 200A at REG 0 first (VOICE 4/4 K1: every key even; at 10, as measured, each
+    key has its own few cents, so another key is not exactly a semitone away); its steps 20 ms later"""
     pre = ENGINES[eng] + CLEAN + PEDAL
-    f0 = pitch(run(f"ds-pitch-ref-{eng}", pre + C4_KEY, 2000).seg(0.3, 1.5), 261.63)
+    t0 = 0
+    if eng == "reed":
+        pre = pre + [f"{10 + i} turn 0 1" for i in range(5)] + ["16 turn 2 -127", "18 btn 8"]   # REG 0, HOME
+        t0 = 20
+    key = [f"{30 + t0} keys 0x80", "1800 keys 0"]                # (C4_KEY, after the steps)
+    f0 = pitch(run(f"ds-pitch-ref-{eng}", pre + key, 2000).seg(0.3, 1.5), 261.63)
     for d in (-37, 12, 50):                            # SELECT -> FRODHES, VOICE, DECAY, K4
-        w = run(f"ds-tune{d}-{eng}", pre + ["10 turn 0 1", "11 turn 0 1", "12 turn 0 1", f"14 turn 5 {d}", "20 dump"] + C4_KEY, 2000)
-        st = w.state(20)
+        w = run(f"ds-tune{d}-{eng}", pre + [f"{10 + t0} turn 0 1", f"{11 + t0} turn 0 1", f"{12 + t0} turn 0 1",
+                                            f"{14 + t0} turn 5 {d}", f"{20 + t0} dump"] + key, 2000)
+        st = w.state(20 + t0)
         assert st["page"] == "VOICE" and st["vpage"].startswith("2/") and st["label3"] == "TUNE"
         c = 1200 * math.log2(pitch(w.seg(0.3, 1.5), 261.63 * 2 ** (d / 1200)) / f0)
         assert abs(c - int(st["card3"])) <= 1.0, f"TUNE: the card says {st['card3']} cents, the pitch moved {c:+.2f}"
     for d in (-5, 3, 24):                              # GLO -> TEMPO, SELECT -> SCALE, K4
-        w = run(f"ds-transp{d}-{eng}", pre + ["10 btn 7", "12 turn 0 1", f"14 turn 5 {d}", "20 dump"] + C4_KEY, 2000)
-        st = w.state(20)
+        w = run(f"ds-transp{d}-{eng}", pre + [f"{10 + t0} btn 7", f"{12 + t0} turn 0 1", f"{14 + t0} turn 5 {d}",
+                                              f"{20 + t0} dump"] + key, 2000)
+        st = w.state(20 + t0)
         assert st["page"] == "SCALE" and st["label3"] == "TRANSP"
         c = 1200 * math.log2(pitch(w.seg(0.3, 1.5), 261.63 * 2 ** (d / 12)) / f0)
         assert abs(c - 100 * int(st["card3"])) <= 1.0, f"TRANSP: the card says {st['card3']}, the pitch moved {c:+.1f} c"
     for btns, o in (("0", -1), ("1 1", 2)):            # OCT- once, OCT+ twice
-        lines = [f"{10 + 3 * i} btn {b}" for i, b in enumerate(btns.split())]
-        w = run(f"ds-oct{o}-{eng}", pre + lines + ["20 dump"] + C4_KEY, 2000)
-        st = w.state(20)
+        lines = [f"{10 + t0 + 3 * i} btn {b}" for i, b in enumerate(btns.split())]
+        w = run(f"ds-oct{o}-{eng}", pre + lines + [f"{20 + t0} dump"] + key, 2000)
+        st = w.state(20 + t0)
         assert int(st["oct"]) == o and st["led.0"] == str(int(o < 0)) and st["led.1"] == str(int(o > 0)), st["oct"]
         c = 1200 * math.log2(pitch(w.seg(0.3, 1.5), 261.63 * 2 ** o) / f0)
         assert abs(c - 1200 * o) <= 1.0, f"OCT {o:+d}: the pitch moved {c:+.1f} c"
@@ -329,14 +336,14 @@ def sync_v(i, hi=13):
 @pytest.mark.parametrize("eng", ENGINES)
 def test_tempo_and_sync(eng):
     """BPM set by the TEMPO page's knob, by tapping PLAY and by MIDI clock: the BPM card, and the tremolo synced
-    (TREM SYNC 1/16, 1/8, 1/4) runs at that BPM's note value; on VIBES the MOTOR's own SYNC (CC 51) too"""
+    (TREM SYNC 1/16, 1/8, 1/4) runs at that BPM's note value; on the 200A its VIBRATO's own SYNC (CC 51) too"""
     pre = ENGINES[eng] + CLEAN + PEDAL
     ref = run(f"ds-sync-ref-{eng}", pre + restruck(CHORD, t0=2600, n=4), 10500)
     clock = [f"{300 + i * 25} midi 0xF8 0 0" for i in range(24 * 8)]   # 25 ms a pulse: 100 BPM (smoothed in)
     cases = [("knob", ["40 btn 7", "50 turn 2 -20"], 3), ("tap", ["40 btn 7"] + [f"{60 + 600 * i} btn 12" for i in range(4)], 6),
              ("clock", ["40 btn 7"] + clock, 9)]
     for how, lines, si in cases:
-        mode = 120 if eng == "vibes" and how == "clock" else 80            # VIBES: the MOTOR once, synced
+        mode = 120 if eng == "reed" and how == "clock" else 80             # the 200A: its VIBRATO once, synced
         fx = ([cc(30, 47, 127), cc(32, 48, 100), cc(33, 51, sync_v(si))] if mode == 120 else
               [cc(30, 17, 64), cc(31, 21, mode), cc(32, 18, 100), cc(33, 20, sync_v(si))])
         w = run(f"ds-sync-{how}-{eng}", pre + fx + ["2550 dump"] + lines + restruck(CHORD, t0=2600, n=4), 10500)
@@ -419,15 +426,17 @@ def frames(x, hop):
 def test_compressor_threshold_and_makeup(eng):
     """COMPRESSOR THRESH: a held note decays through the threshold; the gain reduction (20:1, fast attack and
     release) follows the 6 dB soft knee around the card's level (the detector is a peak follower: the input's peak
-    per 10 ms); MAKEUP: below the threshold the gain is the card's"""
+    per 10 ms); MAKEUP: below the threshold the gain is the card's. The 200A plays C3 (its C6 peaks at -28 dBFS, under
+    every threshold: its top is quiet, as the instrument's; C3 decays from -18 through all three)"""
     pre = ENGINES[eng] + CLEAN + PEDAL
-    hi = note(100, 84, 127, 7000)
+    hi = note(100, 84 if eng == "rhodes" else 48, 127, 7000)
     ref = run(f"ds-cmp-ref-{eng}", pre + hi, 7500)
     for thr in (64, 96, 120):                          # -20, -30, -38 dB
         w = run(f"ds-cmp{thr}-{eng}", pre + [cc(30, 112, 127), cc(31, 108, 0), cc(32, 109, 0), cc(33, 113, 0),
                                             cc(34, 107, thr), cc(35, 106, 127), "70 dump"] + hi, 7500)
         txt = w.state(70)[f"card.{PG['COMP']}.0"]
-        a, b = frames(w.seg(0.15, 7.4), 441), frames(ref.seg(0.15, 7.4), 441)
+        hop = 441 if eng == "rhodes" else 882           # (the 200A's C3, near a pure 131 Hz: 20 ms, over two periods)
+        a, b = frames(w.seg(0.15, 7.4), hop), frames(ref.seg(0.15, 7.4), hop)
         lvl = 20 * np.log10(np.abs(b).max(axis=1) / 32768 + 1e-9)
         gr = 20 * np.log10(np.sqrt((b ** 2).mean(axis=1) + 1e-9) / np.sqrt((a ** 2).mean(axis=1) + 1e-9))
 
@@ -440,11 +449,13 @@ def test_compressor_threshold_and_makeup(eng):
         Ts = np.linspace(-45, 0, 901)
         es = [err(T) for T in Ts]
         assert min(es) < 0.3, (thr, min(es))
-        assert_db(Ts[int(np.argmin(es))], txt, f"THRESH {thr}")
-    ref = run(f"ds-mk-ref-{eng}", pre + note(100, 60, 30, 1500), 1700)
+        assert_db(Ts[int(np.argmin(es))], txt, f"THRESH {thr}", 0.5 if eng == "rhodes" else 1.0)   # (the 200A's
+        # near-sine C3: the fitted knee reads 0.7 dB high at -38, the same compressor; the Rhodes' +-0.5 holds)
+    quiet = note(100, 60, 30, 1500) if eng == "rhodes" else note(100, 84, 30, 1500)   # (the 200A's v30 C4 is near
+    # its mf: +23 dB took it into the limiter; its C6 is quiet)
+    ref = run(f"ds-mk-ref-{eng}", pre + quiet, 1700)
     for mk in (32, 64, 120):
-        w = run(f"ds-mk{mk}-{eng}", pre + [cc(33, 113, mk), cc(34, 107, 1), cc(35, 106, 127), "70 dump"]
-                + note(100, 60, 30, 1500), 1700)
+        w = run(f"ds-mk{mk}-{eng}", pre + [cc(33, 113, mk), cc(34, 107, 1), cc(35, 106, 127), "70 dump"] + quiet, 1700)
         txt = w.state(70)[f"card.{PG['COMP']}.3"]
         assert_db(rms_db(w.seg(0.2, 1.5)) - rms_db(ref.seg(0.2, 1.5)), txt, f"MAKEUP {mk}")
 
@@ -463,7 +474,7 @@ def test_level(eng):
 
 def test_drive_type_card_is_what_runs():
     """the DRIVE page's K1 names the drive TYPE fx.c runs (fx_p[FXP_DRV_SW], "fxdrv"): every CC 84 value and every
-    panel step, on the Rhodes and on VIBES. The sounds themselves: test_every_control DRIVE TYPE, test_drive_types"""
+    panel step, on the Rhodes and on the 200A. The sounds themselves: test_every_control DRIVE TYPE, test_drive_types"""
     names = re.findall(r'"([^"]+)"', re.search(r"N_DRV\[\] = \{([^}]*)\}",
                                                open(os.path.join(ROOT, "firmware", "src", "params.c")).read()).group(1))
     for eng in ENGINES:
@@ -471,8 +482,8 @@ def test_drive_type_card_is_what_runs():
         for v in range(128):
             lines += [cc(t, 84, v), f"{t + 1} dump"]
             t += 2
-        # SELECT from PERFORM to DRIVE (ui.c PG_ORDER: PERF PIANO VOICE 1/2 2/2 COMP DRIVE; VIBES: VOICE 3/3 too)
-        lines += [cc(t, 84, 0)] + [f"{t + 10 + 3 * i} turn 0 1" for i in range(5 + (eng == "vibes"))]
+        # SELECT from PERFORM to DRIVE (ui.c PG_ORDER: PERF PIANO VOICE 1/2 2/2 COMP DRIVE; the 200A: VOICE 3/4 4/4 too)
+        lines += [cc(t, 84, 0)] + [f"{t + 10 + 3 * i} turn 0 1" for i in range(5 + 2 * (eng == "reed"))]
         t += 40
         t_panel = t
         for d in (1, 1, 1, -1, -1, -1):

@@ -37,7 +37,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--rate", default="48000", choices=("44100", "48000"))
     ap.add_argument("--seconds", type=float, default=60.0, help="per take (hil_crackle keeps takes <= 60 s)")
-    ap.add_argument("--engine", default="rhodes", choices=("rhodes", "vibes", "marimba"))
+    ap.add_argument("--engine", default="rhodes", choices=("rhodes", "reed"))
     ap.add_argument("--jack-dev", default="M6")
     ap.add_argument("--jack-ch", type=int, default=5)
     ap.add_argument("--dry-run", action="store_true", help="the takes and their time; no MIDI, no audio")

@@ -4,14 +4,15 @@
 
   - a note struck on full voices waits for a steal's 1.5 ms fade (pend); an all-off in that window let go of every
     sounding voice but not the waiting note, which then started held for good: no note-off ever comes for it (the
-    all-off sends one EV_ALL_OFF instead of the note-offs). Seeds vibes 780 (bars.c) and rhodes 513 (rhodes.c):
+    all-off sends one EV_ALL_OFF instead of the note-offs). Seed rhodes 513 (rhodes.c; Frodhes' vibes 780 too):
     the waiting note now starts let go and damped.
   - the Rhodes: a low key's tone-bar mode (V2) hardly feels the felt (damped T60 about 50 s, x3.9 at RELEASE 127), so
     after an all-off the voice kept a 1-4 LSB hum and its slot for its whole life (up to ~40 s; rh_quiet() false,
     the flash saves waiting). Seed rhodes 628 (rhodes.c): an all-off caps a voice's life at 8 s, and a voice's
     life ends through the 1.5 ms fade.
 
-The voice count is each engine's own (hostrun.voices: rhodes.c RH_VOICES 10 / BAR_VOICES 10, or HOST_DEFS)."""
+The voice count is each engine's own (hostrun.voices: rhodes.c RH_VOICES 10 / reed.c RE_VOICES 10, or HOST_DEFS).
+The 200A (the reed engine) runs every case too."""
 import os
 import re
 
@@ -26,11 +27,11 @@ def voices(eng="rhodes"):
 
 
 def engine_lines(eng):
-    return [cc(50, 79, 0), cc(51, 47, 0)] if eng == "vibes" else []   # VIBES, its motor off
+    return [cc(50, 115, 0), cc(51, 47, 0)] if eng == "reed" else []   # the 200A, its vibrato off
 
 
 @pytest.mark.parametrize("eng,num", [
-    ("rhodes", 123), ("rhodes", 120), ("vibes", 123), ("vibes", 120)])
+    ("rhodes", 123), ("rhodes", 120), ("reed", 123), ("reed", 120)])
 def test_alloff_during_a_steal(eng, num):
     """every voice busy, one more note (it waits for a steal's fade), the all-off in the same block: nothing is left
     held, and it all goes quiet"""
@@ -47,7 +48,7 @@ def test_alloff_during_a_steal(eng, num):
     assert np.abs(r.L[int(5.5 * FS):]).max() < 2
 
 
-@pytest.mark.parametrize("eng", ["rhodes", "vibes"])
+@pytest.mark.parametrize("eng", ["rhodes", "reed"])
 def test_alloff_tail_ends(eng):
     """a low note at RELEASE 127, let go, then the all-off: within 12 s no voice is left and the engine is silent
     (RAW: the engine alone)"""

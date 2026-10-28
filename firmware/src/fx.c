@@ -1486,11 +1486,11 @@ static void fx_reset_state(void)
     memset(rev_comb, 0, sizeof rev_comb); memset(rev_ap, 0, sizeof rev_ap); memset(&hl, 0, sizeof hl);
     pd_on = 0; rv_running = 0; rev_reset_state();       /* (the pre-delay line: at its next use; the TYPE's
                                                          * state: rev_types.c) */
-    rh_lfsr = 0xACE1u; bar_lfsr = 0x1D872u; bar_mot_ph = 0;
+    rh_lfsr = 0xACE1u; re_vph = 0;
     /* every voice ends and the shared pickup RLC / body states go to 0 (as at an engine change), and this block's
      * voice output is dropped (fx_process): the tails a take left under the gate's -66 dBFS rang on and the next take
      * met them (its level moved up to 5 LU with what was played before, on the FM-1: the presets suite) */
-    eng_rh_kill_all(); bar_kill_all();
+    eng_rh_kill_all(); re_kill_all();
     lfo_sh = 0; fl_ic[0] = fl_ic[1] = 0; fl_op = 0;                 /* the filters, the smoothers, the master */
     dr_hp = dr_lp1 = dr_lp2 = dr_tlp = 0; wah_env = wah_lp = wah_bp = 0; cmp_env = 0; cmp_g = 65536;
     dc_l = dc_r = dce_l = dce_r = 0; memset(lk_l, 0, sizeof lk_l); memset(lk_r, 0, sizeof lk_r); lk_pk = 0; lk_g = 32768;
@@ -1702,8 +1702,8 @@ static inline __attribute__((always_inline)) void fx_process(const int32_t *mono
     FR_FAR(fx_out)(mono, out, n);
 }
 
-/* ---- what the effects that run now cost on the FM-1, us per block: the bar engine's CPU model (bars.c
- * bar_cost_fixed) takes it from its budget. An effect costs while it runs: the delay and the reverb also while their
+/* ---- what the effects that run now cost on the FM-1, us per block (Frodhes' bar engine planned its budget with it;
+ * kept for the CPU budget of the engines to come). An effect costs while it runs: the delay and the reverb also while their
  * tails ring after they are switched off; the bypass (FX) keeps everything running. PLACEHOLDERS: split by hand from
  * the measured total (every effect + the filter LP18 / LFO: 1388 - 312 = 1076 us, tools/hil_cpu.py 2026-10-16), each
  * rounded up; replace them with tools/hil_cpu.py --fx-each (idle, one effect at a time, minus idle without effects). */

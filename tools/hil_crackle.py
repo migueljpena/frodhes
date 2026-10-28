@@ -4,7 +4,7 @@
 jack at once, every glitch counted (private/plans/final/B-cracks-test-8-voices.md). A must-pass of the release
 (tools/release.py step 4: every engine, USB at 44.1 and 48 kHz); also `tools/hil_scan.py --only stress_max`.
 
-    tools/hil_crackle.py [--engine rhodes|vibes|marimba|all] [--rate 44100|48000] [--blocksize N] [--source both|usb]
+    tools/hil_crackle.py [--engine rhodes|reed|all] [--rate 44100|48000] [--blocksize N] [--source both|usb]
                          [--worst-s 180] [--recipe-s 120] [--quick] [--no-usb-s 60] [--leds] [--jack-dev M6]
                          [--jack-ch 5] [--seed N]
     tools/hil_crackle.py --dry-run      the planned takes, events and time; no MIDI, no audio, no host run
@@ -25,8 +25,8 @@ against 29 packets), exact at both rates (after the resampler).
 
 The stimulus, per engine (every take starts from every parameter's default; USB VOL FIXED, so USB is the output
 before MASTER; the host and the FM-1 get the same events):
-  worst      every effect heavy (hil_cpu's HEAVY + reverb pre-delay 127, drive mix 64, reverb decay 127; VIBES its
-             motor), the pedal down, chords of every voice (the engine's own count: rhodes.c RH_VOICES / BAR_VOICES)
+  worst      every effect heavy (hil_cpu's HEAVY + reverb pre-delay 127, drive mix 64, reverb decay 127; the 200A its
+             vibrato), the pedal down, chords of every voice (the engine's own count: rhodes.c RH_VOICES / RE_VOICES)
              every 0.15-0.4 s across bass / middle / high / spread at v100 / v127, the pedal lifted and pressed again
              every 20 s. The odd takes at LEVEL -12 dB (CC 110 0): the limiter stays out, so the click check sees
              everything; the even ones at unity, where the limiter works (its activity is information, see click)
@@ -63,7 +63,7 @@ The detectors (each event: time, source, kind, detail):
              limiter works (a USB peak >= 22000 in the 50 ms before) the event is 'click-lim': information
   step       (both) a sudden level step: a 20 ms window 12 dB off the one before and staying there (the next two
              within 6 dB), with no attack or pedal change near it and, down, no damper starting in the 300 ms before;
-             with a free-running level modulation in the take (the vibraphone's motor, the tremolo, the filter's LFO:
+             with a free-running level modulation in the take (the 200A's vibrato, the tremolo, the filter's LFO:
              am_periods) also 12 dB off the level one period before (a trough of it is as low as the last one)
   track      (jack) the jack against USB: the clocks' drift fitted over the take (loud windows voted on a line, the
              first differences too) and taken out (USB warped onto the jack's clock), then per 50 ms window a slip (a
@@ -80,10 +80,10 @@ silence; onset_lag's threshold follows the recording's noise: the old fixed 300 
 10-15 dB under USB, and took one 0.2-0.45 s later, which put every jack guard there). Without a measured rate (the
 host) the strong onsets fit it.
 Proven on the host (the self-test; build/crk evidence in the commit): 0 events on 25 minutes of clean renders (the full
-stimulus, 2 seeds, 3 engines); the injected glitches found 10/10 per kind and engine. Found by it on the host on the
+stimulus, 2 seeds, every engine); the injected glitches found 10/10 per kind and engine. Found by it on the host on the
 way (information, for the planners): the delay's stereo-power send gain steps once per block (fx.c, dly_sg), so its
 echoes carry one-sample steps DL_TIME after a block boundary when L and R differ (chorus, phaser, pan): up to ~700 LSB
-on VIBES with the moderate effects; they are under this click gate's shape test, so it does not fail on them.
+with the moderate effects; they are under this click gate's shape test, so it does not fail on them.
 The rig's own health is separate: the recorder's gaps (Ring.cut) and PortAudio's status flags mark a take RIG (it is
 re-taken once; twice is a FAIL of the rig, not a firmware verdict).
 
@@ -116,7 +116,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "build", "hil", "stress_max")
 FS_HOST = 44100
 FS_JACK = 48000
-ENGINES = ("rhodes", "vibes", "marimba")
+ENGINES = ("rhodes", "reed")                  # the Rhodes, the 200A (CC 115 0: WURLI 200A)
 CPU_TARGET_US, SHEDDER_US = 4500, 5000
 CEIL = 24100                                  # fx.c LIM_T 24000 (+ rounding): information
 LIM_ON = 22000                                # a USB peak this high in the last 50 ms: the limiter is working
@@ -150,9 +150,9 @@ LEDS = (("OFF", 1), ("PLAYED", 2), ("ALL", 3))                         # ui.c LE
 
 
 def voices(eng):
-    """the firmware's voice count for an engine (rhodes.c RH_VOICES / BAR_VOICES)"""
-    src = open(os.path.join(ROOT, "firmware", "src", "rhodes.c")).read()
-    key = "RH_VOICES" if eng == "rhodes" else "BAR_VOICES"
+    """the firmware's voice count for an engine (rhodes.c RH_VOICES / reed.c RE_VOICES)"""
+    key, f = ("RH_VOICES", "rhodes.c") if eng == "rhodes" else ("RE_VOICES", "reed.c")
+    src = open(os.path.join(ROOT, "firmware", "src", f)).read()
     return int(re.search(r"#define " + key + r" (\d+)u", src).group(1))
 
 
@@ -165,10 +165,8 @@ def engine_ccs(eng, fx):
     if "CP_SW" in d:
         out.append((CC["CP_SW"], d.pop("CP_SW")))
     out += [(CC[k], v) for k, v in d.items()]
-    if eng == "vibes":
-        out += [(79, 0), (47, 127 if fx else 0)]          # VIBES, the motor with the effects
-    elif eng == "marimba":
-        out.append((79, 127))
+    if eng == "reed":
+        out += [(115, 0), (47, 127 if fx else 0)]         # WURLI 200A, its vibrato with the effects
     out.append((CC["USB_VOL"], 127))
     return out
 
@@ -591,8 +589,8 @@ def lfo_hz(v):
 
 
 def am_periods(ccs):
-    """(s) the periods of the free-running level modulations a take's settings start: the vibraphone's motor (CC 79 a
-    VIBES value, CC 47 on: its 3.5 Hz AM at RATE 78, the discs open for a third of each period), the TREM / WAH
+    """(s) the periods of the free-running level modulations a take's settings start: the 200A's vibrato (CC 115
+    sent, CC 47 on: 3.5 Hz at RATE 78), the TREM / WAH
     tremolo (CC 17 on with DEPTH: PAN moves the jack's left channel as much as AM does) and the filter's LFO (CC 72)
     sweeping a resonant filter. A level that falls 12 dB in a trough of them is the music's own (vibes-worst1..3 on
     the FM-1, 2026-10-24: the first chord met the motor open for 110 ms, then -15 dB; the host render with the same
@@ -600,7 +598,7 @@ def am_periods(ccs):
     d = dict(param_defaults())
     d.update(dict(ccs))
     out = []
-    if d.get(79, 127) < 96 and d.get(47, 0) >= 64 and d.get(48, 110) > 0:
+    if 115 in dict(ccs) and d.get(47, 0) >= 64 and d.get(48, 110) > 0:
         out.append(1.0 / lfo_hz(min(d.get(49, 78), 120)))
     if d.get(CC["TW_SW"], 0) >= 43 and d.get(CC["TW_DEPTH"], 0) > 0:
         out.append(1.0 / lfo_hz(d.get(19, 90)))
@@ -1001,7 +999,7 @@ def host_take(name, ccs, events, dur, tag="stress_max", clock=(0.0, 0.0)):
 
 
 def host_voices(txt, eng):
-    m = re.search(r"voices max rhodes (\d+) of (\d+) bars (\d+) of (\d+)", txt)
+    m = re.search(r"voices max rhodes (\d+) of (\d+) reed (\d+) of (\d+)", txt)
     if not m:
         return None
     return (int(m.group(1)), int(m.group(2))) if eng == "rhodes" else (int(m.group(3)), int(m.group(4)))

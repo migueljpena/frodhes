@@ -113,7 +113,7 @@ def record(name, dev, ch):
             typ = p.pop("TYPE", 0)
             r.dry(**p)
         r.cc_raw(47, 0)
-        r.cc_raw(79, 0)                                  # VIBES and back: every Rhodes voice ends (eng_switch kills
+        r.cc_raw(115, 0)                                 # the 200A and back: every Rhodes voice ends (eng_switch kills
         time.sleep(0.2)                                   # them, the RLC / body states zeroed). The gate's silence
         r.cc_raw(80, typ)                                 # alone leaves tails ringing under -66 dBFS that come back
         time.sleep(0.3)                                   # with the next note (+-0.4 dB run to run)
@@ -196,7 +196,7 @@ def measure(x, note, hold, ons=(0.0,)):
     on = onset(x)
     y = x[on:on + (int((hold - 0.1) * FS) if hold else len(x) - int(0.2 * FS))]   # the held part: the note-off
                                                           # comes with its own MIDI / block jitter (+-6 ms)
-    g = [on + int(t * FS) for t in ons]                   # the notes' own attacks are not clicks (bar_scan S1)
+    g = [on + int(t * FS) for t in ons]                   # the notes' own attacks are not clicks
     e = env2ms(y)
     ed = 20 * np.log10(e)
     pk = int(np.argmax(e[:50]))                           # the attack: the peak of the first 100 ms

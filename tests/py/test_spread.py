@@ -85,11 +85,3 @@ def test_image_through_drive_and_comp():
     d1 = [balance(L, R, i) for i in range(2)]
     assert all(a * b > 0 and abs(b) >= 0.6 * abs(a) for a, b in zip(d0, d1)), (d0, d1)
     assert np.all(np.isfinite(L)) and np.max(np.abs(L)) < 32767
-
-
-def test_bars_engine_ignores_spread():
-    """VIBES (F13, the bar engine) with SPREAD 127: the same samples as with SPREAD 0"""
-    a = run("vb0", [], [LOW + 24, MID], spread=0, pc=12)
-    b = run("vb127", [], [LOW + 24, MID], spread=127, pc=12)
-    assert np.max(np.abs(a[0])) > 1000
-    assert np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1])

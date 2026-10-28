@@ -29,8 +29,8 @@
 4200 expect state smksus 1
 4300 pad 15 0
 4400 expect state smksus 0
-# the pedal on VIBES too (the bar engine's own pedal)
-4500 midi 0xB0 79 0
+# the pedal on the 200A too (the reed engine's own pedal)
+4500 midi 0xB0 115 0
 4600 pedal 100
 4700 keys 0x80
 4900 keys 0

@@ -97,10 +97,10 @@ FX, SEQ, PLAY, REC, ARP and OCT- / OCT+ are as on the FM-1 (hold one OCT button 
 | KNOB BANK (held) | the panel check: the keyboard's raw readings (faders, wheels, pedal, pads, battery, flash) |
 | FADER BANK | the faders' bank, A or B (lit on B) |
 | 37 keys | C3..C6 at OCTAVE 0 (the middle 27 are the FM-1's F3..G5), each at its own velocity |
-| faders, bank A | the instrument's first VOICE page (Rhodes: TONE BARK BELL HAMMER; VIBES / MARIMBA: STRIKE MALLET TUBE WEIGHT) |
+| faders, bank A | the instrument's first VOICE page (TONE BARK BELL HAMMER, the Rhodes and the 200A) |
 | faders, bank B | the four PERFORM knobs (set them on ASSIGN) |
-| pitch wheel | pitch bend, +-2 semitones (the Rhodes types, as MIDI pitch bend; VIBES and MARIMBA ignore it) |
-| mod wheel | more TREM/WAH depth on top of DEPTH, full at the top (VIBES: the motor's); switches it on if off, off again at rest |
+| pitch wheel | pitch bend, +-2 semitones (as MIDI pitch bend) |
+| mod wheel | more TREM/WAH depth on top of DEPTH, full at the top (on the 200A its vibrato's DEPTH too); switches TREM/WAH on if off, off again at rest |
 | pedal jack | sustain pedal, either polarity (plug it in before switching on) |
 
 **Faders: soft takeover.** A fader takes over only once it reaches the value its card has (after a bank change, a
@@ -114,10 +114,10 @@ keys: KEY VEL (FRODHES page) is the velocity of a medium press, a light touch pl
 
 | Pad | Does | Pad | Does |
 | --- | --- | --- | --- |
-| 1..6 | TYPE: ST77, SUIT, FELT, DYNO, VIBE, MRMB | 9 | DRIVE on / off |
+| 1..6 | TYPE: ST77, SUIT, FELT, DYNO, 200A, 2AMP | 9 | DRIVE on / off |
 | 7 | previous preset | 10 | COMP on / off |
 | 8 | next preset | 11 | FILTER on / off |
-| | | 12 | TREM/WAH on / off (VIBES: the motor) |
+| | | 12 | TREM/WAH on / off |
 | | | 13 / 14 / 15 | PHASER / CHORUS / DELAY on / off |
 | | | 16 | SUSTAIN: held, or a tap latches; one latch with REC (a tap on either lets go, a hold on either releases it) |
 

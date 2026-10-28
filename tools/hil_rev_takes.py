@@ -5,7 +5,7 @@
 settings, the hold for 60 s (FREEZE and SUSTAIN), TYPE switching while playing, REVERB 2's knobs). The firmware's counters are read
 every 0.5 s as in the cracks test (tools/hil_crackle.py Device: CPU, USB underruns), and printed per take.
 
-  tools/hil_rev_takes.py [--engine rhodes|vibes|marimba] [--out DIR] [--only NAME,..] [--rate 48000]
+  tools/hil_rev_takes.py [--engine rhodes|reed] [--out DIR] [--only NAME,..] [--rate 48000]
                          [--source both|usb] [--jack-dev M6] [--jack-ch 5] [--dry-run] [--host] [--list]
 
   --out DIR   where the WAVs go (default private/reverb/takes/<engine>/): <take>-usb.wav (stereo, the USB rate) and
@@ -19,7 +19,7 @@ developer reset), then the reverb's own CCs (from params.c: TYPE CC 95's bands, 
 The ready-to-run command (FM-1, sandbox off, build/hil/DEVICE.lockdir held; MASTER fully up and untouched):
   tools/hil_rev_takes.py --dry-run                                     the plan (~6 min on the Rhodes)
   tools/hil_rev_takes.py                                               the Rhodes -> private/reverb/takes/rhodes/
-  tools/hil_rev_takes.py --engine vibes; tools/hil_rev_takes.py --engine marimba   (~6 min each)
+  tools/hil_rev_takes.py --engine reed                                  the 200A (~6 min)
 """
 import argparse
 import json

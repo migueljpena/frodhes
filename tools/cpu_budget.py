@@ -23,7 +23,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TABLE = os.path.join(ROOT, "tools", "cpu_costs.json")
-ENGINES = ("rhodes", "vibes", "marimba")
+ENGINES = ("rhodes",)            # the 200A (reed.c) joins once the FM-1 has measured it
 
 
 def load(path=TABLE):
@@ -36,20 +36,14 @@ def hi(row):
 
 
 def firmware_voices(root=ROOT):
-    """{engine: voices} as the firmware's sources set them by default: rhodes.c RH_VOICES / BAR_VOICES (one per
-    engine), else FR_VOICES (both)"""
+    """{engine: voices} as the firmware's sources set them by default: rhodes.c RH_VOICES, else FR_VOICES"""
     src = open(os.path.join(root, "firmware", "src", "rhodes.c")).read()
-    try:
-        src += open(os.path.join(root, "firmware", "src", "bars.h")).read()
-    except OSError:
-        pass
 
     def define(name):
         m = re.search(rf"#define\s+{name}\s+(\d+)u?\b", src)
         return int(m.group(1)) if m else None
     fr = define("FR_VOICES")
-    rh, bar = define("RH_VOICES") or fr, define("BAR_VOICES") or fr
-    return {"rhodes": rh, "vibes": bar, "marimba": bar}
+    return {"rhodes": define("RH_VOICES") or fr}
 
 
 def firmware_has_bend(root=ROOT):

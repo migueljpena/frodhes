@@ -60,16 +60,18 @@
 4500 wheel 1 620
 4600 expect state p.2 2
 4610 midi 0xB0 17 0
-# VIBES (CC 79 0): the motor's depth (p.55, 110 in this sound) plus the wheel; the motor switched on and off again
-4700 midi 0xB0 79 0
+# the 200A (CC 115 0): the vibrato's depth (p.55, 110 in this sound) plus the wheel; the wheel switches TREM/WAH on
+# and off again, never the VIBRATO (p.54)
+4700 midi 0xB0 115 0
 4750 midi 0xB0 47 0
 4800 expect state motdepth 110
 4900 wheel 1 485
 5000 expect state p.55 110
-5000 expect state p.54 1
+5000 expect state p.54 0
 5000 expect state motdepth 127
 5100 wheel 1 620
 5200 expect state p.55 110
 5200 expect state p.54 0
+5200 expect state p.2 0
 5200 expect state motdepth 110
 5300 end

@@ -23,7 +23,7 @@ Checks (plan §5):
     face, except the ones listed in SMALL_OK; the name changes as its knob turns;
   - the amber frame only on the turned knob, for about 1 s (and the label amber with it);
   - the title amber, the count "n/m" right-aligned;
-  - dynamic VOICE pages: Rhodes VOICE 1/2, 2/2, VIBES 1/3, 2/3, 3/3 with their labels, right after FRODHES, SELECT
+  - dynamic VOICE pages: Rhodes VOICE 1/2, 2/2, the 200A 1/4 .. 4/4 with their labels, right after FRODHES, SELECT
     walking them in order both ways; no DECAY or MOTOR page; developer CC 2 (the colour candidates A B C) changes
     colours only (the same checks pass in each, the rows show the same); look C = tools/meters_palettes.py search.
 The large face's small fallback (a value that does not fit 28 px) is reported, not failed.
@@ -46,10 +46,10 @@ def run(tag, lines, end_ms, check=False):
     return hostrun.run(tag, lines, end_ms, binary=BIN, check=check)
 
 
-TYPES = [("ST77", 80, 8), ("SUIT", 80, 40), ("FELT", 80, 72), ("DYNO", 80, 104), ("VIBE", 79, 0)]
+TYPES = [("ST77", 80, 8), ("SUIT", 80, 40), ("FELT", 80, 72), ("DYNO", 80, 104), ("200A", 115, 0)]
 VOICE = {"rhodes": [["TONE", "BARK", "BELL", "HAMMER"], ["DECAY", "RELEASE", "NOISE", "TUNE"]],
-         "vibes": [["STRIKE", "MALLET", "TUBE", "WEIGHT"], ["RING", "DAMPER", "NOISE", "TUNE"],
-                   ["MOTOR", "DEPTH", "SPEED", "SHAPE"]]}
+         "reed": [["TONE", "BARK", "BELL", "HAMMER"], ["DECAY", "RELEASE", "NOISE", "TUNE"],
+                  ["VIBRATO", "DEPTH", "SPEED", "SHAPE"], ["REG", "", "", ""]]}
 ROW_X0, ROW_X1, ROW_Y0, ROW_DY, ROW_H = 6, 233, 46, 42, 38      # plan §2: x 6-233, y 46 + 42 k, height 38
 LABEL_X1 = 90                                                     # the labels end before x 90 (where amber is looked for)
 VALUE_XR = ROW_X0 + 220                                           # ui.c draw_row: values right-aligned at row x 220
@@ -449,10 +449,10 @@ def voice_pages(pages):
 
 @pytest.mark.parametrize("name,cc_n,v", TYPES, ids=[t[0] for t in TYPES])
 def test_dynamic_voice_pages(meters, name, cc_n, v):
-    """VOICE 1..n from the engine's table: Rhodes 2, VIBES 3, right after FRODHES, in order, with their labels;
+    """VOICE 1..n from the engine's table: Rhodes 2, the 200A 4, right after FRODHES, in order, with their labels;
     no DECAY or MOTOR page; the count n/m runs 1..m over the walk (or names the VOICE group)"""
     pages, bwd, fwd = pages_of(name, cc_n, v)
-    eng = "vibes" if name == "VIBE" else "rhodes"
+    eng = "reed" if name == "200A" else "rhodes"
     titles = [title_of(s) for _, _, s in pages]
     assert not [t for t in titles if t in ("DECAY", "MOTOR")], titles
     vp = voice_pages(pages)
@@ -478,7 +478,7 @@ def test_dynamic_voice_pages(meters, name, cc_n, v):
     assert [page_id(s) for _, _, s in bwd] == want_back
 
 
-@pytest.mark.parametrize("name,cc_n,v", [TYPES[0], TYPES[4]], ids=["ST77", "VIBE"])
+@pytest.mark.parametrize("name,cc_n,v", [TYPES[0], TYPES[4]], ids=["ST77", "200A"])
 def test_every_choice_option_written(meters, name, cc_n, v):
     """every choice card of every page (both engines; not TYPE: test_type_names_written; not COLOR, the palette
     itself: test_ui_display.py), turned through each of its
@@ -542,17 +542,17 @@ def test_every_choice_option_written(meters, name, cc_n, v):
     assert not errs, "\n".join(errs[:40])
 
 
-def test_vibes_has_one_page_more(meters):
+def test_reed_has_two_pages_more(meters):
     r = len(pages_of("ST77", 80, 8)[0])
-    b = len(pages_of("VIBE", 79, 0)[0])
-    assert b == r + 1, (r, b)
+    b = len(pages_of("200A", 115, 0)[0])
+    assert b == r + 2, (r, b)
 
 
-@pytest.mark.parametrize("eng,cc_n,v", [("rhodes", 80, 8), ("vibes", 79, 0)])
+@pytest.mark.parametrize("eng,cc_n,v", [("rhodes", 80, 8), ("reed", 115, 0)])
 def test_hot_frame(meters, eng, cc_n, v):
     """turn K1..K4 on REVERB 2 (four amounts; REVERB's K1 is the TYPE since 0.9.5), one at a time: the turned row alone gets the amber frame and an amber
     label, still there at 0.8 s, gone by 1.5 s (HOT_MS 1 s)"""
-    pages = pages_of("ST77" if eng == "rhodes" else "VIBE", cc_n, v)[0]
+    pages = pages_of("ST77" if eng == "rhodes" else "200A", cc_n, v)[0]
     pos = [title_of(s) for _, _, s in pages].index("REVERB 2")
     L, t = type_lines(cc_n, v), T0
     for _ in range(pos):
@@ -601,7 +601,7 @@ def look_tokens(look):
 
 
 @pytest.mark.parametrize("look", [0, 1, 2], ids=["A", "B", "C"])
-@pytest.mark.parametrize("name,cc_n,v", [TYPES[0], TYPES[4]], ids=["ST77", "VIBE"])
+@pytest.mark.parametrize("name,cc_n,v", [TYPES[0], TYPES[4]], ids=["ST77", "200A"])
 def test_looks_same_geometry(meters, look, name, cc_n, v):
     """developer CC 2 (the colour candidates A / B / C, ui.c MT_LOOKS) changes colours only: every page, its knobs
     turned, passes the same checks (look C's text is tinted for the panel: NORM undoes it), and what each row shows

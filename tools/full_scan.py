@@ -6,15 +6,14 @@ The rule: always record the headphone jack and USB, but the JACK decides (the us
 for development). Runs, in order, each as a subprocess with its own log under build/hil/full/<timestamp>/:
 
   info          tools/fm1_install.py --info            (which firmware the FM-1 reports; installs nothing)
-  cpu-*         tools/hil_cpu.py, then --engine vibes  (2 runs each; the worst counts)
+  cpu-*         tools/hil_cpu.py, then --engine reed   (2 runs each; the worst counts)
   classic       tools/hil_scan.py                      (every default suite; USB only -> report.json / .txt)
-  vibes         tools/hil_scan.py --vibes --source both --wav   (USB and the jack side by side -> vibes-report.*)
-  jack-*        tools/hil_jack.py, then --engine vibes (hiss / SNR / headroom through the interface -> jack*.json)
+  jack-*        tools/hil_jack.py, then --engine reed  (hiss / SNR / headroom through the interface -> jack*.json)
   seq           tools/hil_seq.py                       (only with --seq)
 
 Each tool's JSON / report is copied into the run directory once it has written it, and SUMMARY.md is built from
 those: per suite ok / FAIL counts, every failing row classified
-  JACK FAIL   real: the jack fails it (the VIBES rows carry each source's verdict, hil_scan check() src_ok)
+  JACK FAIL   real: the jack fails it
   UNDECIDED   failing with no jack value to decide on (the classic suites are USB only; a USB-only measure)
   USB-ONLY    the jack passes, or a USB capture artefact (the USB stream slipped, USB-only clicks): tooling
   INFO        an information row, a USB / jack MISMATCH where both pass, a known stale classic limit (AGENTS.md)
@@ -55,82 +54,6 @@ CLASSES = ("JACK FAIL", "UNDECIDED", "USB-ONLY", "INFO")
 
 
 # ---------------------------------------------------------------- classification
-CELL = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?(?:\s*/\s*[-+]?\d+(?:\.\d+)?)*\s*(?:dB|LU|ms|cents)?\s*(?:\(floor\))?\s*$")
-
-
-def _nums(text):
-    """a plain value cell ('+2.31', '3.6 dB', '+2.31 / -2.86 LU') -> its numbers; None for anything else (a ratio,
-    'x1.49', Hz pairs, '->' sequences: the criterion is about something computed from them)"""
-    if not CELL.match(str(text)):
-        return None
-    return [float(x) for x in re.findall(r"[-+]?\d+(?:\.\d+)?", str(text))]
-
-
-def judge(crit, value_text):
-    """the simple criteria ('>= 3 dB', '< 1 dB', '|step| <= 1.5 LU', '|cents| <= 2 ...', '+6 .. +12.5 LU') on a plain
-    value cell, every number in it: True / False; None when not machine-readable (a row without src_ok: UNDECIDED)"""
-    vs = _nums(value_text)
-    if not vs:
-        return None
-    c = str(crit).strip()
-    m = re.match(r"^\|[a-z ]+\|\s*(<=|<)\s*([+-]?\d+(?:\.\d+)?)\s*(?:dB|LU|ms)?(?:\s*$|\s*\()", c)
-    if m:
-        lim = float(m.group(2))
-        return all(abs(v) <= lim if m.group(1) == "<=" else abs(v) < lim for v in vs)
-    m = re.match(r"^([+-]?\d+(?:\.\d+)?)\s*\.\.\s*([+-]?\d+(?:\.\d+)?)\s*(?:dB|LU|ms)?(?:\s*$|\s*\()", c)
-    if m:
-        return all(float(m.group(1)) <= v <= float(m.group(2)) for v in vs)
-    m = re.match(r"^(>=|<=|>|<)\s*([+-]?\d+(?:\.\d+)?)\s*(?:dB|LU|ms)?(?:\s*$|\s*\()", c)
-    if m:
-        lim = float(m.group(2))
-        return all({">=": v >= lim, "<=": v <= lim, ">": v > lim, "<": v < lim}[m.group(1)] for v in vs)
-    return None
-
-
-def classify_vibes_row(row, takes):
-    """one VIBES report row -> [(class, reason)] (empty for a passing / skipped row); takes {tag: take dict}"""
-    if row.get("ok") or row.get("status") == "skip":
-        return []
-    check, st = row.get("check", ""), row.get("status", "")
-    if check.startswith("takes: the USB stream slipped"):
-        return [("USB-ONLY", "USB capture artefact: the USB stream slipped, the jack did not")]
-    if check.startswith("takes: full scale / clicks"):
-        tags = [t.strip() for t in str(row.get("usb", "")).split(",") if t.strip()]
-        jack_bad = [t for t in tags if (takes.get(t) or {}).get("jack_clicks")]
-        no_jack = [t for t in tags if t not in jack_bad and "jack_clicks" not in (takes.get(t) or {})]
-        usb_only = [t for t in tags if t not in jack_bad and t not in no_jack]
-        out = []
-        if jack_bad:
-            out.append(("JACK FAIL", "clicks on the jack: " + ", ".join(
-                f"{t} ({takes[t]['jack_clicks']})" for t in jack_bad)))
-        if no_jack:
-            out.append(("UNDECIDED", "USB full scale / clicks, no jack recording of: " + ", ".join(no_jack)))
-        if usb_only:
-            out.append(("USB-ONLY", "USB-only full scale / clicks (the jack clean): " + ", ".join(
-                f"{t} (USB fs {takes[t].get('usb_fs', 0)}, clicks {takes[t].get('usb_clicks', 0)})" for t in usb_only)))
-        return out
-    if check == "suite error":
-        return [("UNDECIDED", f"suite error: {row.get('usb', '')}")]
-    if st.startswith("info"):
-        return [("INFO", "information row" + (", USB / jack MISMATCH" if "MISMATCH" in st else ""))]
-    if st.startswith("ok"):
-        mm = row.get("mismatch")
-        return [("INFO", "both pass; USB and jack disagree" + (f" by {mm:+.2f} dB" if isinstance(mm, (int, float)) else ""))]
-    src = row.get("src_ok")
-    if isinstance(src, dict) and "jack" in src:
-        if not src["jack"]:
-            return [("JACK FAIL", "the jack fails" + ("" if src.get("usb", True) else " (USB too)"))]
-        return [("USB-ONLY", "the jack passes, USB fails" if not src.get("usb", True) else
-                 "both pass the criterion; failed on another condition")]
-    jack = str(row.get("jack", "")).strip()
-    if jack in ("", "-", "n/a") or jack.startswith("no value"):
-        return [("UNDECIDED", "no jack value (a USB-only measure, or the jack was not recorded)")]
-    j = judge(row.get("crit", ""), jack)
-    if j is None:
-        return [("UNDECIDED", "the jack has a value but the criterion is not machine-readable (old JSON, no src_ok)")]
-    return [("USB-ONLY", "the jack passes (criterion re-read)")] if j else [("JACK FAIL", "the jack fails (criterion re-read)")]
-
-
 CLASSIC_LINE = re.compile(r"^(ok|FAIL)\s+(\S+)\s+(.*?)\s+\((\d+) s\)\s*$")
 
 
@@ -190,7 +113,7 @@ def build_summary(d):
     if meta.get("git"):
         L += [f"- tools at: {meta['git']}"]
     L += [""]
-    errors = [s for s in steps if s.get("rc") not in (0, None) and s["name"] not in ("classic", "vibes")]
+    errors = [s for s in steps if s.get("rc") not in (0, None) and s["name"] != "classic"]
     if steps:
         L += ["## Steps", "", "| step | exit | time | log |", "|---|---|---|---|"]
         L += [f"| {s['name']} | {s.get('rc')} | {s.get('secs', 0):.0f} s | {s['name']}.log |" for s in steps]
@@ -200,7 +123,7 @@ def build_summary(d):
     L += ["## CPU (worst audio block of 2 runs)", "",
           f"| engine | runs (us) | worst | to {CPU_TARGET} | to {CPU_GATE} | to {CPU_SHED} (shedder) | voices shed |",
           "|---|---|---|---|---|---|---|"]
-    for eng in ("rhodes", "vibes"):
+    for eng in ("rhodes", "reed"):
         runs = []
         for f in sorted(os.listdir(d)):
             if f.startswith(f"cpu-{eng}-") and f.endswith(".log"):
@@ -218,7 +141,7 @@ def build_summary(d):
     L += ["## Hiss / SNR (tools/hil_jack.py, re the interface's full scale)", "",
           "| engine | jack floor (muted) dB | hiss 8-20k jack dB | hiss USB dBFS | jack adds dB | loud jack peak dB | SNR dB |",
           "|---|---|---|---|---|---|---|"]
-    for eng, fn in (("rhodes", "jack.json"), ("vibes", "jack-vibes.json")):
+    for eng, fn in (("rhodes", "jack.json"), ("reed", "jack-reed.json")):
         j = _json(os.path.join(d, fn))
         if not j:
             L.append(f"| {eng} | (no result) | | | | | |")
@@ -241,19 +164,6 @@ def build_summary(d):
                 rows.append((c, f"classic {name}", msg[:160], "", "(USB)", "-", "", why))
     else:
         L.append("| classic | (no report) | | |")
-    v = _json(os.path.join(d, "vibes-report.json"))
-    if v:
-        takes = {t.get("tag"): t for t in v.get("takes", [])}
-        for sname, srows in v.get("suites", {}).items():
-            live = [r for r in srows if r.get("status") != "skip"]
-            nf = sum(not r.get("ok") for r in live)
-            L.append(f"| {sname} | {len(live)} | {len(live) - nf} | {nf} |")
-            for r in srows:
-                for c, why in classify_vibes_row(r, takes):
-                    rows.append((c, sname, r.get("check", ""), r.get("setting", ""), str(r.get("usb", ""))[:120],
-                                 str(r.get("jack", "")), r.get("crit", ""), why))
-    else:
-        L.append("| vibes | (no report) | | |")
     seq = _read(os.path.join(d, "seq.log"))
     if seq is not None:
         tail = [ln for ln in seq.splitlines() if ln.strip() and not ln.startswith("$ ")][-3:]
@@ -357,18 +267,15 @@ def _mtime(p):
 
 def plan(a):
     py, t = sys.executable, lambda n: os.path.join(TOOLS, n)
-    jack = ["--jack-dev", a.jack_dev, "--jack-ch", str(a.jack_ch)]
     S = [("info", [py, t("fm1_install.py"), "--info"], 60, ())]
-    for eng, extra in (("rhodes", []), ("vibes", ["--engine", "vibes"])):
+    for eng, extra in (("rhodes", []), ("reed", ["--engine", "reed"])):
         for i in (1, 2):
             S.append((f"cpu-{eng}-{i}", [py, t("hil_cpu.py")] + extra, 900, ()))
     S.append(("classic", [py, t("hil_scan.py")], 3600, (("report.json", "report.json"), ("report.txt", "report.txt"))))
-    S.append(("vibes", [py, t("hil_scan.py"), "--vibes", "--source", "both", "--wav"] + jack, 5400,
-              (("vibes-report.json", "vibes-report.json"), ("vibes-report.md", "vibes-report.md"))))
     S.append(("jack-rhodes", [py, t("hil_jack.py"), "--dev", a.jack_dev, "--ch", str(a.jack_ch)], 900,
               (("jack.json", "jack.json"),)))
-    S.append(("jack-vibes", [py, t("hil_jack.py"), "--dev", a.jack_dev, "--ch", str(a.jack_ch), "--engine", "vibes"],
-              900, (("jack-vibes.json", "jack-vibes.json"),)))
+    S.append(("jack-reed", [py, t("hil_jack.py"), "--dev", a.jack_dev, "--ch", str(a.jack_ch), "--engine", "reed"],
+              900, (("jack-reed.json", "jack-reed.json"),)))
     if a.seq:
         S.append(("seq", [py, t("hil_seq.py")], 300, ()))
     skip = set(filter(None, (a.skip or "").split(",")))
@@ -384,7 +291,7 @@ def main():
     ap.add_argument("--jack-dev", default="M6")
     ap.add_argument("--jack-ch", type=int, default=5)
     ap.add_argument("--seq", action="store_true", help="also tools/hil_seq.py (clears the FM-1's pattern)")
-    ap.add_argument("--skip", help="steps to leave out, comma-separated: info, cpu, cpu-vibes, classic, vibes, jack ...")
+    ap.add_argument("--skip", help="steps to leave out, comma-separated: info, cpu, cpu-reed, classic, jack ...")
     ap.add_argument("--who", default=f"full_scan@{socket.gethostname()}", help="the lock owner's name")
     a = ap.parse_args()
     if a.offline:

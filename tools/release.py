@@ -22,10 +22,8 @@ tools/doc_links.py), and the notes are assembled from the fragments each change 
                  release, T2 when an engine / the DSP changed (or --full). The device lock, install, then
                  T1 must-pass   hil_scan --tier must (the real-use scenarios, the firmware's counters gated; S1 is
                                 stress_max, tools/hil_crackle.py, at 48 and 44.1 kHz)
-                 T2 full scans  hil_cpu --worst (Rhodes, VIBES and MARIMBA: <= 4500 us, nothing shed), hil_scan (the
-                                release set, then vibes_vel, then --marimba: MARIMBA_MUST), hil_jack on every engine
-                                (SNR; the jack must be connected; MARIMBA: the A5 tails and the idle floor too),
-                                vib_sampleback --engine marimba (Gate VD-M, every key C2..C7)
+                 T2 full scans  hil_cpu --worst (the Rhodes and the 200A: <= 4500 us, nothing shed), hil_scan (the
+                                release set), hil_jack on every engine (SNR; the jack must be connected)
                  --no-device --device-done JSON: those runs were made on this exact build; its "tiers" must cover the
                  needed ones (checked here, as soon as the build's sha256 is known)
  5 docs          tools/doc_links.py's check (each picture's ?v= = its file's hash, no version named in README /
@@ -83,19 +81,7 @@ JACK_PEAK_MIN_DB = -27.0          # the loud chord peaks near -15 dBFS on the ja
 TRAILER = "Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"   # (no session links: a public repo)
 STEPS = ["version", "preconditions", "host", "FM-1", "docs", "confirm", "publish", "emulator", "verify"]
 SCAN_SET = "silence,latency,keyboard,velocity,sustain,held_tail,stress,presets"
-ENGINES = ("rhodes", "vibes", "marimba")
-# hil_scan --marimba (every MARIMBA suite, USB and the jack) exits 1 on any FAIL row, so its report is judged here.
-# A KNOWN row (hil_scan m_known: tools/marimba_scan.py KNOWN / KNOWN_CARDS, the user's decisions) never fails.
-# As VIBES (the release runs vibes_vel, not vibes_jump / vibes_fx, whose stale effect limits fail on every version):
-# the four voice suites must pass every row; the two effect suites (the on/off loudness steps, every FX control) are
-# reported and gate only the rows below. MARIMBA_INFO: rows reported, never gating, with the reason.
-MARIMBA_MUST = ("marimba_voice", "marimba_decay", "marimba_vel", "marimba_roll")
-MARIMBA_FX = ("marimba_jump", "marimba_fx")
-MARIMBA_FX_MUST = (r"^suite error$", r"^takes: ", r": clicks at the switches$", r"^reference drift$",
-                   r"^FX bypass \(CC 111\)", r"^MARIMBA re ST77, ")
-MARIMBA_INFO = {("marimba_vel", "keys C2..C7: level span"):
-                "information, as the host scan's M1 'level span C2-C7' (tools/marimba_scan.py): a marimba is louder "
-                "low than high (FM-1 scans 3 / 4: 8.6 dB); the neighbour step gates the curve"}
+ENGINES = ("rhodes", "reed")                     # the Rhodes, the 200A
 
 
 class Stop(Exception):
@@ -292,20 +278,10 @@ class Release:
                 ev.append(check_cpu(eng, o))
             _, o = sh([PY, "tools/hil_scan.py", "--only", SCAN_SET], timeout=3600)
             ev.append(f"hil_scan {SCAN_SET}: exit 0 ({tail(o, 1)})")
-            _, o = sh([PY, "tools/hil_scan.py", "--only", "vibes_vel", "--source", "both"], timeout=3600)
-            ev.append(f"hil_scan vibes_vel --source both: exit 0 ({tail(o, 1)})")
-            rep_m = os.path.join(ROOT, "build", "hil", "marimba-report.json")
-            t0 = time.time()
-            sh([PY, "tools/hil_scan.py", "--marimba", "--source", "both"], check=False, timeout=5400)
-            if not os.path.exists(rep_m) or os.path.getmtime(rep_m) < t0 - 1:
-                raise Stop(f"hil_scan --marimba wrote no new {os.path.relpath(rep_m, ROOT)}")
-            ev.append(check_marimba_scan(json.load(open(rep_m))))
             for eng in ENGINES:
                 sh([PY, "tools/hil_jack.py", "--engine", eng], timeout=900)
                 rep = json.load(open(os.path.join(ROOT, "build", "hil", JACK_JSON[eng])))
-                ev.append(check_jack_marimba(rep) if eng == "marimba" else check_jack(eng, rep))
-            _, o = sh([PY, "tools/vib_sampleback.py", "--engine", "marimba"], timeout=1800)
-            ev.append(check_sampleback(o))
+                ev.append(check_jack(eng, rep))
         finally:
             lk.release()
         return "\n".join(ev)
@@ -351,7 +327,7 @@ class Release:
         if not self.a.no_device:
             need = self.tiers()["need"]
             dev = (f"FM-1: tiers {'+'.join(need)} with the release build installed (hil_scan --tier must"
-                   + (", then hil_cpu, hil_scan, hil_jack, vib_sampleback)" if "T2" in need else "; T2 not needed)"))
+                   + (", then hil_cpu, hil_scan, hil_jack)" if "T2" in need else "; T2 not needed)"))
         else:
             dev = self.device_done() or "FM-1: NOT tested (--no-device)"
         msg = (f"Release {self.ver}: the notes {notes}, assembled from {changes.DIR}/ (the fragments removed)"
@@ -585,7 +561,7 @@ class Release:
         print("=" * 78)
 
 
-JACK_JSON = dict(rhodes="jack.json", vibes="jack-vibes.json", marimba="jack-marimba.json")
+JACK_JSON = dict(rhodes="jack.json", reed="jack-reed.json")
 
 
 def cpu_cmd(eng):
@@ -605,69 +581,8 @@ def device_plan(ver, tiers=("T0", "T1", "T2")):
         return t1
     return (t1
             + [q(cpu_cmd(e)) + f"   (worst <= {CPU_LIMIT_US} us, nothing shed)" for e in ENGINES]
-            + [q([PY, "tools/hil_scan.py", "--only", SCAN_SET]) + "   (exit 0)",
-               q([PY, "tools/hil_scan.py", "--only", "vibes_vel", "--source", "both"]) + "   (exit 0)",
-               q([PY, "tools/hil_scan.py", "--marimba", "--source", "both"])
-               + f"   (marimba-report.json: {', '.join(MARIMBA_MUST)} every row; {', '.join(MARIMBA_FX)} the "
-               "takes / clicks / drift / bypass / level re ST77 rows; KNOWN rows pass)"]
-            + [q([PY, "tools/hil_jack.py", "--engine", e]) + f"   ({JACK_JSON[e]}: the jack connected"
-               + ("; the A5 tails, the idle floor)" if e == "marimba" else ")") for e in ENGINES]
-            + [q([PY, "tools/vib_sampleback.py", "--engine", "marimba"]) + "   (Gate VD-M: 0 keys outside)"])
-
-
-def check_marimba_scan(rep):
-    """build/hil/marimba-report.json against MARIMBA_MUST / MARIMBA_FX_MUST / MARIMBA_INFO; Stop with every failing
-    row that must pass"""
-    suites = rep["suites"]
-    missing = [n for n in MARIMBA_MUST + MARIMBA_FX if n not in suites]
-    if missing:
-        raise Stop(f"hil_scan --marimba: suites missing from the report: {', '.join(missing)}")
-    bad, info, known, nfx = [], [], 0, 0
-    for n, rows in suites.items():
-        for r in rows:
-            known += bool(r.get("known"))
-            if r["ok"]:
-                continue
-            if (n, r["check"]) in MARIMBA_INFO:
-                info.append(f"{n} {r['check']}: USB {r['usb']} jack {r['jack']} (not gating: "
-                            f"{MARIMBA_INFO[n, r['check']]})")
-            elif n in MARIMBA_MUST or any(re.search(x, r["check"]) for x in MARIMBA_FX_MUST):
-                bad.append(f"{n}: {r['check']} [{r['setting']}] USB {r['usb']} jack {r['jack']} ({r['crit']}) "
-                           f"{r['status']}")
-            else:
-                nfx += 1
-    if bad:
-        raise Stop("hil_scan --marimba: rows that must pass failed:\n" + "\n".join(bad))
-    lvl = [r for r in suites["marimba_jump"] if r["check"].startswith("MARIMBA re ST77")]
-    return (f"hil_scan --marimba --source both: {', '.join(MARIMBA_MUST)} every row ok ({known} KNOWN, user "
-            f"decisions); {', '.join(MARIMBA_FX)}: the must rows ok, {nfx} other row(s) failed (not gating)"
-            + (f"; MARIMBA re ST77 USB {lvl[0]['usb']} jack {lvl[0]['jack']} LU" if lvl else "")
-            + "".join("\n" + x for x in info))
-
-
-def check_jack_marimba(rep):
-    m = rep["marimba"]
-    peak = m["loud"]["jack_peak_db"]
-    if peak < JACK_PEAK_MIN_DB:
-        raise Stop(f"hil_jack marimba: the loud chord peaks at {peak:.1f} dBFS on the jack (usually about -15): "
-                   "is the jack connected to the interface?")
-    bad = [f"tail {k}: {v}" for k, v in rep["tails"].items() if not v.get("ok")]
-    if not rep["idle_ok"]:
-        bad.append(f"idle: {rep['idle']}")
-    if bad:
-        raise Stop("hil_jack marimba (TEST-PLAN A5, the idle floor):\n" + "\n".join(bad))
-    return (f"hil_jack marimba: SNR {m['snr_db']:.1f} dB ({rep['snr_vs_st77_db']:+.1f} re ST77 in the same session, "
-            f"information: MARIMBA's chord is quieter), loud chord jack peak {peak:.1f} dBFS; {len(rep['tails'])} "
-            "tails and the idle floor ok")
-
-
-def check_sampleback(text):
-    m = re.search(r"(\d+) notes, (\d+) outside Gate VD-M", text)
-    if not m:
-        raise Stop("vib_sampleback marimba: no 'outside Gate VD-M' line:\n" + tail(text))
-    if int(m.group(2)):
-        raise Stop(f"vib_sampleback marimba: {m.group(2)} of {m.group(1)} keys outside Gate VD-M:\n" + tail(text))
-    return f"vib_sampleback marimba: {m.group(1)} keys, 0 outside Gate VD-M (device vs host)"
+            + [q([PY, "tools/hil_scan.py", "--only", SCAN_SET]) + "   (exit 0)"]
+            + [q([PY, "tools/hil_jack.py", "--engine", e]) + f"   ({JACK_JSON[e]}: the jack connected)" for e in ENGINES])
 
 
 def check_cpu(eng, text):

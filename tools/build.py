@@ -291,19 +291,6 @@ def hot_loops(dis, fn="app_audio"):
 
 
 MODE_MAX = 32       # the Rhodes MC3 mode loops (RHODES-CPU-PLAN R1: 39 -> 29 insns); a spill there cost ~35 us
-# the bar engine's loops (bars.c, 0.9.5 bars-10): function, the most instructions its inner loop may take (a turn: 4
-# samples for the upper slots, 2 for the pair, 1 for the output and the pulse), what it is. bars.c's cost model
-# (BAR_NS_*) is derived from these counts: a loop that grows past its limit fails the build
-BAR_LOOPS = [("bar_run_lo", 32, "upper slot Q32, 4 samples"), ("bar_run_hi", 32, "upper slot Q30, 4 samples"),
-             ("bar_run_lo_f", 40, "upper slot Q32 + force, 4 samples"),
-             ("bar_run_hi_f", 40, "upper slot Q30 + force, 4 samples"),
-             ("bar_pair_0", 58, "V1 + tube pair, 2 samples"), ("bar_pair_1", 70, "V1 + tube pair + force, 2 samples"),
-             ("bar_pair_0h", 70, "pair, the tube in Q30, 2 samples"),
-             ("bar_pair_1h", 72, "pair + force, the tube in Q30, 2 samples"),
-             ("bar_out_rad", 11, "output + radiation"), ("bar_out", 7, "output"),
-             ("bar_fade_rad", 21, "output + radiation, steal fade"), ("bar_fade", 17, "output, steal fade"),
-             ("bar_felt_pass", 15, "felt noise"), ("bar_force", 16, "the pulse")]
-
 
 def check(img, syms, dis, rt):
     errors, notes = [], []
@@ -356,17 +343,6 @@ def check(img, syms, dis, rt):
         if lp["sh22"] >= 3 or "rh_hermite" in lp["calls"]:
             notes.append(f"Rhodes pickup loop: {lp['n']} insns, {lp['st']} stack stores, {lp['ld']} stack loads"
                          + (f", calls {' '.join(lp['calls'])}" if lp["calls"] else ""))
-    for fn, lim, what in BAR_LOOPS:     # the bar engine's (VIBES / MARIMBA) hot loops, each out of line in bars.c
-        lps = hot_loops(dis, fn) or []
-        if not lps:
-            errors.append(f"the bar loop {fn} not found ({what})")
-            continue
-        lp = max(lps, key=lambda x: x["n"])
-        msg = f"bar {what} ({fn}): {lp['n']} insns, {lp['st']} stack stores, {lp['ld']} stack loads"
-        if lp["n"] > lim or (lim <= 40 and lp["st"]):
-            errors.append(msg + f" (limit {lim}" + (" / no stack stores" if lim <= 40 else "") + ": a register spill?)")
-        else:
-            notes.append(msg)
 
     def sym(name):
         mm = re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M)

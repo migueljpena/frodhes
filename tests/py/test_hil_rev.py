@@ -34,8 +34,8 @@ def test_cpu_dry_run():
 
 
 def test_split_args():
-    mine, rest = hcr.split_args(["--rev-type", "plate", "--worst", "--engine", "vibes", "--spread", "3", "--dry-run"])
-    assert mine == ["--rev-type", "plate", "--spread", "3", "--dry-run"] and rest == ["--worst", "--engine", "vibes"]
+    mine, rest = hcr.split_args(["--rev-type", "plate", "--worst", "--engine", "reed", "--spread", "3", "--dry-run"])
+    assert mine == ["--rev-type", "plate", "--spread", "3", "--dry-run"] and rest == ["--worst", "--engine", "reed"]
     mine, rest = hcr.split_args(["--rev-type", "all", "--", "--spread", "9"])
     assert mine == ["--rev-type", "all"] and rest == ["--spread", "9"]
 

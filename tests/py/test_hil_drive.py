@@ -29,7 +29,7 @@ def test_types_and_cc84_inside_their_bands():
 
 def test_cpu_plan_covers_every_type_variant_and_run():
     names = [n for n, _, _ in hd.drive_types()]
-    p = hd.cpu_plan(["rhodes", "vibes"], names, list(hd.VARIANTS), 3, 48000)
+    p = hd.cpu_plan(["rhodes", "reed"], names, list(hd.VARIANTS), 3, 48000)
     assert len(p) == 2 * len(names) * len(hd.VARIANTS) * 3
     for x in p:
         assert x["argv"][1:5] == ["--worst", "--usb", "48000", "--engine"]

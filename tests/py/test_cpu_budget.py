@@ -43,7 +43,6 @@ def hi(r):
 def test_firmware_voices():
     assert set(FW) == set(cb.ENGINES)
     assert all(1 <= v <= 16 for v in FW.values()), FW
-    assert FW["vibes"] == FW["marimba"]                      # the bar engines share BAR_NV
 
 
 @pytest.mark.parametrize("m", T["whole_isr"], ids=lambda m: f"{m['engine']}{m['voices']}-{m['usb']}-{m['fx']}")
@@ -87,10 +86,7 @@ def test_known_over_is_current():
 def test_predictions():
     """the numbers the release plan quotes (tools/cpu_budget.py prints the whole table)"""
     want = {("rhodes", 8, False): 3373, ("rhodes", 8, True): 3403, ("rhodes", 9, False): 3596,
-            ("rhodes", 9, True): 3626, ("rhodes", 10, False): 3819, ("rhodes", 10, True): 3849,
-            ("vibes", 9, False): 3991, ("vibes", 9, True): 4021, ("vibes", 10, False): 4258, ("vibes", 10, True): 4288,
-            ("marimba", 9, False): 3955, ("marimba", 9, True): 3985, ("marimba", 10, False): 4218,
-            ("marimba", 10, True): 4248}
+            ("rhodes", 9, True): 3626, ("rhodes", 10, False): 3819, ("rhodes", 10, True): 3849}
     got = {k: cb.predict(T, k[0], k[1], bend=k[2])["whole"] for k in want}
     # (a device run that updates tools/cpu_costs.json moves these: update them with it; bending: the spread retune;
     # est_costs_us: + 51, the reverb's half-bands, rev-upsample)

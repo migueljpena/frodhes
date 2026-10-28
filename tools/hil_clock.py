@@ -15,7 +15,7 @@ from the FM-1's own USB-MIDI port or from a computer MIDI interface wired to the
 
 Every synced item of tempo.c tempo_sync_publish, each measured by its effect on the audio:
   trem        TREM SYNC 1/4 (TREM/WAH = TREM, AM, DEPTH 64, sine): the amplitude envelope
-  motor       VIBES MOTOR SYNC 1/4 (CC 79 VIBES, 47 / 48 / 50 / 51): the amplitude envelope
+  motor       the 200A's VIBRATO SYNC 1/4 (CC 115 WURLI 200A, 47 / 48 / 50 / 51): the amplitude envelope
   phaser      PHA SYNC 1/4 (CC 85 phaser, DEPTH 127, FEEDBACK 100, CC 15): third-octave band levels against the
               total (a spectral feature), the band with the clearest fundamental
   chorus      CHORUS SYNC 1/4 (CC 85 chorus, DEPTH 64, CC 23): the same spectral feature; MANUAL when its
@@ -171,7 +171,7 @@ def items():
         LONG_IDX] == 384
     return {
         "trem": dict(kind="lfo", feature="amp", ccs=[(102, 110)] + trem, chord=(48, 60), all_bpm=True),
-        "motor": dict(kind="lfo", feature="amp", ccs=[(79, 0), (47, 127), (48, 110), (50, 0), q("MOT_SYNC")],
+        "motor": dict(kind="lfo", feature="amp", ccs=[(115, 0), (47, 127), (48, 110), (50, 0), q("MOT_SYNC")],
                       chord=(65, 77)),
         "phaser": dict(kind="lfo", feature="spec", ccs=[(102, 110), (85, 127), (13, 127), (16, 100), q("PH_SYNC")],
                        chord=(48, 60, 72), vel=120, all_bpm=True),
@@ -1238,7 +1238,7 @@ def report_txt(via, results, verdict, per, meta):
 
 
 ROWS = [("trem", "TREM SYNC (tremolo)"), ("wah", "TREM SYNC on WAH"), ("phaser", "PHA SYNC"), ("chorus", "CHORUS SYNC"),
-        ("filter", "LFO SYNC (the filter's LFO)"), ("motor", "VIBES MOTOR SYNC"), ("delay_dig", "DLY SYNC, DIG"),
+        ("filter", "LFO SYNC (the filter's LFO)"), ("motor", "200A VIBRATO SYNC"), ("delay_dig", "DLY SYNC, DIG"),
         ("delay_ana", "DLY SYNC, ANA"), ("delay_tape", "DLY SYNC, TAPE"),
         ("delay_long", "DLY SYNC 1/1: the long echo halved"), ("arp", "the arpeggiator on the tempo"),
         ("seq", "the sequencer: Start / Continue from bar 1, Stop"), ("range", "out-of-range clock holds the tempo"),

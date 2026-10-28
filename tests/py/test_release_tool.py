@@ -39,9 +39,9 @@ def test_cpu_and_jack_checks():
     with pytest.raises(rel.Stop):
         rel.check_cpu("rhodes", ok.replace("4321", "4600"))
     with pytest.raises(rel.Stop):
-        rel.check_cpu("vibes", ok.replace("shed 0\nb", "shed 2\nb"))
+        rel.check_cpu("reed", ok.replace("shed 0\nb", "shed 2\nb"))
     with pytest.raises(rel.Stop):
-        rel.check_cpu("vibes", "no output")
+        rel.check_cpu("reed", "no output")
     assert "SNR 80.0" in rel.check_jack("rhodes", dict(loud=dict(jack_peak_db=-15.2), snr_db=80.0))
     with pytest.raises(rel.Stop):
         rel.check_jack("rhodes", dict(loud=dict(jack_peak_db=-60.0), snr_db=20.0))
@@ -257,15 +257,10 @@ def test_dry_run_lists_the_device_plan(tree, monkeypatch, capsys, changed, extra
     py = rel.PY
     t1 = [f"echo y | {py} tools/fm1_install.py build/frodhes-0.9.3.fwsc", f"{py} tools/hil_scan.py --tier must"]
     t2 = [f"{py} tools/hil_cpu.py --worst",
-          f"{py} tools/hil_cpu.py --worst --engine vibes",
-          f"{py} tools/hil_cpu.py --worst --engine marimba",
+          f"{py} tools/hil_cpu.py --worst --engine reed",
           f"{py} tools/hil_scan.py --only {rel.SCAN_SET}",
-          f"{py} tools/hil_scan.py --only vibes_vel --source both",
-          f"{py} tools/hil_scan.py --marimba --source both",
           f"{py} tools/hil_jack.py --engine rhodes",
-          f"{py} tools/hil_jack.py --engine vibes",
-          f"{py} tools/hil_jack.py --engine marimba",
-          f"{py} tools/vib_sampleback.py --engine marimba"]
+          f"{py} tools/hil_jack.py --engine reed"]
     assert [p.split("   (")[0] for p in plan] == t1 + (t2 if full else [])
     if not full:
         assert "hil_cpu.py --worst" not in o
@@ -273,11 +268,8 @@ def test_dry_run_lists_the_device_plan(tree, monkeypatch, capsys, changed, extra
 
 def fake_fm1(hil, calls, changed):
     jack = dict(loud=dict(jack_peak_db=-15.0), snr_db=80.0)
-    for n in ("jack.json", "jack-vibes.json"):
+    for n in ("jack.json", "jack-reed.json"):
         (hil / n).write_text(json.dumps(jack))
-    (hil / "jack-marimba.json").write_text(json.dumps(dict(marimba=dict(loud=dict(jack_peak_db=-15.3), snr_db=70.5),
-                                                          snr_vs_st77_db=-3.8, tails={"C4": dict(ok=True)},
-                                                          idle_ok=True, idle={})))
 
     def sh(cmd, check=True, input=None, timeout=None, quiet=False):
         s = cmd if isinstance(cmd, str) else " ".join(cmd)
@@ -286,18 +278,13 @@ def fake_fm1(hil, calls, changed):
         calls.append(s)
         if "hil_cpu" in s:
             return 0, "a   voices shed 0\n\nworst 3400 us with 9 voices"
-        if "--marimba" in s:
-            (hil / "marimba-report.json").write_text(json.dumps(m_report()))
-            return 1, "FAIL  marimba_jump"                        # (exits 1 on any FAIL row: judged by the report)
-        if "vib_sampleback" in s:
-            return 0, "61 notes, 0 outside Gate VD-M."
         if "--tier must" in s:
             return 0, "T1 must-pass: 6 scenarios, every counter 0"
         return 0, "ok\n"
     return sh
 
 
-@pytest.mark.parametrize("changed, full", [("firmware/src/bars.c\n", True), ("firmware/src/usb.c\n", False),
+@pytest.mark.parametrize("changed, full", [("firmware/src/reed.c\n", True), ("firmware/src/usb.c\n", False),
                                            ("docs/MANUAL.md\n", False)])
 def test_device_step_runs_the_plan(tree, monkeypatch, changed, full):
     """s_device with a fake FM-1: T1 every time, then the T2 commands only when the diff needs them, in device_plan's
@@ -313,61 +300,11 @@ def test_device_step_runs_the_plan(tree, monkeypatch, changed, full):
     assert calls == [p.split("   (")[0] for p in rel.device_plan("0.9.3", need)]
     assert ev.startswith(f"tiers needed: {' + '.join(need)}") and "T1 hil_scan --tier must: exit 0" in ev
     if full:
-        assert "hil_cpu --worst marimba: worst 3400" in ev and "vib_sampleback marimba: 61 keys" in ev
-        assert "hil_jack marimba: SNR 70.5" in ev and "every row ok" in ev
+        assert "hil_cpu --worst reed: worst 3400" in ev and "hil_jack reed: SNR 80.0" in ev
     else:
         assert "T2 not run (the map: no engine / DSP file changed; --full forces it)" in ev
         assert not [c for c in calls if "hil_cpu" in c or "hil_jack" in c]
     assert not (hil / "DEVICE.lockdir").exists()
-
-
-def m_row(check, ok=True, known=None, setting=""):
-    r = dict(check=check, setting=setting, usb="1", jack="1", crit="c", status="ok" if ok else "FAIL", ok=ok)
-    if known:
-        r.update(status="KNOWN", ok=True, known=known)
-    return r
-
-
-def m_report(**extra):
-    s = {n: [m_row("x")] for n in rel.MARIMBA_MUST + rel.MARIMBA_FX}
-    s["marimba_jump"] += [m_row("comp (-20 dB 4:1, MKUP 15): on vs off", ok=False),       # a stale effect limit
-                          m_row("MARIMBA re ST77, A3-E4-A4 v100")]
-    s["marimba_roll"].append(m_row("pumping", known="USER DECISION"))
-    s["marimba_vel"].append(m_row("keys C2..C7: level span", ok=False))
-    for n, rows in extra.items():
-        s[n] = s[n] + rows
-    return dict(suites=s, takes=[])
-
-
-def test_marimba_scan_gate():
-    ev = rel.check_marimba_scan(m_report())
-    assert "1 KNOWN" in ev and "1 other row(s) failed (not gating)" in ev and "level span" in ev
-    for suite, row in (("marimba_voice", m_row("STRIKE (CC 28) 0 vs 64", ok=False, setting="key 60 v100")),
-                       ("marimba_fx", m_row("takes: full scale / clicks", ok=False)),
-                       ("marimba_jump", m_row("drive (DRV ON, DRIVE 40): clicks at the switches", ok=False)),
-                       ("marimba_jump", m_row("MARIMBA re ST77, A3-E4-A4 v100", ok=False)),
-                       ("marimba_jump", m_row("FX bypass (CC 111) with everything on", ok=False)),
-                       ("marimba_fx", m_row("suite error", ok=False))):
-        with pytest.raises(rel.Stop, match="must pass"):
-            rel.check_marimba_scan(m_report(**{suite: [row]}))
-    rep = m_report()
-    del rep["suites"]["marimba_decay"]
-    with pytest.raises(rel.Stop, match="missing"):
-        rel.check_marimba_scan(rep)
-
-
-def test_marimba_jack_and_sampleback_checks():
-    rep = dict(marimba=dict(loud=dict(jack_peak_db=-15.3), snr_db=70.5), snr_vs_st77_db=-3.8,
-               tails={"C4": dict(ok=True)}, idle_ok=True, idle={})
-    assert "SNR 70.5" in rel.check_jack_marimba(rep)
-    for bad in (dict(tails={"C7 v8": dict(ok=False)}), dict(idle_ok=False),
-                dict(marimba=dict(loud=dict(jack_peak_db=-60.0), snr_db=20.0))):
-        with pytest.raises(rel.Stop):
-            rel.check_jack_marimba(dict(rep, **bad))
-    assert "61 keys, 0 outside" in rel.check_sampleback("...\n61 notes, 0 outside Gate VD-M. Recordings: x")
-    for bad in ("61 notes, 2 outside Gate VD-M.", "Traceback"):
-        with pytest.raises(rel.Stop):
-            rel.check_sampleback(bad)
 
 
 def test_device_done_needs_the_same_build(tmp_path, monkeypatch):

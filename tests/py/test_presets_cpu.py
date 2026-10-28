@@ -52,7 +52,7 @@ def drv_max():
 def predict(rec, P, T):
     v = {k: d for k, (h, d) in P.items()}
     v.update(rec)
-    eng = cb.ENGINES[0] if v["P_TYPE"] <= 3 else cb.ENGINES[1] if v["P_TYPE"] == 4 else cb.ENGINES[2]
+    eng = cb.ENGINES[0]                                             # (the Rhodes: the 200A is skipped below)
     on = [k for k, c in (("comp", v["P_CMP_SW"]), ("filter", v["P_FL_FREQ"] < 127 or v["P_FL_LFO"]),
                          ("drive", v["P_DRIVE"]), ("trem_wah", v["P_TW_SW"]), ("phaser", v["P_PH_SW"]),
                          ("chorus", v["P_CP_SW"]), ("delay", v["P_DL_SW"]), ("reverb", v["P_RV_DEPTH"])) if c]
@@ -70,14 +70,14 @@ def test_every_preset_within_4200us():
     worst = []
     for tab, lab in (("PR_FDATA", "F"), ("PR_SDATA", "U")):
         for i, r in enumerate(records(tab)):
-            if r.get("P_TYPE") == 6:                             # the 200A (reed.c): no FM-1 cost table yet (hil_cpu
+            if r.get("P_TYPE") in (4, 5):                        # the 200A (reed.c): no FM-1 cost table yet (hil_cpu
                 worst.append((0, f"{lab}{i + 1:02d}", ["reed: not measured"]))   # on the device); gated there
                 continue
             us, on = predict(r, P, T)
             worst.append((us, f"{lab}{i + 1:02d}", on))
     over = [w for w in worst if w[0] > PRESET_US]
     assert not over, over
-    assert len([w for w in worst if w[1][0] == "F"]) == 21
+    assert len([w for w in worst if w[1][0] == "F"]) == 17
 
 
 def test_starters_loadable():

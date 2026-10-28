@@ -8,10 +8,10 @@ with; clicks outside the note-on guards, on USB and on the headphone jack). Ever
 whole take (build/hil/must/takes/<scenario>-<case>.npz: USB, the jack, the events, the panel), to judge it again on
 the host (--rejudge). Run through hil_scan:
 
-    tools/hil_scan.py --tier must [--fwsc PKG [--prev OLDPKG]] [--scenarios S1,S3] [--engines rhodes,vibes]
+    tools/hil_scan.py --tier must [--fwsc PKG [--prev OLDPKG]] [--scenarios S1,S3] [--engines rhodes,reed]
                       [--rates 48000,44100] [--jack-dev M6] [--jack-ch 5] [--cpu-runs 3] [--dry-run]
     tools/hil_scan.py --tier must --rejudge build/hil/must/takes/X.npz ...   saved takes judged again (no FM-1)
-    tools/hil_scan.py --tier full [hil_scan options]      T2: every classic suite, then --vibes and --marimba
+    tools/hil_scan.py --tier full [hil_scan options]      T2: every classic suite
 
 S1 DAW recording   USB open at 48 and 44.1 kHz (blocksize 128, the device switched to that rate), every engine:
                    every effect heavy (pre-delay 127, drive mix 64, reverb decay 127), the pedal (re-pressed every
@@ -21,14 +21,14 @@ S1 DAW recording   USB open at 48 and 44.1 kHz (blocksize 128, the device switch
                    (called by name, per rate; the counters are polled around it all the same).
 S2 live on jack    no USB stream (the FM-1 connected, nobody reading its audio): the same stimulus, the jack
                    recorded through the interface; then the idle floor (USB: exact digital zero; jack: its level).
-S3 switching       F01..F16 by program change and TYPE (ST77 SUIT FELT DYNO VIBES MARIMBA) while a chord is held
+S3 switching       F01..F16 by program change and TYPE (ST77 SUIT FELT DYNO 200A 2AMP) while a chord is held
                    under the pedal, struck again after each switch; then F01, release: exact zero within 10 s (no
                    stuck note). Clicks inside a switch's 300 ms (the designed fade) are information, outside a FAIL.
 S4 controls        every parameter CC (params.c, but TYPE) swept 0 -> 127 and back to its default under a held
                    chord + pedal, on every engine.
 S5 update          (with --fwsc) F03 loaded and its sound edited on the running firmware (--prev: install the
                    previous release first, as a user would have it), the package installed over USB; after the reboot
-                   the same note must match one of the factory presets F01..F19 loaded on the new firmware (the boot
+                   the same note must match one of the factory presets F01..F17 loaded on the new firmware (the boot
                    plays a stored preset, not the edits: 0.9.5's design; which one is the old firmware's record:
                    information; matching none is a broken boot or migration). The OCT- rescue is a hands-on step, listed as MANUAL. After every install the MIDI port and the USB input
                    are waited for, PortAudio restarted and the devices found by name again (the FM-1 re-enumerates);
@@ -67,7 +67,7 @@ from hil_cpu import USB_ITEMS, usb_merge  # noqa: E402
 ROOT = hs.ROOT
 OUT = os.path.join(ROOT, "build", "hil", "must")
 PY = os.path.join(ROOT, ".local", "venv", "bin", "python")
-ENGINES = ("rhodes", "vibes", "marimba")
+ENGINES = ("rhodes", "reed")                     # the Rhodes, the 200A
 RATES = (48000, 44100)
 SCENARIOS = ("S1", "S2", "S3", "S4", "S5", "S6")
 TITLES = dict(S1="DAW recording: stress_max (USB stream, every effect heavy, the user's recipe)",
@@ -83,8 +83,8 @@ NV = 9                                               # voices per engine (B may 
 
 # ---- the panel ---------------------------------------------------------------------------------------------------
 S5_PC = 2                                             # S5: F03 loaded on the old firmware (not the default F01)
-S5_FACTORY_PCS = tuple(range(16)) + (32, 33, 34)     # F01..F16, F17..F19 (presets.c preset_of_pc)
-ENGINE_SEL = dict(rhodes=[(80, hs.type_cc(0))], vibes=[(79, hs.type_cc(4))], marimba=[(79, hs.type_cc(5))])
+S5_FACTORY_PCS = tuple(range(16)) + (32,)           # F01..F16, F17 (presets.c preset_of_pc)
+ENGINE_SEL = dict(rhodes=[(80, hs.type_cc(0))], reed=[(115, hs.type_cc(4))])
 HEAVY = dict(DRIVE=127, CMP_SW=127, CMP_AMT=100, TW_SW=127, TW_DEPTH=127, PH_SW=127, PH_DEPTH=127, PH_FDBK=127,
              CP_SW=64, CP_DEPTH=127, DL_SW=80, DL_DEPTH=127, DL_TIME=127, DL_FDBK=127, REV=127,
              FL_TYPE=45, FL_FREQ=60, FL_RESO=100, FL_LFO=64)          # hil_cpu's heavy (the filter LP18 + its LFO)
@@ -94,7 +94,7 @@ MODERATE = dict(DRIVE=30, CP_SW=64, CP_DEPTH=50, PH_SW=127, PH_DEPTH=60, DL_SW=4
 
 def panel_msgs(engine, fx=None, raw=None):
     """the CC messages that set a known panel: CC 120, every parameter at its default, the DRY dict + fx (CC 85
-    before the phaser's CCs), raw {cc: v}, then the engine (VIBES: its motor on with the effects, as hil_cpu)"""
+    before the phaser's CCs), raw {cc: v}, then the engine (the 200A: its vibrato on with the effects, as hil_cpu)"""
     m = [(120, 0)] + list(hs.param_defaults())
     d = dict(hs.DRY)
     d.update(fx or {})
@@ -103,7 +103,7 @@ def panel_msgs(engine, fx=None, raw=None):
     m += [(hs.CC[k], v) for k, v in d.items()]
     m += sorted((raw or {}).items())
     m += ENGINE_SEL[engine]
-    if engine == "vibes":
+    if engine == "reed":
         m.append((47, 127 if fx else 0))
     return m
 
@@ -152,7 +152,7 @@ def stim_recipe(seconds, step=0.35):
 
 
 SWITCH_CHORD = (48, 55, 60, 64, 67)
-TYPE_SEQ = [(80, hs.type_cc(t)) for t in range(4)] + [(79, hs.type_cc(4)), (79, hs.type_cc(5)), (80, hs.type_cc(0))]
+TYPE_SEQ = [(80, hs.type_cc(t)) for t in range(4)] + [(115, hs.type_cc(4)), (115, hs.type_cc(5)), (80, hs.type_cc(0))]
 
 
 def stim_switch(dwell=0.8, n_presets=16, type_cycles=2):
@@ -174,7 +174,7 @@ SWEEP_SKIP = {80}                                      # TYPE: S3 switches it (a
 
 
 def stim_sweep(params=None, per=0.45, steps=8, restrike=2.0):
-    """S4: a chord held under the pedal (struck again every restrike s: MARIMBA's bars ring ~1-2 s); each parameter's
+    """S4: a chord held under the pedal (struck again every restrike s); each parameter's
     CC from 0 to 127 in steps over 0.3 s, then back to its default. Returns (events, the swept CCs)"""
     params = [(c, v) for c, v in (params if params is not None else hs.param_defaults()) if c not in SWEEP_SKIP]
     ev = [(0.0, "cc", 64, 127)] + [(0.05, "on", n, 100) for n in SWITCH_CHORD]
@@ -205,7 +205,7 @@ def parse_reply(msgs):
     items (CC 100 id, 101 / 102 value; hil_cpu USB_ITEMS)"""
     got, usb, cur = {}, {}, dict(id=None, msb=0)
     for c, v in msgs:
-        if c in (115, 116, 117, 118, 107, 108, 109, 110, 112, 113):
+        if c in (115, 116, 117, 118, 107, 108, 109, 110):
             got[c] = v
         elif c == 100:
             cur["id"] = v
@@ -919,7 +919,7 @@ class Must:
         fl, fc = rel(dflt, br)
         rows = [("installed", os.path.basename(self.a.fwsc) + (f" over {os.path.basename(self.a.prev)}"
                                                                if self.a.prev else ""), "fm1_install exit 0", "ok"),
-                ("after the update vs the factory presets loaded on it (F01..F19, Program Change)",
+                ("after the update vs the factory presets loaded on it (F01..F17, Program Change)",
                  (f"matches {', '.join(hits)}" if hits else "matches none") + f"; nearest {bn} (PC {bpc}): "
                  f"{dl:+.2f} LU / {100 * dc:+.1f} %", "some factory preset within 0.5 LU and 5 %: the boot plays a "
                  "stored preset (0.9.5's design; which one is 0.9.4's record)", "ok" if hits else "FAIL"),
@@ -1047,7 +1047,7 @@ def fm1_info():
 
 # ---- the plan and its time ----------------------------------------------------------------------------------------
 SETUP_S = 2.8                    # per case: the panel (0.3), the stream's start (1.0), the tail (1.5)
-CPU_RUN_S = dict(rhodes=25.0, vibes=40.0, marimba=40.0)     # hil_cpu --worst --usb: its scenarios x 3 takes
+CPU_RUN_S = dict(rhodes=25.0, reed=25.0)          # hil_cpu --worst --usb: its scenarios x 3 takes
 INSTALL_S = 120.0
 
 
@@ -1111,7 +1111,7 @@ def parse_args(argv):
 def tier_main(argv):
     a = parse_args(argv)
     if a.tier == "full":                              # T2: today's suites, every one (overnight, unattended)
-        names = list(hs.TESTS) + [n for n in hs.VORDER] + [n for n in hs.MORDER]
+        names = list(hs.TESTS)
         return hs.main(["--only", ",".join(names)] + a.rest + (["--dry-run"] if a.dry_run else []))
     if a.rest:
         raise SystemExit(f"--tier must: unknown options {a.rest}")

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Every card with a unit, at every value: the text the firmware shows (slot_text, as the card draws it) and the
- * number the audio code really runs with (the same table entry fx.c / bars.c read), for tests/py/test_display_sound.py.
+ * number the audio code really runs with (the same table entry fx.c / reed.c read), for tests/py/test_display_sound.py.
  * The whole app is included (one compilation unit, as on the FM-1) with tests/host.c's main renamed:
  *
  *   cc -DDINGHY_HOST -Dmain=host_main -Ifirmware/src -Ifirmware/gen tests/c/cards.c -lm
@@ -40,7 +40,7 @@ int main(void)
         param_set(P_CMP_GAIN, (int32_t)v); put("CMP_GAIN", P_CMP_GAIN, v, ((int32_t)v * 16461) >> 7);    /* log2 Q12 */
         param_set(P_CMP_SW, 1); param_set(P_CMP_AMT, (int32_t)v); put("CMP_AMT", P_CMP_AMT, v, ((int32_t)v * 27434) >> 7);
     }
-    param_set(P_TYPE, 4); param_set(P_MOT_ON, 1);                   /* VIBES, the MOTOR page: its SPEED text */
-    for (v = 0; v < 128u; v++) { param_set(P_MOT_RATE, (int32_t)v); put("MOTOR", P_MOT_RATE, v, bar_mot_inc); }
+    param_set(P_TYPE, 4); param_set(P_MOT_ON, 1);                   /* the 200A, VOICE 3/4: the vibrato's SPEED text */
+    for (v = 0; v < 128u; v++) { param_set(P_MOT_RATE, (int32_t)v); put("MOTOR", P_MOT_RATE, v, re_vib_inc); }
     return 0;
 }

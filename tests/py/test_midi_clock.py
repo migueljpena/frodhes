@@ -308,11 +308,11 @@ LFOS = {   # name: (the dump key, the CCs that switch it on and set its SYNC to 
     "chorus": ("cpph", lambda s: [(85, 64), (86, 80), (23, band(s, 14))]),
     "phaser": ("phph", lambda s: [(85, 127), (13, 80), (15, band(s, 14))]),
     "filter LFO": ("lfoph", lambda s: [(70, band(1, 6)), (72, 60), (77, band(s, 14))]),
-    "vibes motor": ("motph", lambda s: [(79, 0), (47, 127), (51, band(s, 13))]),
+    "200A vibrato": ("motph", lambda s: [(115, 0), (47, 127), (51, band(s, 13))]),
 }
 
 
-@pytest.mark.parametrize("name,s", [(n, 9) for n in LFOS] + [("chorus", 11), ("filter LFO", 12), ("vibes motor", 3)])
+@pytest.mark.parametrize("name,s", [(n, 9) for n in LFOS] + [("chorus", 11), ("filter LFO", 12), ("200A vibrato", 3)])
 def test_every_synced_lfo(name, s):
     """each synced LFO (1/4; and 1/2, 1 BAR, 1/16) locked to the beats of a 120 BPM clock with the main loop busy:
     its cycle starting (phase 0) on the beat, a cycle of several beats on beat 1 counted from Start"""

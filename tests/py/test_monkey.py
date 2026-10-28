@@ -167,17 +167,18 @@ def test_the_panic_outlasts_a_preset_browse(binary):
     assert mk.check(ev, binary) == []
 
 
-def test_the_probe_turns_the_motor_off(binary):
-    """0.9.5 seed 273194706 (shrunk): REEDY, a VIBES preset with its motor on: the probe's key-up met the motor's
-    pulse (+2 dB, not a release); the probe now switches the motor off (CC 47 0) as well as FX"""
-    ev = [(15007, "midi 0xC0 12 0"), (15706, "midi 0xC0 23 0"), (19803, "midi 0xB0 79 64")]
+def test_the_probe_turns_the_vibrato_off(binary):
+    """0.9.5 seed 273194706 (shrunk, then the bar engine gone): a preset with an in-engine level modulation on, the
+    200A's vibrato (F17 200A VIB, PC 32): the probe's key-up would meet its pulse (+2 dB, not a release); the probe
+    switches it off (CC 47 0) as well as FX"""
+    ev = [(15007, "midi 0xC0 12 0"), (15706, "midi 0xC0 32 0")]
     assert mk.check(ev, binary) == []
 
 
 def test_the_probe_sets_level_and_known_clicks_take_the_switch(binary):
-    """0.9.5 seed 427470656 (shrunk): MARIMBA at LEVEL -12 dB with HAMMER 0: the probe read -43 dBFS, 'dead'; the
-    probe now sets LEVEL to 0 dB. An effect switched on at depth 0 gets a depth (PHASER: #2), so the pair is #2"""
-    ev = [(16631, "midi 0xB6 79 115"), (16657, "midi 0xB0 31 0"), (18552, "midi 0xB0 30 0"), (20000, "midi 0xB0 110 0")]
+    """0.9.5 seed 427470656 (shrunk; it ran on MARIMBA, gone since): LEVEL -12 dB with HAMMER 0: the probe read -43
+    dBFS, 'dead'; the probe now sets LEVEL to 0 dB. An effect switched on at depth 0 gets a depth (PHASER: #2), so the pair is #2"""
+    ev = [(16657, "midi 0xB0 31 0"), (18552, "midi 0xB0 30 0"), (20000, "midi 0xB0 110 0")]
     assert mk.check(ev, binary) == []
     assert mk.known_click(["P_PH_SW", "P_PH_DEPTH"]) == "#2" and mk.known_click(["P_PH_DEPTH"]) is None
 

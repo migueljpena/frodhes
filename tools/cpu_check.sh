@@ -1,27 +1,26 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only
-# The per-branch pre-merge CPU check on the FM-1: the 4 worst cases x 3 takes, every effect (the heaviest drive TYPE,
+# The per-branch pre-merge CPU check on the FM-1: the 3 worst cases x 3 takes, every effect (the heaviest drive TYPE,
 # TAPE, the heaviest reverb TYPE: tools/final/hil_cpu_fx.py), 10 voices, USB 48 kHz, each judged on the MAX of its
 # takes against the margin rule (the user's): the whole ISR <= 4200 us. ~10 min. Exit 1 on a breach (or a take's own
-# hil_cpu FAIL: 4500 us, a shed voice, a USB fault), 0 when all 4 pass.
+# hil_cpu FAIL: 4500 us, a shed voice, a USB fault), 0 when all 3 pass.
 #
 #   tools/cpu_check.sh [PACKAGE.fwsc]     run it from the branch's tree; PACKAGE: installed first (fm1_install --yes),
 #                                         else the build already on the FM-1 is measured (say which in the report)
 #
 #   case                    takes  rule
 #   cpu_rhodes_spread_bend  3      SPREAD 127 + --bend-sweep; in CPU_HURT: 3 good takes IN A ROW (one over = FAIL)
-#   cpu_vibes               3      --engine vibes; in CPU_HURT: 3 in a row
+#   cpu_reed                3      --engine reed (the 200A); in CPU_HURT: 3 in a row
 #   cpu_rhodes_bend         3      --bend-sweep; the max of the takes <= the limit
-#   cpu_marimba             3      --engine marimba; the max of the takes <= the limit
-# Optional cases, run only when ONLY names them (not in the default 4):
-#   cpu_vibes_size_inf      3      cpu_vibes on INFINITE with --cc-sweep 73:1:127:200: the reverb SIZE turned every
+# Optional cases, run only when ONLY names them (not in the default 3):
+#   cpu_reed_size_inf       3      cpu_reed on INFINITE with --cc-sweep 73:1:127:200: the reverb SIZE turned every
 #                                  200 ms, so its fades (0.9.6, 186 ms) run back to back; the max <= the limit
-#   cpu_vibes_size_plate    3      the same on PLATE
-#   (ONLY=vibes_size: both)
+#   cpu_reed_size_plate     3      the same on PLATE
+#   (ONLY=reed_size: both)
 # (each take ~25-50 s; the same steps, names and rule as tools/final/run_final_rev.sh's cpu_* steps)
 #
 # Environment (all optional):
-#   CPU_TAKES=3  CPU_LIMIT_US=4200  CPU_HURT=cpu_rhodes_spread_bend,cpu_vibes   as in run_final_rev.sh (CPU_HURT's
+#   CPU_TAKES=3  CPU_LIMIT_US=4200  CPU_HURT=cpu_rhodes_spread_bend,cpu_reed   as in run_final_rev.sh (CPU_HURT's
 #                           cases: at least 3 takes in a row whatever CPU_TAKES)
 #   REV_TYPE=NAME           the reverb TYPE for every effect (default: the heaviest by the compiled estimate)
 #   ONLY=case,case          only these cases (the names above, or without cpu_: rhodes_spread_bend); an unknown
@@ -49,24 +48,24 @@ OUT="${OUT:-$TREE/build/cpu_check}"
 DRY="${DRY_RUN:-0}"
 CPU_TAKES="${CPU_TAKES:-3}"
 CPU_LIMIT_US="${CPU_LIMIT_US:-4200}"
-CPU_HURT="${CPU_HURT:-cpu_rhodes_spread_bend,cpu_vibes}"
+CPU_HURT="${CPU_HURT:-cpu_rhodes_spread_bend,cpu_reed}"
 ONLY="${ONLY:-}"
 case "$CPU_TAKES$CPU_LIMIT_US" in *[!0-9]*|"") echo "CPU_TAKES / CPU_LIMIT_US: integers" >&2; exit 2 ;; esac
 [ "$CPU_TAKES" -ge 1 ] || { echo "CPU_TAKES >= 1" >&2; exit 2; }
-CASES="cpu_rhodes_spread_bend cpu_vibes cpu_rhodes_bend cpu_marimba"
-OPTIONAL="cpu_vibes_size_inf cpu_vibes_size_plate"     # (only when ONLY names them)
+CASES="cpu_rhodes_spread_bend cpu_reed cpu_rhodes_bend"
+OPTIONAL="cpu_reed_size_inf cpu_reed_size_plate"       # (only when ONLY names them)
 # norm LIST: a comma list with each name given its cpu_ prefix (rhodes_spread_bend = cpu_rhodes_spread_bend);
-# vibes_size = both size cases
+# reed_size = both size cases
 norm() { local out="" x; local IFS=,; for x in $1; do x="${x// /}"; [ -z "$x" ] && continue
     case "$x" in cpu_*) ;; *) x="cpu_$x" ;; esac
-    [ "$x" = "cpu_vibes_size" ] && x="cpu_vibes_size_inf,cpu_vibes_size_plate"
+    [ "$x" = "cpu_reed_size" ] && x="cpu_reed_size_inf,cpu_reed_size_plate"
     out="$out${out:+,}$x"; done; echo "$out"; }
 ONLY="$(norm "$ONLY")"
 CPU_HURT="$(norm "$CPU_HURT")"
 if [ -n "$ONLY" ]; then
     IFS=, read -r -a want <<< "$ONLY"
     for x in "${want[@]}"; do
-        [[ " $CASES $OPTIONAL " == *" $x "* ]] || { echo "ONLY: unknown case '$x'; the cases: $CASES $OPTIONAL (or without cpu_; vibes_size: both size cases)" >&2; exit 2; }
+        [[ " $CASES $OPTIONAL " == *" $x "* ]] || { echo "ONLY: unknown case '$x'; the cases: $CASES $OPTIONAL (or without cpu_; reed_size: both size cases)" >&2; exit 2; }
     done
 fi
 NOPT=0; for x in $OPTIONAL; do [[ ",$ONLY," == *",$x,"* ]] && NOPT=$((NOPT + 1)); done   # (the optional cases named)
@@ -126,17 +125,16 @@ case_run() {
     fi
 }
 case_run cpu_rhodes_spread_bend --spread 127 -- --worst --usb 48000 "${BEND[@]+"${BEND[@]}"}"
-case_run cpu_vibes -- --engine vibes --worst --usb 48000
+case_run cpu_reed -- --engine reed --worst --usb 48000
 case_run cpu_rhodes_bend -- --worst --usb 48000 "${BEND[@]+"${BEND[@]}"}"
-case_run cpu_marimba -- --engine marimba --worst --usb 48000
 if [ "$CCSW" = "1" ]; then
-    case_run cpu_vibes_size_inf --rev-type INFINITE -- --engine vibes --worst --usb 48000 --cc-sweep 73:1:127:200
-    case_run cpu_vibes_size_plate --rev-type PLATE -- --engine vibes --worst --usb 48000 --cc-sweep 73:1:127:200
-elif [[ ",$ONLY," == *",cpu_vibes_size_"* ]]; then
+    case_run cpu_reed_size_inf --rev-type INFINITE -- --engine reed --worst --usb 48000 --cc-sweep 73:1:127:200
+    case_run cpu_reed_size_plate --rev-type PLATE -- --engine reed --worst --usb 48000 --cc-sweep 73:1:127:200
+elif [[ ",$ONLY," == *",cpu_reed_size_"* ]]; then
     FAILS=$((FAILS + 1)); say "  the size cases: this tree's hil_cpu has no --cc-sweep: FAIL (not judged)"
 fi
 if [ "$RAN" = "0" ]; then say "cpu_check: NOTHING JUDGED: 0 cases ran (ONLY=$ONLY): not a PASS"; exit 2; fi
-if [ "$FAILS" = "0" ]; then say "cpu_check: PASS ($RAN of $((4 + NOPT)) cases; whole ISR <= $CPU_LIMIT_US us; logs in $OUT)"; exit 0; fi
+if [ "$FAILS" = "0" ]; then say "cpu_check: PASS ($RAN of $((3 + NOPT)) cases; whole ISR <= $CPU_LIMIT_US us; logs in $OUT)"; exit 0; fi
 say "cpu_check: FAIL: $FAILS case(s) over the margin or failed (logs in $OUT)"
 exit 1
 }

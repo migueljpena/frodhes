@@ -45,10 +45,3 @@ def test_cmp_narrowed():
     assert atk == [max(1, int(round(65536 * (1 - math.exp(-1 / (0.0001 * 500 ** (v / 127) * FS)))))) for v in range(128)]
     assert rel == [max(1, int(round(65536 * (1 - math.exp(-1 / (0.020 * 75 ** (v / 127) * FS)))))) for v in range(128)]
     assert max(atk) < 65536 and max(rel) < 256
-
-
-def test_bar_mot_cos_is_the_sine():
-    """bars.h: BAR_MOT_COS = FX_SINE + 256 (the generated BAR_MOT_COS_GEN is not linked)"""
-    sine, cos = tab("FX_SINE", "fx_tables.h"), tab("BAR_MOT_COS", "bars_tables.h")
-    assert len(cos) == 257 and sine[256:513] == cos
-    assert "#define BAR_MOT_COS (FX_SINE + 256)" in open(os.path.join(ROOT, "firmware", "src", "bars.h")).read()

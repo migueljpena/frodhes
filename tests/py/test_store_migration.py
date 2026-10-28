@@ -45,6 +45,17 @@ def v3_bank(seed):
     return recs
 
 
+def retyped(recs):
+    """the records as the migration leaves them: a TYPE of Frodhes' (4 VIBES, 5 MARIMBA: STAGE 77) or of this
+    firmware's first builds (6 / 7 the 200A: 4 / 5) converted once (params.c params_retype); every other byte as is"""
+    out = []
+    for r in recs:
+        r = bytearray(r)
+        r[16] = 0 if r[16] in (4, 5) else r[16] - 2 if r[16] in (6, 7) else r[16]
+        out.append(bytes(r))
+    return out
+
+
 def old_flash(path, bank_recs=None, bank_k=BANK_A, pattern=True, notes=(60, 64, 67)):
     """a 0.9.5 flash: its settings (made by a run: U01 shown, OCT +1, a three-note pattern), its preset bank, its
     pattern; then saved as 0.9.5's five sectors (the record and the 0.9.6 pattern removed)"""
@@ -77,7 +88,7 @@ def test_full_v3_bank_migrates_every_field():
     img = read_img(fl)
     k, data = newest_record(img)
     assert k == REC_B and record_at(img, SET) is None                  # (A holds 0.9.5's 256 bytes)
-    assert bytes(user_presets(img)) == b"".join(recs)
+    assert bytes(user_presets(img)) == b"".join(retyped(recs))
     assert bytes(img[:5 * SECTOR]) == bytes(old)                        # 0.9.5's five sectors untouched
     assert same_setup(data, rec)                                        # the settings as 0.9.5 had them
     s = b.state(100)
@@ -152,12 +163,12 @@ def test_cut_migration_runs_again():
     assert record_at(img, SET) is None and record_at(img, REC_B) is None and bytes(img[:5 * SECTOR]) == bytes(old)
     b = boot("mig-cut-2", fl, [], 300, check_preset=False)
     img = read_img(fl)
-    assert b.saves and bytes(user_presets(img)) == b"".join(recs) and b.state(100)["notes"] == "3"
+    assert b.saves and bytes(user_presets(img)) == b"".join(retyped(recs)) and b.state(100)["notes"] == "3"
     img[REC_B * SECTOR:REC_B * SECTOR + 12] = b"\xff" * 12            # (2): the header not programmed
     open(fl, "wb").write(img)
     b = boot("mig-cut-3", fl, ["150 dump"], 300, check_preset=False)
     img = read_img(fl)
-    assert b.saves and bytes(user_presets(img)) == b"".join(recs) and b.state(100)["notes"] == "3"
+    assert b.saves and bytes(user_presets(img)) == b"".join(retyped(recs)) and b.state(100)["notes"] == "3"
     assert bytes(img[:5 * SECTOR]) == bytes(old) and same_setup(settings_record(img), rec)
 
 
@@ -213,7 +224,7 @@ def test_back_to_095_takes_only_what_095_saved():
     fl, _, b = back_and_up("mig-back-sq", settings=False, bank=False)
     s = b.state(100)
     assert not b.fails and (s["oct"], s["notes"]) == ("2", "5"), (s["oct"], s["notes"])
-    assert bytes(user_presets(read_img(fl))) == b"".join(v3_bank(5))
+    assert bytes(user_presets(read_img(fl))) == b"".join(retyped(v3_bank(5)))
     fl, _, b = back_and_up("mig-back-none", settings=False, bank=False, pattern=False)
     s = b.state(100)
     assert not b.fails and (s["oct"], s["notes"]) == ("2", "3") and not b.saves and not b.seq_saves
@@ -242,7 +253,7 @@ def test_smk_migrates_only_under_its_owner_tag():
     assert len(img) == 9 * SECTOR and bytes(img[:5 * SECTOR]) == bytes(old)
     a = img[5 * SECTOR:6 * SECTOR]
     assert struct.unpack("<II", a[:8]) == (MAGIC, 256 + 16 * V3)
-    assert bytes(a[12 + 256:12 + 256 + 16 * V3]) == b"".join(recs) and r.state(100)["notes"] == "3"
+    assert bytes(a[12 + 256:12 + 256 + 16 * V3]) == b"".join(retyped(recs)) and r.state(100)["notes"] == "3"
     fl2 = flash_file("mig-smk-stock")
     smk_old_flash(fl2, recs)
     r = run("mig-smk-stock", ["100 dump"], 300, flash=fl2, env={"FRODHES_FLASHLOG": "1", "FRODHES_SMK_STOCK": "1"},

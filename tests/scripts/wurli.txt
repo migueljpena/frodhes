@@ -1,7 +1,7 @@
-# The 200A (TYPE 6, the reed engine, reed.c): picked on the panel (one detent past MARIMBA), a note and its damper,
+# The 200A (TYPE 4, the reed engine, reed.c): picked on the panel (one detent past BELL DYNO), a note and its damper,
 # a pedal chord past the 10 voices (two steals, 5 ms fades), a re-struck note, silence at the end. RAW: no effects.
 50 midi 0xB0 119 127
-60 midi 0xB0 79 127
+60 midi 0xB0 80 127
 200 turn 1 1
 300 expect state card.2.0 WURLI_200A
 # one note, key-up: the damper stops it
