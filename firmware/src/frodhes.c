@@ -157,12 +157,12 @@ static int32_t voice_mono[256];
 static void host_race_check(void)
 {
     static uint8_t bad[16], lost[16];
-    uint32_t i, nv = eng_cur == ENG_BARS ? BAR_NV : RH_NV;
+    uint32_t i, nv = eng_cur == ENG_BARS ? BAR_NV : eng_cur == ENG_REED ? RE_NV : RH_NV;
     int calm = eq_r == eq_w && engq_r == engq_w && eng_want == eng_cur && !eng_swapping;
     for (i = 0; i < nv && i < 16u; i++) {
-        uint32_t alive = eng_cur == ENG_BARS ? bv[i].alive : rv[i].alive, held = eng_cur == ENG_BARS ? bv[i].held : rv[i].held;
-        uint32_t note = eng_cur == ENG_BARS ? bv[i].note : rv[i].note, pend = eng_cur == ENG_BARS ? bv[i].pend : rv[i].pend;
-        uint32_t pn = eng_cur == ENG_BARS ? bv[i].pend_note : rv[i].pend_note;
+#define HRC(f) (eng_cur == ENG_BARS ? (uint32_t)bv[i].f : eng_cur == ENG_REED ? (uint32_t)re_v[i].f : (uint32_t)rv[i].f)
+        uint32_t alive = HRC(alive), held = HRC(held), note = HRC(note), pend = HRC(pend), pn = HRC(pend_note);
+#undef HRC
         int want = (out_ref[note & 127u] && !note_to_arp[note & 127u]) || arp_playing == note;
         if (calm && alive && held && !want) { if (bad[i] < 255u && ++bad[i] == 3u) printf("%6u ms  RACE STUCK voice %u note %u\n", fm1_ms, i, note); }
         else bad[i] = 0;
@@ -587,6 +587,7 @@ static void app_main(void)
         eng_pump();                             /* (notes.c: events that waited for room in the engine's ring) */
         rev_poll();                             /* (rev_types.c: HALL's lines cleared after a TYPE change) */
         rh_cc_poll();                           /* (rhodes.c: the note-on coefficients, when TUNE / DECAY / RELEASE moved) */
+        re_knob(RK_TUNE, (int32_t)set.tune * 65536); re_poll();   /* (reed.c: every key's words, when a VOICE knob moved) */
         seq_poll();
         arp_poll();
         ui_leds(lit, tempo_beat_led() || (arp_on() && arp_n && arp_playing < 128u));

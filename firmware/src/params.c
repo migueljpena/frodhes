@@ -34,23 +34,24 @@ typedef struct {
     const char *const *names; /* F_ENUM */
 } pdesc_t;
 
-static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB"};
-static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA"};
-/* TYPE -> engine (0 Rhodes, 1 bars), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
+static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB", "200A"};
+static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA", "WURLI 200A"};
+/* TYPE -> engine (0 Rhodes, 1 bars, 2 reeds: reed.c, the Wurlitzer 200A), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
  * step with N_TYPE. The Rhodes types 0..3 are unchanged; VIBES (4) is the first bar type, MARIMBA (5) the second
- * (bars.c BAR_TYPE[1]). TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
+ * (bars.c BAR_TYPE[1]), the 200A (6) the reed engine's. TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
  * bit0 a motor (the MOTOR controls and their auto-on), bit1 a damper (key-up damps; without one DECAY's second card
  * is MUTE, the player's hand: 0 = rings out). */
-#define N_TYPE_N 6u
-static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1};
-static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1};
-static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0};
-static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0};
-static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96};   /* the bar types' CC 79 band starts, rising in TYPE
+#define N_TYPE_N 7u
+static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 2};
+static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1, 0};
+static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0, 0};
+static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0, 2};
+static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96, 0};   /* the bar types' CC 79 band starts, rising in TYPE
                                     * order (frodhes.c midi_cc): VIBES 0..95, MARIMBA 96..127 (the Rhodes: CC 80) */
 _Static_assert(sizeof N_TYPE / sizeof N_TYPE[0] == N_TYPE_N && sizeof N_TYPE_LONG / sizeof N_TYPE_LONG[0] == N_TYPE_N,
                "one name per TYPE");
-#define TYPE_IS_BARS(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] != 0u)   /* the main loop's TYPE (the UI) */
+#define TYPE_IS_BARS(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] == 1u)   /* the main loop's TYPE (the UI) */
+#define TYPE_IS_REED(t) ((uint32_t)(t) < N_TYPE_N && TYPE_ENGINE[(t)] == 2u)   /* the 200A */
 #define TYPE_HAS_MOTOR(t) ((uint32_t)(t) < N_TYPE_N && (TYPE_FLAGS[(t)] & 1u) != 0u)   /* VIBES */
 #define TYPE_NO_DAMPER(t) (TYPE_IS_BARS(t) && !(TYPE_FLAGS[(t)] & 2u))   /* MARIMBA: DECAY's second card is MUTE */
 /* the engine queries (engine.c, lane C, after the merge: it defines ENG_HAS_BARS, the BK_* knob ids and these
@@ -92,7 +93,7 @@ static const char *const N_SYNC[] = {"FREE", "1/32", "16T", "1/16", "8T", "16D",
                                      "1/1", "2BAR", "4BAR"};
 
 static const pdesc_t PARAMS[P_COUNT] = {
-    [P_TYPE] = {"TYPE", 5, 0, F_ENUM, 80, N_TYPE},
+    [P_TYPE] = {"TYPE", 6, 0, F_ENUM, 80, N_TYPE},
     [P_DRIVE] = {"DRV", 127, 0, F_R10, 81, 0},
     [P_TW_SW] = {"TREM", 2, 0, F_ENUM, 17, N_TW},
     [P_TW_DEPTH] = {"DPTH", 127, 0, F_R10, 18, 0},
@@ -436,13 +437,13 @@ static void param_apply(uint32_t id)
     case P_DL_FDBK: fx_set(FXP_DL_FDBK, v); break;
     case P_RV_DEPTH: fx_set(FXP_RV_DEPTH, v); break;
     case P_TONE:     /* -0.5 gap .. 0 below the middle; above it RH_TONE_UP per step (params.json "tone": short of the axis) */
-        rh_tone_off = v <= 64 ? (v - 64) * (1 << 18) : (v - 64) * RH_TONE_UP; eng_bar_knob(BK_STRIKE, (uint32_t)v); break;
-    case P_BARK: rh_bark_s = (int32_t)KN_P64(v); rh_bark_g = (int32_t)KN_P64I(v); eng_bar_knob(BK_MALLET, (uint32_t)v); break;
-    case P_BELL: rh_bell = (int32_t)KN_P32(v); eng_bar_knob(BK_TUBE, (uint32_t)v); break;
-    case P_HAMMER: rh_ham = (int32_t)KN_HAM(v); eng_bar_knob(BK_WEIGHT, (uint32_t)v); break;
-    case P_DECAY: rh_k_decay = (int32_t)DECAY_K[v]; eng_bar_knob(BK_RING, (uint32_t)v); break;   /* k = 1/S, S = 2^((v-64)/32): higher = longer */
-    case P_RELEASE: rh_k_rel = (int32_t)DECAY_K[v]; eng_bar_knob(BK_DAMPER, (uint32_t)v); break;
-    case P_NOISE: rh_thump = KN_THUMP[v]; rh_felt = KN_FELT[v]; rh_knock = KN_KNOCK[v]; rh_pnz = KN_PEDAL[v]; eng_bar_knob(BK_NOISE, (uint32_t)v); break;
+        rh_tone_off = v <= 64 ? (v - 64) * (1 << 18) : (v - 64) * RH_TONE_UP; eng_bar_knob(BK_STRIKE, (uint32_t)v); re_knob(RK_TONE, v); break;
+    case P_BARK: rh_bark_s = (int32_t)KN_P64(v); rh_bark_g = (int32_t)KN_P64I(v); eng_bar_knob(BK_MALLET, (uint32_t)v); re_knob(RK_BARK, v); break;
+    case P_BELL: rh_bell = (int32_t)KN_P32(v); eng_bar_knob(BK_TUBE, (uint32_t)v); re_knob(RK_BELL, v); break;
+    case P_HAMMER: rh_ham = (int32_t)KN_HAM(v); eng_bar_knob(BK_WEIGHT, (uint32_t)v); re_knob(RK_HAMMER, v); break;
+    case P_DECAY: rh_k_decay = (int32_t)DECAY_K[v]; eng_bar_knob(BK_RING, (uint32_t)v); re_knob(RK_DECAY, v); break;   /* k = 1/S, S = 2^((v-64)/32): higher = longer */
+    case P_RELEASE: rh_k_rel = (int32_t)DECAY_K[v]; eng_bar_knob(BK_DAMPER, (uint32_t)v); re_knob(RK_RELEASE, v); break;
+    case P_NOISE: rh_thump = KN_THUMP[v]; rh_felt = KN_FELT[v]; rh_knock = KN_KNOCK[v]; rh_pnz = KN_PEDAL[v]; eng_bar_knob(BK_NOISE, (uint32_t)v); re_knob(RK_NOISE, v); break;
     case P_SPREAD: rh_spread = v; break;                              /* (S13; the Rhodes, at each strike) */
     case P_DL_TONE: fx_set(FXP_DL_TONE, v); break;
     case P_PH_SW: fx_set(FXP_PH_SW, v); break;

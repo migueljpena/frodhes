@@ -3,6 +3,8 @@
  *
  *   TYPE 0..3  ST77 SUIT FELT DYNO   the Rhodes engine (rhodes.c, unchanged)
  *   TYPE 4     VIBES                 the bar engine (bars.c)
+ *   TYPE 5     MARIMBA               the bar engine
+ *   TYPE 6     200A                  the reed engine (reed.c, the Wurlitzer 200A)
  *
  * The app calls only these entry points: eng_note_on / eng_note_off / eng_pedal_level / eng_all_off post events
  * into this file's ring (main loop -> ISR, single producer, single consumer); eng_set_type(TYPE); eng_quiet(),
@@ -20,10 +22,13 @@
  * that never leaves VIBES never takes this path. */
 #include "rhodes.c"
 #include "bars.h"     /* the bar engine's state; its code (bars.c) comes last, in frodhes.c */
+#include "reed.c"     /* the reed engine (self-contained: its tables, voices and render) */
 
 #define ENG_HAS_BARS 1                         /* params.c: the engine hooks below replace its stubs */
 #define ENG_RHODES 0u
 #define ENG_BARS 1u
+#define ENG_REED 2u
+#define ENG_REED_TYPE 6u                       /* params.c: the 200A */
 #define ENG_RH_NTYPE 4u                        /* TYPE 0..3 the Rhodes; 4.. the bar types (4 = VIBES), as params.c
                                                 * TYPE_ENGINE / TYPE_SUB */
 
@@ -72,6 +77,7 @@ static void eng_set_type(uint32_t t)
 {
     uint8_t w = eng_want, s = eng_want_sub;
     if (t < ENG_RH_NTYPE) { rh_type = (uint8_t)t; eng_want = ENG_RHODES; }
+    else if (t == ENG_REED_TYPE) eng_want = ENG_REED;
     else { t -= ENG_RH_NTYPE; eng_want_sub = (uint8_t)(t < BAR_NTYPE ? t : 0u); eng_want = ENG_BARS; }
     if (eng_want != w || (eng_want == ENG_BARS && eng_want_sub != s)) eng_epoch++;
 }
@@ -124,7 +130,7 @@ static void eng_bar_knob(uint32_t k, uint32_t v)
 static int eng_quiet(void)
 {
     if (eq_w != eq_r || eng_swapping || eng_want != eng_cur || (eng_want == ENG_BARS && eng_want_sub != bar_sub)) return 0;
-    return eng_cur == ENG_BARS ? bar_quiet() : rh_quiet();
+    return eng_cur == ENG_BARS ? bar_quiet() : eng_cur == ENG_REED ? re_quiet() : rh_quiet();
 }
 
 
@@ -136,6 +142,11 @@ static int eng_note_sounding(uint32_t n)
         for (v = 0; v < BAR_NV; v++) if (act >> v & 1u && bar_notes[v] == n) return 1;
         return 0;
     }
+    if (eng_cur == ENG_REED) {
+        uint32_t act = re_active_bits;
+        for (v = 0; v < RE_NV; v++) if (act >> v & 1u && re_notes[v] == n) return 1;
+        return 0;
+    }
     {
         uint32_t act = rh_active_bits;
         for (v = 0; v < RH_NV; v++) if (act >> v & 1u && rh_notes[v] == n) return 1;
@@ -143,7 +154,7 @@ static int eng_note_sounding(uint32_t n)
     return 0;
 }
 
-static uint32_t eng_shed_count(void) { return rh_shed_count + bar_shed_count; }
+static uint32_t eng_shed_count(void) { return rh_shed_count + bar_shed_count + re_shed_count; }
 
 /* ---- ISR */
 static void eng_rh_kill_all(void)               /* the Rhodes stops at once (after the fade block) */
@@ -156,41 +167,48 @@ static void eng_rh_kill_all(void)               /* the Rhodes stops at once (aft
 
 static void eng_switch(uint32_t want)
 {
-    if (eng_cur == ENG_BARS) bar_kill_all(); else eng_rh_kill_all();
+    if (eng_cur == ENG_BARS) bar_kill_all(); else if (eng_cur == ENG_REED) re_kill_all(); else eng_rh_kill_all();
     eng_cur = (uint8_t)want;
     bar_sub = eng_want_sub;                                         /* the bar type: latched only here (C1) */
     if (want == ENG_BARS) bar_pedal(eng_pedal_cc);                  /* the pedal is global */
+    else if (want == ENG_REED) re_pedal(eng_pedal_cc);
     else rh_post(EV_PEDAL, 0, eng_pedal_cc);
     eng_swapping = 0;
 }
 
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
 static uint64_t eng_h_ms, eng_h_mul, eng_h_blocks;
-static uint32_t eng_h_max_ms, eng_h_max_mul, eng_h_max_us[2];   /* us: per engine (ENG_RHODES, ENG_BARS) */
-static uint32_t eng_h_max_nv[2];                                 /* the most voices alive at once, per engine */
+static uint32_t eng_h_max_ms, eng_h_max_mul, eng_h_max_us[3];   /* us: per engine (ENG_RHODES, ENG_BARS, ENG_REED) */
+static uint32_t eng_h_max_nv[3];                                 /* the most voices alive at once, per engine */
 static FILE *eng_h_log;
 static int eng_h_log_open;
 #endif
 
 static void eng_render(int32_t *mono, uint32_t n)
 {
-    uint32_t want = eng_want == ENG_BARS ? ENG_BARS : ENG_RHODES, j;
+    uint32_t want = eng_want == ENG_BARS ? ENG_BARS : eng_want == ENG_REED ? ENG_REED : ENG_RHODES, j;
     if ((want != eng_cur || (want == ENG_BARS && eng_want_sub != bar_sub)) && !eng_swapping) {   /* another engine,
                                                                     * or another bar type (C1) */
-        uint32_t busy = eng_cur == ENG_BARS ? bar_active_bits : rh_active_bits;
+        uint32_t busy = eng_cur == ENG_BARS ? bar_active_bits : eng_cur == ENG_REED ? re_active_bits : rh_active_bits;
         if (busy) eng_swapping = 1;                                 /* fade the old engine out this block */
         else eng_switch(want);                                      /* nothing sounding: change now */
     }
     if (!eng_swapping)                                              /* events wait while the old engine fades */
         while (eq_r != eq_w) {
             uint32_t e = eq[eq_r & 31u], type = e >> 28, note = e >> 16 & 127u, val = e & 0xFFFFu;
-            if (eng_cur == ENG_BARS ? type == EV_NOTE_ON && !bar_strike(note, val) : ev_w - ev_r >= 32u) break;
+            if (eng_cur == ENG_BARS ? type == EV_NOTE_ON && !bar_strike(note, val)
+                : eng_cur == ENG_REED ? type == EV_NOTE_ON && !re_strike(note, val) : ev_w - ev_r >= 32u) break;
                                                                     /* every voice waits for a note (BUGHUNT #21):
                                                                     * this one next block, in order; the Rhodes'
                                                                     * ring full (its note-ons can wait the same way) */
             eq_r = eq_r + 1u;
             if (type == EV_PEDAL) eng_pedal_cc = (uint8_t)val;
             if (eng_cur == ENG_RHODES) rh_post(type, note, val);    /* drained by rh_render below, in order */
+            else if (eng_cur == ENG_REED) {                         /* (struck above) */
+                if (type == EV_NOTE_OFF) re_note_off(note);
+                else if (type == EV_PEDAL) re_pedal(val);
+                else if (type == EV_ALL_OFF) re_all_off();
+            }
             else if (type == EV_NOTE_ON) ;                          /* (struck above) */
             else if (type == EV_NOTE_OFF) bar_note_off(note);
             else if (type == EV_PEDAL) bar_pedal(val);
@@ -198,13 +216,22 @@ static void eng_render(int32_t *mono, uint32_t n)
         }
     if (eng_shed_req) {
         eng_shed_req = 0;
-        if (eng_cur == ENG_RHODES) rh_shed_req = 1; else bar_shed();
+        if (eng_cur == ENG_RHODES) rh_shed_req = 1; else if (eng_cur == ENG_BARS) bar_shed();
     }
-    if (eng_cur == ENG_BARS) { bar_render(mono, n); rh_side_on = 0; } else rh_render(mono, n);   /* (SPREAD: Rhodes only) */
+    if (eng_cur == ENG_BARS) { bar_render(mono, n); rh_side_on = 0; }
+    else if (eng_cur == ENG_REED) { re_render(mono, n); rh_side_on = 0; }
+    else rh_render(mono, n);                                        /* (SPREAD: Rhodes only) */
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
     {   /* host counters: mode-samples and int64 multiplies this block (Rhodes: estimated from the live modes) */
         uint32_t ms = 0, mul = 0, ns = 0, i, m;
         if (eng_cur == ENG_BARS) { ms = bar_h_blk_ms; mul = bar_h_blk_mul; ns = bar_h_blk_ns; bar_h_blk_ms = bar_h_blk_mul = bar_h_blk_ns = 0; }
+        else if (eng_cur == ENG_REED) {                         /* (an estimate until the FM-1 measures it) */
+            for (i = 0; i < RE_NV; i++)
+                if (re_v[i].alive) {
+                    for (m = 0; m < RE_NM; m++) if (re_v[i].m[m].on) { ms += n; mul += 2u * n; ns += 170u * n; }
+                    mul += 4u * n; ns += 900u * n;
+                }
+        }
         else {
             for (i = 0; i < RH_NV; i++)
                 if (rv[i].alive) {
@@ -215,11 +242,11 @@ static void eng_render(int32_t *mono, uint32_t n)
         eng_h_ms += ms; eng_h_mul += mul; eng_h_blocks++;
         if (ms > eng_h_max_ms) eng_h_max_ms = ms;
         if (mul > eng_h_max_mul) eng_h_max_mul = mul;
-        if (ns / 1000u > eng_h_max_us[eng_cur & 1u]) eng_h_max_us[eng_cur & 1u] = ns / 1000u;
+        if (ns / 1000u > eng_h_max_us[eng_cur]) eng_h_max_us[eng_cur] = ns / 1000u;
         {
-            uint32_t a = eng_cur == ENG_BARS ? bar_active_bits : rh_active_bits, c = 0;
+            uint32_t a = eng_cur == ENG_BARS ? bar_active_bits : eng_cur == ENG_REED ? re_active_bits : rh_active_bits, c = 0;
             for (; a; a &= a - 1u) c++;
-            if (c > eng_h_max_nv[eng_cur & 1u]) eng_h_max_nv[eng_cur & 1u] = c;
+            if (c > eng_h_max_nv[eng_cur]) eng_h_max_nv[eng_cur] = c;
         }
         if (!eng_h_log_open) {
             const char *p = getenv("FRODHES_MSLOG");
@@ -249,14 +276,15 @@ static void eng_host_report(void)                /* tests/host.c, at the end of 
     printf("mode-samples %llu (max per block %u, blocks %llu)\n", (unsigned long long)eng_h_ms, eng_h_max_ms,
            (unsigned long long)eng_h_blocks);
     printf("mul64 %llu (max per block %u)\n", (unsigned long long)eng_h_mul, eng_h_max_mul);
-    printf("cpu-proxy max %u us per block (%s)\n", eng_h_max_us[eng_cur & 1u], eng_cur == ENG_BARS ?
+    printf("cpu-proxy max %u us per block (%s)\n", eng_h_max_us[eng_cur], eng_cur == ENG_BARS ?
            "bars: the cost model's whole block, effects included" : "voices only, P0 costs; + 312 idle, + 1388 with every effect");
     printf("cpu-proxy-each rhodes %u bars %u\n", eng_h_max_us[ENG_RHODES], eng_h_max_us[ENG_BARS]);   /* a run on both */
     printf("voices max rhodes %u of %u bars %u of %u\n", eng_h_max_nv[ENG_RHODES], (unsigned)RH_NV,
            eng_h_max_nv[ENG_BARS], (unsigned)BAR_NV);               /* tools/hil_crackle.py: every voice taken */
     printf("ev_drop %u\n", (unsigned)(eq_drop + ev_drop));
     printf("rhodes steals %u\n", (unsigned)rh_h_steals);          /* tools/engine_ab.py */
-    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
+    printf("cpu-proxy-reed %u voices max %u of %u\n", eng_h_max_us[ENG_REED], eng_h_max_nv[ENG_REED], (unsigned)RE_NV);
+    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub : eng_cur == ENG_REED ? ENG_REED_TYPE : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
     if (eng_h_log) fclose(eng_h_log);
     if (bar_h_pred) fclose(bar_h_pred);
 }

@@ -86,7 +86,7 @@ static const engui_t ENG_UI[] = {           /* by TYPE_UI */
     ENG_UI_ROW(ENG_BARS_C, 28, ENG_BARS_HINT),
     ENG_UI_ROW(ENG_MRMB_C, 28, ENG_MRMB_HINT),   /* make-up: VIBES's until the marimba is measured on the FM-1 */
 };
-static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
+static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2, 0};   /* (the 200A: the Rhodes' cards for now) */   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
 _Static_assert(sizeof ENG_RHODES_HINT / sizeof ENG_RHODES_HINT[0] == (sizeof ENG_RHODES_C / sizeof ENG_RHODES_C[0] + 3u) / 4u &&
                sizeof ENG_BARS_HINT / sizeof ENG_BARS_HINT[0] == (sizeof ENG_BARS_C / sizeof ENG_BARS_C[0] + 3u) / 4u &&
                sizeof ENG_MRMB_HINT / sizeof ENG_MRMB_HINT[0] == (sizeof ENG_MRMB_C / sizeof ENG_MRMB_C[0] + 3u) / 4u,
