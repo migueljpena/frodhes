@@ -131,7 +131,7 @@ def test_midi(new):
     assert d["pc.12"] == "12 type=4" and d["pc.13"] == "13 type=4"  # F13, F14
     assert d["pc.14"] == "14 type=5" and d["pc.15"] == "15 type=5"  # F15, F16 MARIMBA
     assert d["pc.16"].startswith("200") and d["pc.17"].startswith("200")   # U01, U02: nothing saved
-    assert [d[f"pc.{p}"].split()[0] for p in (32, 33, 34, 35, 39)] == ["16", "17", "18", "200", "200"]   # F17..F19 (0.9.5)
+    assert [d[f"pc.{p}"].split()[0] for p in (32, 33, 34, 35, 36, 37, 39)] == ["16", "17", "18", "19", "20", "200", "200"]   # F17..F21
     assert d["factory.12"] == "F13 VIBES type=4 sw=0 mode=0 mot=1 depth=90 rate=66 shape=0 rev=20"   # 0.9.5 presets (DRY)
     assert d["factory.13"] == "F14 VIBES ECHO type=4 sw=0 mode=0 mot=0 depth=110 rate=78 shape=0 rev=34"
     assert d["factory.14"].startswith("F15 MARIMBA type=5 sw=0 mode=0 mot=0 ") and d["factory.14"].endswith("rev=22")
@@ -141,12 +141,15 @@ def test_midi(new):
 
 def chain(nf, x, undo=False):
     """params_sanitize's conversions of a saved preset index (undo: index + 1): a layout of nf factory presets (12
-    before VIBES, 14 before MARIMBA, 16 up to 0.9.5's RC) to 16, then 16 to today's 19 (flags2)"""
+    before VIBES, 14 before MARIMBA, 16 up to 0.9.5's RC) to 16, then 16 to 19 (flags2 1), then 19 to today's 21 (flags2 2:
+    the 200A's F20, F21)"""
     o = 1 if undo else 0
     if nf in (12, 14) and nf + o <= x < nf + 16 + o and (nf == 14 or not undo):
         x += 16 - nf
-    if nf != 19 and 16 + o <= x < 32 + o:
+    if nf not in (19, 21) and 16 + o <= x < 32 + o:
         x += 3
+    if nf != 21 and 19 + o <= x < 35 + o:
+        x += 2
     return x
 
 
@@ -161,26 +164,26 @@ def test_preset_index_conversion(new):
             if tag != "old":                                       # the undo's preset (index + 1) moves with it
                 u = int(d[f"conv.{tag}.{pre}"].split("undo=")[1])
                 assert u == (0 if pre == 200 else chain(nf, pre + 1, undo=True)), (tag, pre, u)
-    assert chain(12, 12) == 19 and chain(14, 14) == 19 and chain(16, 16) == 19   # U01, whichever layout it was saved in
-    assert chain(16, 15) == 15 and chain(16, 31) == 34                           # F16 stays, U16 -> 34
+    assert chain(12, 12) == 21 and chain(14, 14) == 21 and chain(16, 16) == 21   # U01, whichever layout it was saved in
+    assert chain(16, 15) == 15 and chain(16, 31) == 36                           # F16 stays, U16 -> 36
     for pre in pres:
         assert d[f"conv.new.{pre}"].split()[0] == str(pre)          # flags2 set: untouched
-    assert d["fresh.flags4"] == "1" and d["fresh.flags32"] == "1" and d["fresh.flags2"] == "1"
+    assert d["fresh.flags4"] == "1" and d["fresh.flags32"] == "1" and d["fresh.flags2"] == "3"
 
 
 def test_rc_starters_become_factory(new):
     """0.9.5's RC kept TAPE ECHO, DREAM, RADIO as the starters U10..U12 (indices 25..27 of 16 factory presets): a
     record naming one, on a bank never saved, comes back as F17..F19 (16..18); with the bank holding presets there,
-    the user slot (28..30); U09 (24) and U13 (28) as any user preset"""
+    the user slot (30..32 in the 21-factory layout); U09 (24) and U13 (28) as any user preset"""
     d = run(new, "rcmap")
-    for pre, empty, held in ((24, 27, 27), (25, 16, 28), (26, 17, 29), (27, 18, 30), (28, 31, 31)):
+    for pre, empty, held in ((24, 29, 29), (25, 16, 30), (26, 17, 31), (27, 18, 32), (28, 33, 33)):
         assert d[f"rcmap.0.{pre}"] == f"{empty} undo={empty + 1}", (pre, d[f"rcmap.0.{pre}"])
         assert d[f"rcmap.1.{pre}"] == f"{held} undo={held + 1}", (pre, d[f"rcmap.1.{pre}"])
 
 
 def test_vibes_record_on_old_firmware(new, old):
     rec = os.path.join(OUT, "vibes.rec")
-    run(new, "dump", rec, 4, 1, 19)                                 # VIBES, TREM AM, U01 (the new index)
+    run(new, "dump", rec, 4, 1, 21)                                 # VIBES, TREM AM, U01 (the new index)
     d = run(old, "load", rec)
     assert d["set.type"] == "0" and d["set.tw_mode"] == "1"         # TYPE out of the old range: the default
     assert d["set.rev"] == "33" and d["rh_type"] == "0"             # the rest kept, no crash
@@ -188,8 +191,8 @@ def test_vibes_record_on_old_firmware(new, old):
     # plays nothing it cannot read); the settings above still load
     assert d["u01.used"] == "0"
     d = run(new, "load", rec)                                       # and on this firmware it is all there
-    assert (d["set.type"], d["set.tw_mode"], d["set.preset"]) == ("4", "1", "19")
-    assert (d["u01.type"], d["u01.tw_mode"], d["u01.preset"]) == ("4", "1", "19")
+    assert (d["set.type"], d["set.tw_mode"], d["set.preset"]) == ("4", "1", "21")
+    assert (d["u01.type"], d["u01.tw_mode"], d["u01.preset"]) == ("4", "1", "21")
 
 
 def test_old_record_on_new_firmware(new, old):
@@ -197,9 +200,9 @@ def test_old_record_on_new_firmware(new, old):
     run(old, "dump", rec, 3, 1, 12)                                 # DYNO, AM tremolo, U01 (the old index)
     d = run(new, "load", rec)
     assert (d["set.type"], d["set.tw_mode"], d["set.tw_sw"], d["set.rev"]) == ("3", "1", "1", "33")
-    assert d["set.preset"] == "19"                                  # converted to the new U01
+    assert d["set.preset"] == "21"                                  # converted to the new U01
     assert (d["rh_type"], d["fx.tw_sw"], d["fx.tw_mode"]) == ("3", "1", "1")
-    assert (d["u01.type"], d["u01.tw_mode"], d["u01.preset"]) == ("3", "1", "19")
+    assert (d["u01.type"], d["u01.tw_mode"], d["u01.preset"]) == ("3", "1", "21")
 
 
 def test_marimba_record_on_0_9_3(new, prev):
@@ -216,12 +219,12 @@ def test_marimba_record_on_0_9_3(new, prev):
 
 
 def test_0_9_3_record_on_new_firmware(new, prev):
-    """a 0.9.3 record (VIBES, U01 = index 14) on this firmware: VIBES kept, U01 converted to 19 once"""
+    """a 0.9.3 record (VIBES, U01 = index 14) on this firmware: VIBES kept, U01 converted to 21 once"""
     rec = os.path.join(OUT, "v093.rec")
     run(prev, "dump", rec, 4, 1, 14)
     d = run(new, "load", rec)
-    assert (d["set.type"], d["set.tw_mode"], d["set.preset"]) == ("4", "1", "19")
-    assert (d["u01.type"], d["u01.preset"]) == ("4", "19")
+    assert (d["set.type"], d["set.tw_mode"], d["set.preset"]) == ("4", "1", "21")
+    assert (d["u01.type"], d["u01.preset"]) == ("4", "21")
 
 
 def test_marimba_cards(new):

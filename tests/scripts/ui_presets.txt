@@ -37,14 +37,16 @@
 3900 midi 0xC0 13 0
 4000 expect led 5 0
 4000 expect state vcard.2.0 OFF
-# PRESETS after F14: F15, F16 (MARIMBA), F17..F19 (0.9.5), then U01 (the user presets follow the factory ones),
-# back: F14, F13
+# PRESETS after F14: F15, F16 (MARIMBA), F17..F19 (0.9.5), F20, F21 (the 200A), then U01 (the user presets follow
+# the factory ones), back: F14, F13
 4100 turn 6 1
 4120 turn 6 1
 4140 turn 6 1
 4160 turn 6 1
 4180 turn 6 1
 4200 turn 6 1
+4220 turn 6 1
+4240 turn 6 1
 4700 expect led 5 1
 4700 expect state header U01_SUIT_TRM
 4800 turn 6 -1
@@ -53,6 +55,8 @@
 4860 turn 6 -1
 4880 turn 6 -1
 4900 turn 6 -1
+4920 turn 6 -1
+4940 turn 6 -1
 5400 expect led 5 0
 5400 expect state header F14_VIBES_ECHO
 5500 turn 6 -1
@@ -70,13 +74,17 @@
 6600 expect state header F19_RADIO
 6600 expect preset
 6600 expect sound
-6700 midi 0xC0 35 0
+6700 midi 0xC0 37 0
 6800 expect state header F19_RADIO
 6800 expect state preset 18
-# PRESETS from F19: U01 (one detent), back: F19
+# program change 35, 36: F20, F21 (the 200A); from F21: U01 (one detent), back: F21
+6810 midi 0xC0 35 0
+6850 expect state header F20_WURLI_200A
+6860 midi 0xC0 36 0
+6880 expect state header F21_200A_VIB
 6900 turn 6 1
 7400 expect state header U01_SUIT_TRM
-7400 expect state preset 19
+7400 expect state preset 21
 7500 turn 6 -1
-8000 expect state header F19_RADIO
+8000 expect state header F21_200A_VIB
 8100 end

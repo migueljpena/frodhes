@@ -61,6 +61,8 @@ typedef struct {
     int32_t gout;                             /* Q24 output gain: the bell's slope-1 norm x g x g_key */
     int32_t ltcap;                            /* log2 of the contact's cap (tc_per periods), samples, Q26 */
     int32_t sn;                               /* Q30 the action noise's gain (x NOISE) */
+    int32_t lom[RE_NM], la[RE_NM];            /* each mode's log2 angle and log2 decay a sample (Q26): the ISR's
+                                               * own words under a bend or a part-damper */
 } re_rk_t;
 typedef struct {
     re_rk_t k[RE_NKEY];
@@ -68,8 +70,8 @@ typedef struct {
     int32_t bark;                             /* the swing's factor (BARK), Q16 */
     int32_t lhx;                              /* log2 of HAMMER's contact factor, Q26 */
     int32_t w2f;                              /* the second mode's share over the set's (BELL up to 64), Q15 */
-    int32_t r_rel, r_knee, r_fast, r_slow;    /* the damper's step ratios (Q30): 1 / fast, fast / slow, fast, slow */
-    uint32_t knee;                            /* the fast stage's samples */
+    int32_t la_f, la_s;                       /* log2 of the damper's decays a sample, its fast and slow stage (Q26) */
+    uint32_t knee;                            /* the fast stage's samples (a full damper) */
     uint32_t gen;
 } re_rks_t;
 static re_rks_t re_rks[2];
@@ -84,8 +86,11 @@ typedef struct {
 typedef struct {
     re_ms_t m[RE_NM];
     re_rk_t rk;                               /* the key's words at the note-on */
-    int32_t r_rel, r_knee, r_fast, r_slow, p16;
-    uint32_t knee;
+    int32_t la_f, la_s, p16, pan;             /* pan: SPREAD's position, Q8 -256 (left) .. 256 */
+    uint32_t knee, knee0;
+    int32_t lw, lb;                           /* log2 of the damper's weight (0: a full damper), of the bend (Q26) */
+    uint16_t w15, rg;                         /* the damper's weight (Q15, 32768 full), the release velocity's x */
+    uint8_t dirty;                            /* bit s: stage s's words are the table's, not this bend / weight's */
     int32_t pbuf[RE_PBUF];                    /* the force (Q30 x the strike level ratio), delayed one sample */
     int32_t bbuf[RE_BBUF];                    /* the ping's */
     int32_t b0;                               /* Q30 the bell at rest (so u = 0 gives 0 out) */
@@ -114,6 +119,11 @@ static uint8_t re_notes[RE_NV];
 static uint32_t re_ages;
 static uint8_t re_hold;                       /* the sustain pedal down */
 static int32_t re_s1;                         /* the first difference's last input (Q22) */
+/* the vibrato (the VIBES motor's controls, engine.c eng_bar_knob): on, depth and shape 0..127, the phase step (Q32) */
+static volatile uint8_t re_vib_on, re_vib_depth, re_vib_shape;
+static volatile uint32_t re_vib_inc = 525947u;  /* (5.4 Hz) */
+static uint32_t re_vph;                        /* its phase (Q32) */
+static int32_t re_vdb, re_vlp;                 /* the LDR's lagged gain (dB, Q16), the darkening low-pass (Q30) */
 static uint32_t re_quiet_blocks;
 static uint32_t re_shed_count;
 #ifdef RE_TAP
@@ -240,7 +250,7 @@ static inline int32_t re_x16(int32_t v) { return (v - 64) << 10; }   /* x = (kno
 static void re_build(re_rks_t *R)
 {
     int32_t kv[RK_N], x, n15, lfast, lslow, a15;
-    int64_t af, as, w2, dd;
+    int64_t af, as, w2;
     uint32_t key, j, st;
     uint8_t lo;
     for (j = 0; j < RK_N; j++) kv[j] = re_kv[j];
@@ -250,13 +260,7 @@ static void re_build(re_rks_t *R)
     x = (int32_t)(((int64_t)re_x16(kv[RK_RELEASE]) * 106344155) >> 16);                             /* x log2 3 */
     lfast = RE_L_FAST + x; lslow = RE_L_SLOW + x;                                                   /* x 3^x */
     af = re_exp2(RE_L_T60K - lfast, 40); as = re_exp2(RE_L_T60K - lslow, 40);   /* the per-sample decays, Q40 */
-#define RE_SQ2(a) ((((a) >> 8) * ((a) >> 8)) >> 25)              /* a^2 / 2, Q40 (a < 2^-4) */
-    R->r_fast = (int32_t)(((int64_t)1 << 30) - ((af - RE_SQ2(af)) >> 10));                          /* e^-a, Q30 */
-    R->r_slow = (int32_t)(((int64_t)1 << 30) - ((as - RE_SQ2(as)) >> 10));
-    R->r_rel = (int32_t)(((int64_t)1 << 30) + ((af + RE_SQ2(af)) >> 10));                           /* e^a */
-    dd = af - as;
-    R->r_knee = (int32_t)(((int64_t)1 << 30) - ((dd - RE_SQ2(dd)) >> 10));                          /* e^-(af - as) */
-#undef RE_SQ2
+    R->la_f = RE_L_T60K - lfast; R->la_s = RE_L_T60K - lslow;
     R->knee = (uint32_t)((re_exp2(lfast, 16) * RE_KNEE_K + ((int64_t)1 << 31)) >> 32);
     a15 = (kv[RK_REG] * 32768 + 63) / 127;
     /* NOISE: (knob / 64)^1.5; BELL: up to 64 the second mode's share x (knob / 64)^2, over it the ping */
@@ -280,6 +284,7 @@ static void re_build(re_rks_t *R)
         for (j = 0; j < RE_NM; j++) {
             re_mw_t *m = &r->m[j];
             int64_t h = re_exp2(md[j].lom - (1 << 26), 30), a = re_exp2(RE_L_T60K - md[j].lt60, 40);
+            r->lom[j] = md[j].lom; r->la[j] = RE_L_T60K - md[j].lt60;
             int32_t k1, k2, rs;
             m->on = (uint8_t)(md[j].w > 0 && h < RE_HALF_MAX);
             m->lo = 0; m->b = 0;
@@ -318,12 +323,38 @@ static void re_poll(void)                                        /* main loop: t
 }
 
 /* ---- the voices (ISR) */
+static int32_t re_bend_l;                     /* log2 of the pitch bend (Q26; engine.c rh_bend_t), this block's */
+
+/* e^x (x Q40, |x| < 2^-4) in Q30 */
+static int32_t re_ex(int64_t x) { int64_t h = ((x >> 8) * (x >> 8)) >> 25; return (int32_t)(((int64_t)1 << 30) + ((x + h) >> 10)); }
+
+/* the damper's decay a sample in stage st (0: none), at the voice's weight, Q40 */
+static int64_t re_ad(const re_voice_t *v, uint32_t st) { return st == 0 ? 0 : re_exp2((st == 1u ? v->la_f : v->la_s) + v->lw, 40); }
+
+/* stage st's words at this voice's bend and damper weight (a bend, a half pedal, a release velocity) */
+static void re_vwords(re_voice_t *v, uint32_t st)
+{
+    uint32_t j;
+    int64_t ad = re_ad(v, st);
+    for (j = 0; j < RE_NM; j++) {
+        re_mw_t *m = &v->rk.m[j];
+        uint8_t lo;
+        int32_t k1, k2, rs;
+        if (!m->on) continue;
+        re_words((int32_t)re_exp2(v->rk.lom[j] + v->lb - (1 << 26), 30), re_exp2(v->rk.la[j], 40) + ad, &lo, &k1, &k2, &rs);
+        m->k[st][0] = k1; m->k[st][1] = k2;
+        m->lo = (uint8_t)((m->lo & ~(1u << st)) | (uint32_t)lo << st);
+    }
+    v->dirty &= (uint8_t)~(1u << st);
+}
+
 /* the damper's stage (0 sustain, 1 fast, 2 slow): the older state rescaled so the motion goes on as the float
  * model's x[k] env[k] does (reed-worklet.js: the states scaled by the step each sample). r30: the step before over
  * the step after (Q30) */
 static void re_set_stage(re_voice_t *v, uint32_t st, int32_t r30)
 {
     uint32_t j;
+    if (v->dirty >> st & 1u) re_vwords(v, st);
     for (j = 0; j < RE_NM; j++) {
         re_ms_t *s = &v->m[j];
         uint8_t lo = (uint8_t)(v->rk.m[j].lo >> st & 1u);
@@ -380,7 +411,12 @@ static void re_start(re_voice_t *v, uint32_t note, uint32_t vel)
     const re_key_t *K = &RE_KEYS[note - RE_KEY_LO];
     uint32_t j;
     v->rk = R->k[note - RE_KEY_LO];
-    v->r_rel = R->r_rel; v->r_knee = R->r_knee; v->r_fast = R->r_fast; v->r_slow = R->r_slow; v->knee = R->knee;
+    v->la_f = R->la_f; v->la_s = R->la_s; v->knee = v->knee0 = R->knee;
+    v->lw = 0; v->w15 = 32768; v->rg = 32768; v->lb = 0; v->dirty = 0;
+    {   /* SPREAD: as the Rhodes (rhodes.c rh_init), by the note */
+        int32_t p = rh_spread ? ((2 * (int32_t)note - 129) * rh_spread * 256) / (87 * 127) : 0;
+        v->pan = p > 256 ? 256 : p < -256 ? -256 : p;
+    }
     v->p16 = R->p16;
     v->note = (uint8_t)note; v->vel = (uint8_t)vel;
     v->lvl = re_level(K, &v->rk, vel, R->bark, R->w2f);
@@ -442,7 +478,7 @@ static int re_strike(uint32_t note, uint32_t vel)
             re_noise(note, vel, &v->rk);
             v->pn = re_join(v->pbuf, v->pi, v->pn, re_contact(K, &v->rk, vel, R->lhx, 0), r15, RE_PBUF); v->pi = 0;
             if (v->m[3].on) { v->bn = re_join(v->bbuf, v->bi, v->bn, v->blen, r15, RE_BBUF); v->bi = 0; }
-            if (v->stage) re_set_stage(v, 0, v->stage == 1u ? v->r_fast : v->r_slow);
+            if (v->stage) re_set_stage(v, 0, re_ex(-re_ad(v, v->stage)));
             v->rel = 0; v->rpend = 0; v->quiet = 0; v->held = 1; v->age = ++re_ages;
             return 1;
         }
@@ -461,27 +497,73 @@ static int re_strike(uint32_t note, uint32_t vel)
     return 1;
 }
 
-/* the damper falls: the next sample is the release's first, still undamped (reed_model: env[0] = 1) */
-static void re_release(re_voice_t *v) { if (!v->rel && !v->rpend && v->alive && !v->stage) v->rpend = 1; }
+static uint8_t re_pedal_cc;                   /* the pedal's last level */
 
-static void re_note_off(uint32_t note)
+/* the damper on a key that is up: its weight w15 (Q15; 32768 a full damper, the float model's; 0 none: the pedal down).
+ * Falling (0 -> w): the next sample is the release's first, still undamped (reed_model: env[0] = 1). Changing while it
+ * damps (a half pedal moved, the pedal down again): the words for the new weight, the older state rescaled. The fast
+ * stage lasts knee0 x 32768 / w (the knee is a level: a lighter damper reaches it later) */
+static void re_damp(re_voice_t *v, uint32_t w15)
+{
+    int32_t lw = w15 == 32768u || !w15 ? 0 : re_log2(w15, 15);   /* (over 32768: a quick lift damps harder) */
+    if (!v->alive) return;
+    if (!w15) {                                                   /* the damper lifts: the reed rings again */
+        if (v->stage) re_set_stage(v, 0, re_ex(-re_ad(v, v->stage)));
+        v->rpend = 0; v->rel = 0;
+        return;
+    }
+    if (lw != v->lw) {
+        int64_t a0 = v->stage ? re_ad(v, v->stage) : 0;
+        v->lw = lw; v->w15 = (uint16_t)w15;
+        v->knee = w15 == 32768u ? v->knee0 : (v->knee0 << 15) / w15;   /* (knee0 < 2^16) */
+        v->dirty |= 6u;                                            /* the damped stages' words for this weight */
+        if (v->stage) {
+            int64_t a1;
+            re_vwords(v, v->stage);
+            a1 = re_ad(v, v->stage);
+            {   uint32_t j;
+                int32_t r30 = re_ex(a1 - a0);                     /* the step before (e^-a0) over the one after */
+                for (j = 0; j < RE_NM; j++) if (v->m[j].on) v->m[j].x2 = (int32_t)(((int64_t)v->m[j].x2 * r30) >> 30);
+            }
+        }
+    }
+    if (!v->stage && !v->rpend) v->rpend = 1;
+}
+
+/* the key's damper weight now: the pedal's (rhodes_tables.h PEDAL_W: full under 42, half 42..63, none from 64) x the
+ * release velocity's x0.6 .. 1.4 (rhodes.c rh_rel_gain) */
+static uint32_t re_key_w(const re_voice_t *v)
+{
+    uint32_t w = PEDAL_W[re_pedal_cc & 127u];
+    w = w >= 32767u ? 32768u : w;
+    return (w * v->rg) >> 15;
+}
+
+static void re_note_off(uint32_t note, uint32_t rv)
 {
     uint32_t i;
     for (i = 0; i < RE_NV; i++)
         if (re_v[i].alive && re_v[i].note == note) {
             re_v[i].held = 0;
-            if (!re_hold) re_release(&re_v[i]);
+            re_v[i].rg = (uint16_t)rh_rel_gain(rv);
+            re_damp(&re_v[i], re_key_w(&re_v[i]));
         }
 }
 
 static void re_pedal(uint32_t cc)
 {
     uint32_t i;
-    re_hold = (uint8_t)(cc >= 64u);
-    if (!re_hold) for (i = 0; i < RE_NV; i++) if (re_v[i].alive && !re_v[i].held) re_release(&re_v[i]);
+    re_pedal_cc = (uint8_t)(cc > 127u ? 127u : cc);
+    re_hold = (uint8_t)(re_pedal_cc >= 64u);
+    for (i = 0; i < RE_NV; i++) if (re_v[i].alive && !re_v[i].held) re_damp(&re_v[i], re_key_w(&re_v[i]));
 }
 
-static void re_all_off(void) { uint32_t i; re_hold = 0; for (i = 0; i < RE_NV; i++) { re_v[i].held = 0; re_release(&re_v[i]); } }
+static void re_all_off(void)
+{
+    uint32_t i;
+    re_hold = 0; re_pedal_cc = 0;
+    for (i = 0; i < RE_NV; i++) { re_v[i].held = 0; re_v[i].rg = 32768; re_damp(&re_v[i], 32768u); }
+}
 
 static void re_kill_all(void)
 {
@@ -533,15 +615,58 @@ static int32_t re_sn_next(re_sn_t *q)                            /* one sample o
     return (int32_t)(((((int64_t)x * e) >> 30) * q->g) >> 28);
 }
 
+/* cos(2 pi ph) (ph Q32), Q30: the quarter sine table */
+static inline int32_t re_cos32(uint32_t ph)
+{
+    uint32_t q = ph >> 30, f = (ph >> 4) & 0x3FFFFFFu;           /* the quadrant, its position (Q16 table steps) */
+    int32_t a = q & 1u ? re_sin_ph(f) : re_sin_ph((1u << 26) - f);   /* sin t, or cos t = sin(pi/2 - t) */
+    return q == 1u || q == 2u ? -a : a;
+}
+
+/* the 200A's vibrato on the line (reed_model.trem_stage, the set's trem_ldr): in dB -depth 20 C dip, dip =
+ * (1 + cos x + h2d (cos 2x - 1)) / 2 (0 at the top, 1 in the trough), through the LDR's lag (on fast, off slow); the
+ * loud phase darker: a 1 kHz low-pass mixed in by 1 - gmin / g. SHAPE 0 the 200A's own cycle, 127 a smooth sine */
+static void re_vibrato(int32_t *o, uint32_t n)
+{
+    int32_t dep = re_vib_on ? re_vib_depth : 0, sh = re_vib_shape;
+    int32_t c16 = RE_TR_C0 + (RE_TR_C1 - RE_TR_C0) * sh / 127, h2d = RE_TR_HD0 + (RE_TR_HD1 - RE_TR_HD0) * sh / 127;
+    int32_t full = (int32_t)(((int64_t)RE_TR_DB * dep) / 127);    /* the trough at no lag: -depth 20 dB, Q16 */
+    int32_t amp = (int32_t)(((int64_t)full * c16) >> 16);
+    uint32_t i, inc = re_vib_inc;
+    if (!dep && re_vdb == 0) { re_vph += inc * n; return; }       /* off and settled: the phase runs on */
+    for (i = 0; i < n; i++) {
+        int32_t c1, c2, dip, tgt, g, m;
+        re_vph += inc;
+        c1 = re_cos32(re_vph); c2 = re_cos32(re_vph << 1);
+        dip = (int32_t)(((int64_t)(1 << 30) + c1 + (((int64_t)h2d * (c2 - (1 << 30))) >> 16)) >> 1);   /* Q30 */
+        tgt = -(int32_t)(((int64_t)amp * dip) >> 30);
+        re_vdb += (int32_t)(((int64_t)(tgt - re_vdb) * (tgt > re_vdb ? RE_TR_KON : RE_TR_KOFF)) >> 30);
+        g = (int32_t)re_exp2((int32_t)(((int64_t)re_vdb * 11146541) >> 16), 30);      /* 10^(dB / 20): x log2(10) / 20 */
+        m = re_vdb > -full ? (1 << 30) - (int32_t)re_exp2((int32_t)(((int64_t)(-full - re_vdb) * 11146541) >> 16), 30) : 0;
+        re_vlp += (int32_t)(((int64_t)(o[i] - re_vlp) * ((1 << 30) - RE_TR_LPA)) >> 30);
+        o[i] = (int32_t)(((int64_t)(o[i] + (int32_t)(((int64_t)(re_vlp - o[i]) * m) >> 30)) * g) >> 30);
+    }
+}
+
 static void re_render(int32_t *mono, uint32_t n)
 {
-    static int32_t s[256], u[256], ns[256];
-    uint32_t i, j, act = 0;
-    for (i = 0; i < n; i++) { s[i] = 0; ns[i] = 0; }
+    static int32_t s[256], sr[256], u[256], ns[256], bt_last, s1r;
+    uint32_t i, j, act = 0, side = 0;
+    if (rh_bend_t != bt_last) {                                  /* the bend (engine.c eng_bend_set), as log2 */
+        bt_last = rh_bend_t;
+        re_bend_l = bt_last ? re_log2((uint64_t)((int64_t)(1 << 30) + bt_last), 30) : 0;
+    }
+    for (i = 0; i < RE_NV; i++) side |= re_v[i].alive && re_v[i].pan;
+    for (i = 0; i < n; i++) { s[i] = 0; sr[i] = 0; ns[i] = 0; }
     for (i = 0; i < RE_NV; i++) {
         re_voice_t *v = &re_v[i];
         int32_t peak = 0, b0 = v->b0, d = v->rk.d, gout = v->rk.gout, p16 = v->p16;
         if (!v->alive) continue;
+        if (v->lb != re_bend_l) {                             /* the bend moved: this voice's words for it */
+            v->lb = re_bend_l;
+            v->dirty = 7u;
+            re_vwords(v, v->stage);
+        }
         for (j = 0; j < n; j++) u[j] = 0;
         j = 0;
         while (j < n) {                                       /* segments: the forces' ends, the damper's stages */
@@ -549,15 +674,16 @@ static void re_render(int32_t *mono, uint32_t n)
             if (pl && pl < seg) seg = pl;
             if (bl && bl < seg) seg = bl;
             if (v->rpend) seg = 1u;
-            else if (v->stage == 1u && v->rel + seg > v->knee + 1u) seg = v->knee + 1u - v->rel;
+            else if (v->stage == 1u && v->rel + seg > v->knee + 1u) seg = v->rel >= v->knee + 1u ? 0u : v->knee + 1u - v->rel;
+            if (!seg) { re_set_stage(v, 2, re_ex(re_ad(v, 2) - re_ad(v, 1))); continue; }
             for (m = 0; m < 3u; m++)
                 if (v->m[m].on) re_run(&v->m[m], &v->rk.m[m], v->stage, pl ? &v->pbuf[v->pi] : 0, u + j, seg);
             if (v->m[3].on) re_run(&v->m[3], &v->rk.m[3], v->stage, bl ? &v->bbuf[v->bi] : 0, u + j, seg);
             if (pl) v->pi += seg;
             if (bl) v->bi += seg;
             if (v->rpend || v->rel) v->rel += seg;
-            if (v->rpend) { v->rpend = 0; re_set_stage(v, 1, v->r_rel); }
-            else if (v->stage == 1u && v->rel == v->knee + 1u) re_set_stage(v, 2, v->r_knee);
+            if (v->rpend) { int64_t a1; v->rpend = 0; if (v->dirty & 2u) re_vwords(v, 1); a1 = re_ad(v, 1); re_set_stage(v, 1, re_ex(a1)); }
+            else if (v->stage == 1u && v->rel == v->knee + 1u) re_set_stage(v, 2, re_ex(re_ad(v, 2) - re_ad(v, 1)));
             j += seg;
         }
         for (j = 0; j < n; j++) {
@@ -569,7 +695,11 @@ static void re_render(int32_t *mono, uint32_t n)
                 o = (int32_t)(((int64_t)o * v->fade) >> 15);
                 v->fade -= 32768 / (int32_t)RE_FADE + 1; if (v->fade < 0) v->fade = 0;
             }
-            s[j] += o >> 2;                                   /* Q22: every voice's sum */
+            if (!side) s[j] += o >> 2;                        /* Q22: every voice's sum */
+            else {                                            /* SPREAD: a left and a right sum, each its preamp */
+                s[j] += (int32_t)(((int64_t)o * (256 + v->pan)) >> 10);
+                sr[j] += (int32_t)(((int64_t)o * (256 - v->pan)) >> 10);
+            }
         }
         v->quiet = peak < 1342 && v->pi >= v->pn ? v->quiet + 1u : 0u;   /* |u| < 1e-5 (Q27) */
         if (v->quiet > 8u || (v->fade != 32768 && v->fade <= 0)) {
@@ -582,14 +712,25 @@ static void re_render(int32_t *mono, uint32_t n)
         for (j = 0; j < n && re_sn[i].on; j++) ns[j] += re_sn_next(&re_sn[i]);
     re_active_bits = act;
     re_quiet_blocks = act ? 0u : re_quiet_blocks + 1u;
+    if (!side) s1r = re_s1;
+    rh_side_on = (uint8_t)(side != 0);
     for (i = 0; i < n; i++) {
         int32_t y = (s[i] - re_s1) >> 1;                              /* the differentiating input, Q22 */
-        int32_t t = (int32_t)(((int64_t)y * RE_DRIVE) >> 14);         /* x drive, Q24 */
-        int32_t o = re_tanh(t) + ns[i];                               /* Q30, full scale = tanh's ceiling */
+        int32_t o = re_tanh((int32_t)(((int64_t)y * RE_DRIVE) >> 14)), so = 0;   /* x drive (Q24); Q30, full scale = tanh's ceiling */
         re_s1 = s[i];
+        if (side) {                                                   /* M = (L + R) / 2, S = (L - R) / 2 (fx.c) */
+            int32_t orr = re_tanh((int32_t)(((int64_t)((sr[i] - s1r) >> 1) * RE_DRIVE) >> 14));
+            s1r = sr[i];
+            so = (o - orr) >> 1; o = (o >> 1) + (orr >> 1);
+            rh_side[i] = (int32_t)(((int64_t)so * RE_OUT_GAIN) >> 31);
+        }
+        mono[i] = o + ns[i];                                          /* Q30 for now: the vibrato next */
+    }
+    re_vibrato(mono, n);
+    for (i = 0; i < n; i++) {
 #ifdef RE_TAP
-        re_tap[i] = o;
+        re_tap[i] = mono[i];
 #endif
-        mono[i] = (int32_t)(((int64_t)o * RE_OUT_GAIN) >> 31);        /* Q15 */
+        mono[i] = (int32_t)(((int64_t)mono[i] * RE_OUT_GAIN) >> 31);  /* Q15 */
     }
 }

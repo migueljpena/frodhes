@@ -80,15 +80,36 @@ static const ectl_t ENG_MRMB_C[] = {
 };
 static const char *const ENG_MRMB_HINT[] = {"HOW THE MALLET STRIKES", "HOW BARS RING; MUTE = HAND"};
 
+/* the 200A (TYPE 6, the reed engine, reed.c): the Rhodes' cards, what they do on a reed (TONE the pickup plates'
+ * shape, BARK the reed's swing, BELL its second mode / the ping, HAMMER the felt), then its vibrato on the VIBES
+ * motor's parameters (VIBRATO on / off, DEPTH, SPEED, SHAPE: 0 the 200A's own cycle, 127 a smooth sine) */
+static const ectl_t ENG_REED_C[] = {
+    {P_TONE, "TONE", EK_AMT, EU_NONE},
+    {P_BARK, "BARK", EK_AMT, EU_NONE, 1},    /* FRODHES K2: the 200A's character */
+    {P_BELL, "BELL", EK_AMT, EU_NONE},
+    {P_HAMMER, "HAMMER", EK_AMT, EU_NONE},
+    {P_DECAY, "DECAY", EK_AMT, EU_NONE},
+    {P_RELEASE, "RELEASE", EK_AMT, EU_NONE},
+    {P_NOISE, "NOISE", EK_AMT, EU_NONE},
+    {S_TUNE, "TUNE", EK_AMT, EU_C},
+    {P_MOT_ON, "VIBRATO", EK_CHOICE, EU_NONE},
+    {P_MOT_DEPTH, "DEPTH", EK_AMT, EU_NONE, 2},                                       /* FRODHES K3 */
+    {P_MOT_RATE, "SPEED", EK_AMT, EU_HZ},
+    {P_MOT_SHAPE, "SHAPE", EK_AMT, EU_NONE},
+};
+static const char *const ENG_REED_HINT[] = {"HOW THE REED IS STRUCK", "HOW NOTES DIE AWAY", "THE 200A'S VIBRATO"};
+
 #define ENG_UI_ROW(c, mk, h) {c, sizeof c / sizeof c[0], mk, h}
 static const engui_t ENG_UI[] = {           /* by TYPE_UI */
     ENG_UI_ROW(ENG_RHODES_C, 15, ENG_RHODES_HINT),
     ENG_UI_ROW(ENG_BARS_C, 28, ENG_BARS_HINT),
     ENG_UI_ROW(ENG_MRMB_C, 28, ENG_MRMB_HINT),   /* make-up: VIBES's until the marimba is measured on the FM-1 */
+    ENG_UI_ROW(ENG_REED_C, 15, ENG_REED_HINT),   /* make-up: the Rhodes' until the 200A is measured on the FM-1 */
 };
-static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2, 0};   /* (the 200A: the Rhodes' cards for now) */   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
+static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 2, 3};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
 _Static_assert(sizeof ENG_RHODES_HINT / sizeof ENG_RHODES_HINT[0] == (sizeof ENG_RHODES_C / sizeof ENG_RHODES_C[0] + 3u) / 4u &&
                sizeof ENG_BARS_HINT / sizeof ENG_BARS_HINT[0] == (sizeof ENG_BARS_C / sizeof ENG_BARS_C[0] + 3u) / 4u &&
-               sizeof ENG_MRMB_HINT / sizeof ENG_MRMB_HINT[0] == (sizeof ENG_MRMB_C / sizeof ENG_MRMB_C[0] + 3u) / 4u,
+               sizeof ENG_MRMB_HINT / sizeof ENG_MRMB_HINT[0] == (sizeof ENG_MRMB_C / sizeof ENG_MRMB_C[0] + 3u) / 4u &&
+               sizeof ENG_REED_HINT / sizeof ENG_REED_HINT[0] == (sizeof ENG_REED_C / sizeof ENG_REED_C[0] + 3u) / 4u,
                "one hint per VOICE page");
 #define ENG_VP_MAX 4u                        /* VOICE pages an engine may have (ui.c's page walk) */

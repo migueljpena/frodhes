@@ -7,10 +7,10 @@
  *   PRESETS encoder   browse F01..F19, U01..U16; loads 400 ms after the last detent (the edit goes to undo)
  *   SAVE              open the save mode: PRESETS / K1 pick the slot, SAVE again saves (when quiet), HOME cancels
  *   SAVE held 700 ms  undo / redo the last load
- *   MIDI PC           0..15 -> F01..F16, 16..31 -> U01..U16 (as before 0.9.5), 32..34 -> F17..F19 (preset_of_pc) */
+ *   MIDI PC           0..15 -> F01..F16, 16..31 -> U01..U16 (as before 0.9.5), 32..36 -> F17..F21 (preset_of_pc) */
 
-#define PR_NF 19u                               /* 12 Rhodes (F01..F12, unchanged), the bar types' F13..F16, then
-                                                 * F17..F19 (0.9.5: the starters U10..U12 before) */
+#define PR_NF 21u                               /* 12 Rhodes (F01..F12, unchanged), the bar types' F13..F16, then
+                                                 * F17..F19 (0.9.5: the starters U10..U12 before), the 200A's F20..F21 */
 #define PR_NU 16u
 _Static_assert(PR_NF == PR_NF_UI && PR_NF + PR_NU == PR_NALL_UI && PR_NF == PR_NF_SET, "ui.c / params.c preset counts");
 _Static_assert(PR_NF >= 16u && PR_NF <= 16u + 96u, "program changes 0..15: F01..F16, 16..31: U01..U16, 32..: F17..");
@@ -56,7 +56,8 @@ _Static_assert(sizeof pr_user == ST_TAIL_N, "the user presets are the store reco
  * MARIMBA): 1.5:1, ATTACK 92 (9 ms), RELEASE 64. LOW CUT 70 (~150 Hz) / 80 (~200 Hz) keeps the bass out of the tails. */
 static const char *const PR_FNAME[PR_NF] = {
     "STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "SUIT TREM", "DRIVEN 77", "BALLAD", "DYNO 80S", "70S PHASER",
-    "FUNK WAH", "RESO SWEEP", "AUTO WAH", "VIBES", "VIBES ECHO", "MARIMBA", "WOOD ECHO", "TAPE ECHO", "DREAM", "RADIO"};   /* (the header shows 14 characters: names up to 10) */
+    "FUNK WAH", "RESO SWEEP", "AUTO WAH", "VIBES", "VIBES ECHO", "MARIMBA", "WOOD ECHO", "TAPE ECHO", "DREAM", "RADIO",
+    "WURLI 200A", "200A VIB"};   /* (the header shows 14 characters: names up to 10) */
 static const uint8_t PR_FDATA[PR_NF][PR_FDN] = {
     /* ---- DRY (F01..F04, F13, F15): each instrument as the model plays it, the compressor and a trace of room only */
     /* F01 STAGE 77: the clean stage piano (the boot sound) */
@@ -148,6 +149,16 @@ static const uint8_t PR_FDATA[PR_NF][PR_FDN] = {
     {P_TYPE, 0, P_NOISE, 48, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
      P_DRIVE, 55, P_DRV_SW, 4, P_DRV_TONE, 76, P_FL_TYPE, 5, P_FL_FREQ, 66, P_FL_RESO, 0, P_DL_SW, 3, P_DL_DEPTH, 15,
      P_DL_TIME, 54, P_DL_FDBK, 30, P_RV_DEPTH, 10, P_RV_TYPE, 1, P_RV_LOCUT, 80, P_LEVEL, 75, 0xFF},
+    /* ---- the 200A (the reed engine, TYPE 6): the play page's v4.3 with its knobs at the centre, NOISE at 64 (the
+     * model's action noise as measured), the Rhodes' dry compressor and room, LEVEL as F01 (the 200A at mf sits
+     * within 0.2 dB of STAGE 77 on average, host) */
+    /* F20 WURLI 200A: dry, no vibrato */
+    {P_TYPE, 6, P_NOISE, 64, P_MOT_ON, 0, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1,
+     P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 18, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 55, 0xFF},
+    /* F21 200A VIB: the vibrato at the factory rate (SPEED 95 = 5.4 Hz, the 200A's oscillator) and its own shape */
+    {P_TYPE, 6, P_NOISE, 64, P_MOT_ON, 1, P_MOT_DEPTH, 72, P_MOT_RATE, 95, P_MOT_SHAPE, 0, P_CMP_SW, 1, P_CMP_AMT, 50,
+     P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 18, P_RV_TYPE, 1, P_RV_LOCUT, 70,
+     P_LEVEL, 55, 0xFF},
 };
 _Static_assert(PR_FDN % 2u == 0u, "id / value pairs");
 

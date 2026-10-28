@@ -31,7 +31,7 @@ P = dict(TYPE=0, DRIVE=1, TW_SW=2, TW_DEPTH=3, TW_RATE=4, TW_MODE=6, CP_SW=8, CP
 
 # a record that names an empty user slot (U16, never a starter): the boot plays the record's own sound (snd_base:
 # the last preset loaded or saved), so the record's panel and its conversions are what the tests see
-NO_PRESET = 34
+NO_PRESET = 36
 
 
 def flash_file(tag):
@@ -319,10 +319,10 @@ def test_old_settings_records_convert():
 
 def test_094_settings_record_preset_index():
     """a 0.9.4 / 0.9.5-RC settings record (16 factory presets: U01 = 16; flags2 0) on 0.9.5 (19: F17..F19 before the
-    user bank): F01..F16 stay, U01..U16 move by 3, once; the preset it names then plays as stored (an empty one: the
+    user bank; 21 since the 200A's F20, F21): F01..F16 stay, U01..U16 move by 5, once; the preset it names then plays as stored (an empty one: the
     record's panel)"""
     fl = flash_file("v094")
-    for pre, want in ((0, 0), (15, 15), (16, 19), (31, 34)):
+    for pre, want in ((0, 0), (15, 15), (16, 21), (31, 36)):
         img = bytearray(b"\xff" * 5 * SECTOR)
         r = v1_record({P["TYPE"]: 1, P["DRIVE"]: 20}, preset=pre)
         r[O_VER], r[O_FLAGS] = 2, 255                       # every flag up to 0.9.5's RC, flags2 (0.9.5) clear
@@ -512,7 +512,7 @@ def test_record_naming_an_empty_slot_runs_its_synced_rates():
     fl, img = saved_flash("emptyslot", [cc(20, 17, 64), cc(21, 18, 100), cc(22, 20, 64),   # TREM on, DEPTH, SYNC
                                         "100 btn 9", "140 btn 9", "3000 dump"])          # SAVE to U01
     rec = settings_record(img)
-    assert rec[O_PRESET] == 19 and rec[O_PANEL + 2] == 1, (rec[O_PRESET], rec[O_PANEL + 2])   # U01, its sound
+    assert rec[O_PRESET] == 21 and rec[O_PANEL + 2] == 1, (rec[O_PRESET], rec[O_PANEL + 2])   # U01, its sound
     rec[O_PRESET] = NO_PRESET                                       # the record names U16: empty (never a starter)
     put_settings(img, rec)
     open(fl, "wb").write(img)

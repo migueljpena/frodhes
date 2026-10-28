@@ -45,13 +45,15 @@
 2800 expect sound
 2800 expect state bars 1
 2800 expect state vcard.2.0 ON
-# ---- browse back over F19..F17, F16, F15 (MARIMBA), F14 to F13 VIBES (loads after 400 ms), then hold SAVE: undo to U01, the header with it
+# ---- browse back over F21, F20 (the 200A), F19..F17, F16, F15 (MARIMBA), F14 to F13 VIBES (loads after 400 ms), then hold SAVE: undo to U01, the header with it
 2900 turn 6 -1
 2920 turn 6 -1
 2940 turn 6 -1
 2960 turn 6 -1
 2980 turn 6 -1
 3000 turn 6 -1
+3010 turn 6 -1
+3030 turn 6 -1
 3050 turn 6 -1
 3600 expect state header F13_VIBES
 3600 expect preset

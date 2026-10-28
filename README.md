@@ -14,11 +14,11 @@ instrument: on a Rhodes a hammer strikes a tine, the tine rings against its tone
 motion into sound, with the bark of hard notes, the bell of the attack, the slow whirl of a held tine and
 keys that each sound a little different; on the vibraphone a mallet strikes a bar,
 its tuned tube rings along and the motor makes it pulse; on the marimba a yarn mallet strikes a rosewood bar whose
-long tube makes the low notes bloom. Six instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Vibes and
-Marimba), a
+long tube makes the low notes bloom; on the Wurli 200A a felt hammer strikes a steel reed that barks past its pickup.
+Seven instrument types (Stage 77, Suitcase, Early Felt, Bell Dyno, Vibes, Marimba and Wurli 200A), a
 stage-keyboard effects chain (compressor, a drive with five overdrive types, a resonant filter with its LFO, tremolo / wah, phaser, chorus, delay
 with a digital, an analog-style and a tape echo, a reverb with hall, plate and infinite types), tap tempo with MIDI
-clock sync, USB-MIDI in and out and TRS MIDI in, MIDI pitch bend, release velocity and a stereo SPREAD by key on the Rhodes, chord mode, a pattern recorder (1–16 bar loops, quantize, overdub, undo / erase), an arpeggiator, scales, a sustain pedal, velocity from the FM-1's own keys (TOUCH: LIGHT / MEDIUM / HEAVY / FIXED), 10-voice polyphony on every instrument and 19 factory plus 16 user presets. The screen shows one page at a time with
+clock sync, USB-MIDI in and out and TRS MIDI in, MIDI pitch bend, release velocity and a stereo SPREAD by key on the Rhodes, chord mode, a pattern recorder (1–16 bar loops, quantize, overdub, undo / erase), an arpeggiator, scales, a sustain pedal, velocity from the FM-1's own keys (TOUCH: LIGHT / MEDIUM / HEAVY / FIXED), 10-voice polyphony on every instrument and 21 factory plus 16 user presets. The screen shows one page at a time with
 four cards, one for each of the FM-1's four knobs, each read at a glance by its kind (an amount fills its row like a
 fader, a selector lights one block per option up to its choice, an ON / OFF switch shows a lit dot), the value always
 in the same large letters; the instrument brings its own VOICE pages; the first page, PERFORM, puts the drive, the filter's cutoff and the delay's and reverb's dry / wet (or
@@ -74,10 +74,10 @@ the MIDI map.
 | Page | K1 | K2 | K3 | K4 | Button |
 | --- | --- | --- | --- | --- | --- |
 | **PERFORM** | DRIVE | FILTER | DELAY | REVERB | HOME (assignable on ASSIGN) |
-| **FRODHES** (main) | TYPE | TONE (VIBES / MARIMBA: MALLET) | BELL (VIBES: MOTOR; MARIMBA: TUBE) | KEY VEL | HOME twice |
+| **FRODHES** (main) | TYPE | TONE (VIBES / MARIMBA: MALLET; 200A: BARK) | BELL (VIBES: MOTOR; MARIMBA: TUBE; 200A: vibrato DEPTH) | KEY VEL | HOME twice |
 | **VOICE 1/2** (VIBES: 1/3) | TONE (VIBES / MARIMBA: STRIKE) | BARK (MALLET) | BELL (TUBE) | HAMMER (WEIGHT) | (SELECT) |
 | **VOICE 2/2** (VIBES: 2/3) | DECAY (VIBES / MARIMBA: RING) | RELEASE (VIBES: DAMPER; MARIMBA: MUTE) | NOISE | TUNE | (SELECT) |
-| **VOICE 3/3** (VIBES only: the motor) | MOTOR (ON / OFF) | DEPTH | SPEED | SHAPE | (SELECT) |
+| **VOICE 3/3** (VIBES: the motor; WURLI 200A: its vibrato) | MOTOR (200A: VIBRATO) (ON / OFF) | DEPTH | SPEED | SHAPE | (SELECT) |
 | **COMPRESSOR** | THRESHOLD (OFF / on) | RATIO | ATTACK | MAKEUP | (SELECT) |
 | **DRIVE** | OFF / FDRV / KHLON / TSH8 / OHCD / BHLUE | AMOUNT | TONE | MIX | (SELECT) |
 | **FILTER** | OFF / LP12 / LP18 (default) / HP12 / HP18 / BP / NOTCH | FREQ | RESO | LFO | (SELECT) |
@@ -127,6 +127,7 @@ the release notes, `?v=`).
 firmware/src/frodhes.c    <- the app: keys, MIDI, sustain, settings, the main loop
 firmware/src/rhodes.c     <- the voice engine: tine and tonebar, hammer, pickup, damper
 firmware/src/bars.c       <- the bar instruments (VIBES, MARIMBA): bar modes, tube, mallet, damper / hand, motor
+firmware/src/reed.c       <- the WURLI 200A: reed modes, hammer, the bell pickup, damper, preamp, vibrato (tools/gen_reed.py)
 firmware/src/fx.c         <- the effects and the master (limiter, silence gate)
 firmware/src/keyvel.c     <- key velocity: a key's reading once it lands -> its velocity (TOUCH); hal/fm1_keyadc.h the rows
 firmware/src/ui.c         <- the pages;  params.c the parameters;  tempo.c tempo and scales;  presets.c

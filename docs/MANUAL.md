@@ -23,7 +23,7 @@ Frodhes is an independent open-source project, not affiliated with or endorsed b
 2. [The idea: one page, four knobs](#2-the-idea-one-page-four-knobs)
 3. [Buttons and knobs](#3-buttons-and-knobs)
 4. [The pages](#4-the-pages)
-5. [VIBES and MARIMBA: the bar instruments](#5-vibes-and-marimba-the-bar-instruments) (VIBES: [the vibraphone](#vibes-the-vibraphone), the motor [on and off](#the-motor-on-and-off); [MARIMBA](#marimba))
+5. [VIBES and MARIMBA: the bar instruments](#5-vibes-and-marimba-the-bar-instruments) (VIBES: [the vibraphone](#vibes-the-vibraphone), the motor [on and off](#the-motor-on-and-off); [MARIMBA](#marimba); and [WURLI 200A](#wurli-200a), the reed piano)
 6. [Presets](#6-presets)
 7. [Effects on and off](#7-effects-on-and-off)
 8. [Tempo and sync](#8-tempo-and-sync)
@@ -119,8 +119,8 @@ preset or switch an effect it briefly shows what happened, in large letters.
 | --- | --- |
 | **SELECT** (knob) | Next / previous page |
 | **K1 K2 K3 K4** | The four cards on the current page |
-| **ALGORITHM** (knob) | The TYPE (the four Rhodes, VIBES and MARIMBA), from any page (on SEQUENCER: the step cursor) |
-| **PRESETS** (knob) | Browse the sounds F01–F19 and your U01–U16 (loads when you stop turning; on SEQUENCER: bar by bar) |
+| **ALGORITHM** (knob) | The TYPE (the four Rhodes, VIBES, MARIMBA and the WURLI 200A), from any page (on SEQUENCER: the step cursor) |
+| **PRESETS** (knob) | Browse the sounds F01–F21 and your U01–U16 (loads when you stop turning; on SEQUENCER: bar by bar) |
 | **MASTER** (knob) | Volume (it glides as you turn it, without steps) |
 | **HOME** | PERFORM page; press again for the main page (titled FRODHES), and back |
 | **EDIT** | CHORD page; press again there to switch chord mode on / off (it comes back with the last chord type) |
@@ -176,7 +176,7 @@ The page after PERFORM (press **HOME** twice) carries the instrument's name as i
 
 | Knob | Card | What it does |
 | --- | --- | --- |
-| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **VIBES**, the vibraphone (see [VIBES](#vibes-the-vibraphone)), or **MARIMBA** (see [MARIMBA](#marimba)). Applies to the next notes. |
+| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **VIBES**, the vibraphone (see [VIBES](#vibes-the-vibraphone)), **MARIMBA** (see [MARIMBA](#marimba)), or **WURLI 200A**, the reed electric piano (see [WURLI 200A](#wurli-200a)). Applies to the next notes. |
 | K2 | **TONE** | Where the tine sits against the pickup: lower is rounder and warmer, higher is more bell and midrange (the same as VOICE 1/2's TONE). On VIBES and MARIMBA: **MALLET** |
 | K3 | **BELL** | The bright metallic overtone at the start of each note (the same as VOICE 1/2's BELL). On VIBES: **MOTOR** on / off; on MARIMBA: **TUBE** |
 | K4 | **KEY VEL** | How hard the FM-1's own keys strike: the velocity of a medium press (TOUCH on [SETUP](#setup); harder presses play louder, softer ones quieter), and with TOUCH at **FIXED** the velocity of every press. Around 60–80 soft and round, 96 medium (the default), 108–127 hard with bark. MIDI notes keep their own velocity. |
@@ -734,11 +734,38 @@ hall) and **F16 WOOD ECHO** (a hard yarn mallet, heavier, MUTE 0, a light chorus
 hall). **Over MIDI:** CC 79 from 96 to 127 selects
 MARIMBA (0–95 VIBES); Program Change 14 / 15 loads F15 / F16. **Polyphony:** 10 notes, as the Rhodes.
 
+### WURLI 200A
+
+Turn **ALGORITHM** (or the TYPE card) one step past MARIMBA to **WURLI 200A**: a Wurlitzer 200A reed piano, its
+64 keys A1–C7. Each key is a steel reed struck by a felt hammer; it swings past the pickup's plates, whose bell-shaped
+response folds a hard strike into the 200A's **bark** (the growl of loud notes), while soft notes stay round. A
+differentiating input and the preamp (shared by every note, as in the instrument) finish the line signal: what the
+200A's own output gives, before its amp and speaker. Every key has its own regulation, measured on a real 200A
+(each reed's position, level, decay and tuning), and its strike has the hammer's short knock and the action's
+noise. Notes outside A1–C7 do not sound, as on the instrument.
+
+**VOICE 1/3** (how the reed is struck): **TONE** the shape of the pickup's plates (down rounder and darker, up more
+mids and edge; the level stays), **BARK** how far the reed swings past them (more growl and more output; the main
+page's K2), **BELL** the reed's second mode (down to none at 0; past the middle a metallic ping joins the strike),
+**HAMMER** the felt's hardness (soft passes less of the strike: darker and softer; hard: brighter and louder).
+**VOICE 2/3** (how notes die away): **DECAY** (half to double), **RELEASE** (the damper: short to a long tail),
+**NOISE** (the action at the strike, 0 none; 64 as measured), **TUNE**. **VOICE 3/3** (the 200A's vibrato, really a
+tremolo, on the VIBES motor's controls): **VIBRATO** on / off, **DEPTH** (the main page's K3; at 127 the troughs go
+20 dB down), **SPEED** (95 is the 200A's own 5.4 Hz; SYNC follows the tempo as the motor does) and **SHAPE** (0 the
+200A's measured cycle: the volume stays up and dips in short troughs, the loud phase a little darker; 127 a smooth
+sine).
+
+The sustain pedal works as on the Rhodes, half-pedal included (a lighter damper, a longer tail), the release
+velocity too (a quick lift damps harder), and so do the pitch bend (±2 semitones) and SPREAD (low keys left, high keys
+right). **Presets:** **F20 WURLI 200A** (dry, no vibrato) and **F21 200A VIB** (the vibrato at 5.4 Hz). **Over
+MIDI:** CC 115 (any value) selects it; Program Change 35 / 36 loads F20 / F21. **Polyphony:** 10 notes. Its CPU
+time on the FM-1 is not measured yet.
+
 ## 6. Presets
 
 ![Browsing presets](manual/img/browse.png?v=172e1e43)
 
-Turn **PRESETS** to browse: **F01–F19** are the factory sounds (F13 and F14 are VIBES, F15 and F16 MARIMBA), **U01–U16** your own, after F19. A preset loads when you stop
+Turn **PRESETS** to browse: **F01–F21** are the factory sounds (F13 and F14 are VIBES, F15 and F16 MARIMBA, F20 and F21 the WURLI 200A), **U01–U16** your own, after F21. A preset loads when you stop
 turning (after 0.4 s). If you did not mean to, **hold SAVE** (0.7 s) to go back to the sound you had before the
 last load (the top line names it again); hold it again to return (redo). The first time Frodhes
 starts (or if its settings are ever lost), it plays **F01 STAGE 77**.
@@ -749,10 +776,11 @@ starts (or if its settings are ever lost), it plays **F01 STAGE 77**.
 | F05 SUIT TREM | F06 DRIVEN 77 | F07 BALLAD | F08 DYNO 80S |
 | F09 70S PHASER | F10 FUNK WAH | F11 RESO SWEEP | F12 AUTO WAH |
 | F13 VIBES | F14 VIBES ECHO | F15 MARIMBA | F16 WOOD ECHO |
-| F17 TAPE ECHO | F18 DREAM | F19 RADIO | |
+| F17 TAPE ECHO | F18 DREAM | F19 RADIO | F20 WURLI 200A |
+| F21 200A VIB | | | |
 
 Each instrument comes twice: **dry**, the model as it plays (F01–F04, one for each Rhodes TYPE, F13 VIBES and F15
-MARIMBA: only a gentle compressor and a trace of room), and **with effects** (F05–F12, F14, F16, F17–F19). Every preset has the
+MARIMBA, F20 the 200A: only a gentle compressor and a trace of room), and **with effects** (F05–F12, F14, F16, F17–F19; F21 the 200A's vibrato). Every preset has the
 compressor on, set for glue rather than squash: a threshold of -16 dB at 2:1 on the Rhodes, its 5 ms attack letting
 the hammer and the bark through, 1.5:1 with a slower attack on the mallets. Nearly every one has a little reverb, HALL
 or PLATE (the plate on the bright and vintage sounds), with LOW CUT at 150–200 Hz so the bass stays out of the tail.
@@ -778,6 +806,8 @@ or PLATE (the plate on the bright and vintage sounds), with LOW CUT at 150–200
 | F17 TAPE ECHO | A warm piano into the tape echo, dotted 1/8 on the tempo, a plate |
 | F18 DREAM | Felt hammers, a slow stereo pan, chorus, a quarter-note analog echo and a long, dark, moving hall |
 | F19 RADIO | A hard OHCD drive through a band-pass, like a small speaker, a short tape slap and a small room |
+| F20 WURLI 200A | Dry: the 200A as it is, a gentle compressor, a trace of hall |
+| F21 200A VIB | The 200A with its own vibrato at 5.4 Hz (its measured shape), a gentle compressor, a trace of hall |
 
 The echoes and sweeps marked "on the tempo" follow the TEMPO page's BPM (120 when you start; PLAY taps it), so they
 fit what you play. The Rhodes presets F01–F12 and F17–F19 are level-matched: each one's LEVEL (SETUP) brings it within 1 LU of
@@ -815,7 +845,7 @@ again to store it, or **HOME** (or **OCT−**) to cancel. The name is made from 
 ![Save mode](manual/img/save.png?v=6cd0471d)
 
 The save waits for silence: the bottom line says **SAVING...** until the sound has died away, then **SAVED**. INFINITE's SUSTAIN and FREEZE hold their tail without end, so while one of them is on the save waits and the bottom line says **SAVE WAITS: SUSTAIN ON** or **SAVE WAITS: FREEZE ON**; turn DECAY down (or change the type, or switch the reverb OFF), let the tail die away, and the save goes through. The settings are saved the same way, once it is quiet. A user
-preset can be overwritten but not deleted, and browsing skips the empty ones. There is no factory reset: F01–F19 are
+preset can be overwritten but not deleted, and browsing skips the empty ones. There is no factory reset: F01–F21 are
 always there to start again from.
 
 **What is kept, and when:**
@@ -948,7 +978,7 @@ also send their notes to the computer.
 **MIDI out is USB only:** the FM-1's keys, chord mode, the arpeggiator and the sequencer send their notes on CHANNEL
 (channel 1 when ALL). Notes that come in over MIDI are not sent back, but what the arpeggiator or the sequencer
 makes from them is, so switch MIDI thru off in your computer's software. No clock, CCs or program changes are sent.
-The TRS jack is MIDI in only. **Program Change** 0–15 loads F01–F16, 16–31 loads U01–U16 (as before 0.9.5), and 32–34 loads F17–F19.
+The TRS jack is MIDI in only. **Program Change** 0–15 loads F01–F16, 16–31 loads U01–U16 (as before 0.9.5), and 32–36 loads F17–F21.
 
 **Pitch bend** (the pitch wheel, USB or TRS, on CHANNEL) bends the Rhodes ±2 semitones: every note that sounds
 glides with the wheel and a note struck while the wheel is moved starts at the bent pitch. The bend stays across a
@@ -972,7 +1002,8 @@ MARIMBA ignore it.
 | CC | Parameter | CC | Parameter |
 | --- | --- | --- | --- |
 | 64 | Sustain (half-pedal) | 80 | TYPE (0–31 STAGE, 32–63 SUITCASE, 64–95 FELT, 96–127 DYNO) |
-| Pitch bend | ±2 semitones, the Rhodes types only (VIBES and MARIMBA ignore it) | 121 | Reset all controllers: the pitch bend back to 0 |
+| Pitch bend | ±2 semitones, the Rhodes types and the WURLI 200A (VIBES and MARIMBA ignore it) | 121 | Reset all controllers: the pitch bend back to 0 |
+| 115 | TYPE: the WURLI 200A (any value) | | |
 | 47 / 48 | VIBES MOTOR on (≥ 64) / DEPTH (no effect on MARIMBA) | 49 / 50 / 51 | VIBES MOTOR SPEED / SHAPE / SYNC |
 | 79 | TYPE of the bar instruments: 0–95 VIBES, 96–127 MARIMBA | 9 | Developer: the bar instruments' mode cap, VIBES and MARIMBA (0 = automatic, 1–49 = 0–48 upper modes, ≥ 50 = none; not saved) |
 | 10 | Developer: reset (≥ 64): every LFO, the delay / reverb lines and the noise to their start state (for comparing recordings) | | |
@@ -1048,8 +1079,8 @@ issues: [github.com/leonardoMirabal/frodhes](https://github.com/leonardoMirabal/
 
 | | |
 | --- | --- |
-| **Sound** | A physical model computed live, no samples. Rhodes: hammer, tine, tonebar and pickup, every key a little different, the tine's slow whirl on E2–C6, SPREAD across the stereo field (CC 105); 4 types (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO). VIBES: a vibraphone, mallet, bar modes, tuned tube and motor. MARIMBA: rosewood bars, mallet, bar modes and tuned tube, no damper or motor (C2–C7 authentic) |
-| **Polyphony** | 10 voices (the Rhodes, VIBES and MARIMBA); an 11th note takes over the quietest released note (else the oldest held one) with a 1.5 ms fade |
+| **Sound** | A physical model computed live, no samples. Rhodes: hammer, tine, tonebar and pickup, every key a little different, the tine's slow whirl on E2–C6, SPREAD across the stereo field (CC 105); 4 types (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO). VIBES: a vibraphone, mallet, bar modes, tuned tube and motor. MARIMBA: rosewood bars, mallet, bar modes and tuned tube, no damper or motor (C2–C7 authentic). WURLI 200A: a reed piano, hammer, reed modes and the bell-shaped pickup, a measured 200A's regulation and its vibrato (A1–C7) |
+| **Polyphony** | 10 voices (the Rhodes, VIBES, MARIMBA and the WURLI 200A; the 200A: an 11th note takes over the oldest with a 5 ms fade); an 11th note takes over the quietest released note (else the oldest held one) with a 1.5 ms fade |
 | **Range** | 88 notes, A0–C8 over MIDI (notes outside play the nearest end); the 27 keys play F3–G5, OCT ±2 octaves, TRANSP ±24 semitones, TUNE ±50 cents |
 | **Velocity** | MIDI 1–127. The FM-1's keys: F3–C5 sense how firmly they land (TOUCH LIGHT / MEDIUM / HEAVY, KEY VEL the velocity of a medium press, default 96), C#5–G5 play the recent average; TOUCH FIXED: every key at KEY VEL (1–127) |
 | **Audio** | 44.1 kHz, integer processing, 256-frame blocks (5.8 ms); output limiter; exact digital silence 200 ms after the sound falls below −66 dBFS |
@@ -1059,7 +1090,7 @@ issues: [github.com/leonardoMirabal/frodhes](https://github.com/leonardoMirabal/
 | **MIDI out** | USB only: notes from the keys, chord mode, arpeggiator and sequencer. No clock, CC or program change out |
 | **Clock** | CLOCK INT or EXT: 24 PPQN in from USB or TRS, 40–240 BPM; the synced effects, the arpeggiator and the sequencer locked to its pulses; Start plays from bar 1, Continue from where Stop left it, Stop stops |
 | **Tempo** | 40–240 BPM; tap tempo on PLAY |
-| **Presets** | 19 factory (F01–F19) + 16 user (U01–U16); Program Change 0–15 (F01–F16), 16–31 (U01–U16), 32–34 (F17–F19) |
+| **Presets** | 21 factory (F01–F21) + 16 user (U01–U16); Program Change 0–15 (F01–F16), 16–31 (U01–U16), 32–36 (F17–F21) |
 | **Effects** | COMP → DRIVE → FILTER → TREM/WAH → PHASER → CHORUS → DELAY → REVERB → limiter |
 | Compressor | Threshold 0 to −40 dB, ratio 1.5:1–20:1, attack 0.1–50 ms, release 20 ms–1.5 s (CC 109), makeup 0 to +24 dB |
 | Filter | LP12, LP18, HP12, HP18, BP, NOTCH; 30 Hz–16 kHz; resonance Q 0.7–20; LFO ±4 octaves |

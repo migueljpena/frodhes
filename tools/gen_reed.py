@@ -151,6 +151,20 @@ def header(P, src):
     w("#define RE_KNEE_K %d          /* the knee's samples per second of the fast T60, Q16 */" % q(D["knee_db"] / -60.0 * FS, 16))
     w("#define RE_BELL_MAX %d        /* the BELL knob's ping at 10, Q30 */" % q(M.BELL_MAX, 30))
     w("#define RE_L_PING %d          /* log2 of the ping's pulse (0.25 ms), samples */" % lg(2.5e-4 * FS))
+    T = P["trem_ldr"]
+    c0, c1 = T["comp"]["%g" % M.TREM_H2], T["comp"]["0"]
+    w("/* the vibrato (reed_model.trem_stage with the set's trem_ldr): the dip's 2nd harmonic at SHAPE 0 (the 200A's),")
+    w(" * its depth at full (dB), the LDR's lag (on, off: Q30 steps), its drive compensation at SHAPE 0 and 127 (the")
+    w(" * smooth sine: C Q16, h2d Q16), the darkening low-pass's pole (Q30) */")
+    w("#define RE_TR_H2 %d             /* Q16 */" % q(M.TREM_H2, 16))
+    w("#define RE_TR_DB %d             /* Q16 */" % q(M.TREM_DB, 16))
+    w("#define RE_TR_KON %d" % q(1 - math.exp(-1 / (T["on"] * FS)), 30))
+    w("#define RE_TR_KOFF %d" % q(1 - math.exp(-1 / (T["off"] * FS)), 30))
+    w("#define RE_TR_C0 %d" % q(c0[0], 16))
+    w("#define RE_TR_HD0 %d" % q(c0[1], 16))
+    w("#define RE_TR_C1 %d" % q(c1[0], 16))
+    w("#define RE_TR_HD1 %d" % q(c1[1], 16))
+    w("#define RE_TR_LPA %d" % q(math.exp(-2 * math.pi * M.TREM_LP_HZ / FS), 30))
     w("/* the action noise (reed_model.snoise): its band-pass (twice), rise, T60, velocities, length */")
     wn = 2 * math.pi * S["hz"] / FS
     al = math.sin(wn) / (2 * S["q"])

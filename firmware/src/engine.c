@@ -119,10 +119,10 @@ static void eng_bar_knob(uint32_t k, uint32_t v)
                                      * (louder than the strike at 127, louder than the note it damps), so it is 30 dB
                                      * down and a felt (SOFT) pulse: the default -31 .. -40 dB re the strike */
         bar_nz = (int32_t)KN_NZ[eng_want_sub][c] << 8; bar_thump = rh_thump >> 5; bar_felt = rh_felt; break;
-    case BK_MOT_ON: bar_mot_on = (uint8_t)(v != 0); break;
-    case BK_MOT_DEPTH: bar_mot_depth = (uint8_t)c; break;
-    case BK_MOT_SHAPE: bar_mot_shape = (uint8_t)c; break;
-    case BK_MOT_INC: bar_mot_inc = v; break;
+    case BK_MOT_ON: bar_mot_on = (uint8_t)(v != 0); re_vib_on = bar_mot_on; break;   /* (the 200A's vibrato too) */
+    case BK_MOT_DEPTH: bar_mot_depth = (uint8_t)c; re_vib_depth = (uint8_t)c; break;
+    case BK_MOT_SHAPE: bar_mot_shape = (uint8_t)c; re_vib_shape = (uint8_t)c; break;
+    case BK_MOT_INC: bar_mot_inc = v; re_vib_inc = v; break;
     default: break;
     }
 }
@@ -205,7 +205,7 @@ static void eng_render(int32_t *mono, uint32_t n)
             if (type == EV_PEDAL) eng_pedal_cc = (uint8_t)val;
             if (eng_cur == ENG_RHODES) rh_post(type, note, val);    /* drained by rh_render below, in order */
             else if (eng_cur == ENG_REED) {                         /* (struck above) */
-                if (type == EV_NOTE_OFF) re_note_off(note);
+                if (type == EV_NOTE_OFF) re_note_off(note, val);
                 else if (type == EV_PEDAL) re_pedal(val);
                 else if (type == EV_ALL_OFF) re_all_off();
             }
@@ -219,7 +219,7 @@ static void eng_render(int32_t *mono, uint32_t n)
         if (eng_cur == ENG_RHODES) rh_shed_req = 1; else if (eng_cur == ENG_BARS) bar_shed();
     }
     if (eng_cur == ENG_BARS) { bar_render(mono, n); rh_side_on = 0; }
-    else if (eng_cur == ENG_REED) { re_render(mono, n); rh_side_on = 0; }
+    else if (eng_cur == ENG_REED) re_render(mono, n);          /* (it sets rh_side_on: SPREAD) */
     else rh_render(mono, n);                                        /* (SPREAD: Rhodes only) */
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
     {   /* host counters: mode-samples and int64 multiplies this block (Rhodes: estimated from the live modes) */

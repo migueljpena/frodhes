@@ -21,6 +21,18 @@
 #define RE_KNEE_K 1926758400          /* the knee's samples per second of the fast T60, Q16 */
 #define RE_BELL_MAX 322122547        /* the BELL knob's ping at 10, Q30 */
 #define RE_L_PING 232378316          /* log2 of the ping's pulse (0.25 ms), samples */
+/* the vibrato (reed_model.trem_stage with the set's trem_ldr): the dip's 2nd harmonic at SHAPE 0 (the 200A's),
+ * its depth at full (dB), the LDR's lag (on, off: Q30 steps), its drive compensation at SHAPE 0 and 127 (the
+ * smooth sine: C Q16, h2d Q16), the darkening low-pass's pole (Q30) */
+#define RE_TR_H2 14418             /* Q16 */
+#define RE_TR_DB 1310720             /* Q16 */
+#define RE_TR_KON 8085367
+#define RE_TR_KOFF 695429
+#define RE_TR_C0 87550
+#define RE_TR_HD0 9724
+#define RE_TR_C1 78343
+#define RE_TR_HD1 -7737
+#define RE_TR_LPA 931158027
 /* the action noise (reed_model.snoise): its band-pass (twice), rise, T60, velocities, length */
 #define RE_SN_B0 15081315           /* Q30 */
 #define RE_SN_A1 -2116461470
@@ -650,4 +662,4 @@ static const int32_t RE_TANH[1025] = {
     1073741550,1073741554,1073741559,1073741563,1073741567,1073741571,1073741575,1073741579,
     1073741582,
 };
-/* sha256 eb7816aae8e97d79d9020cff2edd7aff01a8560c08c39ad2cc2c0f78a0db46d2 */
+/* sha256 42d8a9fffeb514a876b266cd898a8ecb0aa5d100aa5a7159eace4bee33a13697 */

@@ -26,7 +26,7 @@ def ref(tmp_path_factory):
     d = tmp_path_factory.mktemp("reed")
     exe = str(d / "reed_ref")
     subprocess.run(["cc", "-O2", "-Wall", "-Werror", "-Wno-unused-function", "-I" + os.path.join(ROOT, "firmware", "gen"),
-                    "-o", exe, os.path.join(ROOT, "tests", "c", "reed_ref.c")], check=True)
+                    "-o", exe, os.path.join(ROOT, "tests", "c", "reed_ref.c"), "-lm"], check=True)
     return exe, d
 
 
@@ -88,3 +88,60 @@ def test_no_rom_window_words():
     for w in re.findall(r"-?\d+", txt.split("sha256")[0]):
         u = int(w) & 0xFFFFFFFF
         assert not (gen_reed.ROM_LO <= u <= gen_reed.ROM_HI), w
+
+
+def run_ev(ref, ev, nblk, side=False):
+    """Raw events [(block, text)] through the engine: the preamp's output (and SPREAD's side, Q15)."""
+    exe, d = ref
+    (d / "ev2.txt").write_text("".join("%d %s\n" % (b * B, t) for b, t in sorted(ev, key=lambda e: e[0])))
+    args = [exe, str(d / "ev2.txt"), str(d / "o2.raw"), str(nblk * B)] + ([str(d / "s2.raw")] if side else [])
+    subprocess.run(args, check=True)
+    o = np.fromfile(str(d / "o2.raw"), dtype=np.int32) / 2.0 ** 30
+    return (o, np.fromfile(str(d / "s2.raw"), dtype=np.int32) / 32768.0) if side else o
+
+
+def f0_of(x, f_guess):
+    w = np.hanning(len(x))
+    sp = np.abs(np.fft.rfft(x * w, 1 << 20))
+    fr = np.fft.rfftfreq(1 << 20, 1 / M.FS)
+    band = (fr > f_guess * 0.9) & (fr < f_guess * 1.1)
+    return fr[band][np.argmax(sp[band])]
+
+
+def rms(x):
+    return float(np.sqrt((x ** 2).mean()))
+
+
+def test_pitch_bend_retunes_the_sounding_note(ref):
+    base = run_ev(ref, [(0, "on 57 90")], 60)
+    up = run_ev(ref, [(0, "on 57 90"), (20, "bend 2000")], 60)
+    seg = slice(30 * B, 60 * B)
+    r = f0_of(up[seg], 247) / f0_of(base[seg], 220)
+    assert abs(1200 * np.log2(r) - 200) < 1.0                    # +2 semitones, within a cent
+    assert np.abs(np.diff(up[19 * B:22 * B])).max() < 4 * np.abs(np.diff(base[19 * B:22 * B])).max()   # no click
+
+
+def test_half_pedal_damps_slower_than_up_and_faster_than_down(ref):
+    tail = slice(40 * B, 70 * B)
+    def with_pedal(cc):
+        return rms(run_ev(ref, [(0, "ped %d" % cc), (1, "on 60 100"), (20, "off 60")], 70)[tail])
+    up, half, down = with_pedal(0), with_pedal(52), with_pedal(127)
+    assert up < half < down
+
+
+def test_release_velocity_quick_lift_damps_faster(ref):
+    tail = slice(30 * B, 50 * B)
+    slow = rms(run_ev(ref, [(0, "on 60 100"), (20, "offv 60 1")], 50)[tail])
+    quick = rms(run_ev(ref, [(0, "on 60 100"), (20, "offv 60 127")], 50)[tail])
+    neutral = rms(run_ev(ref, [(0, "on 60 100"), (20, "off 60")], 50)[tail])
+    assert quick < neutral < slow
+
+
+def test_spread_places_low_left_high_right_and_keeps_the_centre(ref):
+    o0, s0 = run_ev(ref, [(0, "on 40 100"), (0, "on 88 100")], 40, side=True)
+    assert not np.any(s0)                                         # SPREAD 0: no side at all
+    o, sd = run_ev(ref, [(0, "spread 127"), (0, "on 40 100")], 40, side=True)
+    m = o / 2.0                                                   # (the tap is Q30; the side Q15 of the same scale)
+    assert np.dot(sd, m * 0 + o) < 0                              # the low note: left (S against M: L = M + S)
+    o2, sd2 = run_ev(ref, [(0, "spread 127"), (0, "on 88 100")], 40, side=True)
+    assert np.dot(sd2, o2) > 0

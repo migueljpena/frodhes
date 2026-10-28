@@ -346,6 +346,13 @@ static void midi_cc(uint32_t cc, uint32_t v)
         ui_mark_param(P_TYPE);
         return;
     }
+    if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 2): any value, the 200A (the
+                                                        * only one so far; CC 79 and 80 are as before) */
+        uint32_t t, pick = 0u;
+        for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 2u) { pick = t; break; }
+        if (pick) { type_pick((int32_t)pick); ui_mark_param(P_TYPE); }
+        return;
+    }
     if (cc == 120u || cc == 123u) {                    /* all notes off: every MIDI note is let go as if its note-off
                                                         * came (0.9.3: a lost note-off left that note dead, and the
                                                         * arpeggiator playing it), then the dampers on everything */
