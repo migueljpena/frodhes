@@ -76,7 +76,7 @@ typedef struct {
     uint32_t knee;                            /* the fast stage's samples (a full damper) */
     uint32_t gen;
 } re_rks_t;
-static re_rks_t re_rks[2];
+static re_rks_t re_rks[2] RH_OWN_SECTION(".pool.re_rks");   /* 23 KB: built in the main loop, so the pool (zeroed at boot) */
 static volatile uint32_t re_pub;              /* the published buffer + 1 (0: none yet) */
 
 typedef struct {

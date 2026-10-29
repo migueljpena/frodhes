@@ -157,7 +157,7 @@ their effect on the audio, the delay types' echoes, the arpeggiator and the sequ
 through a tempo change and a Stop / Start, with CLOCK INT too (`--via int`), and writes one table row | INT | EXT-USB |
 EXT-TRS (`--selftest`, `--dry-run` without the FM-1); `tools/hil_cpu.py` measures the
 audio interrupt's worst block and the USB audio's health (`--usb 44100|48000` holds a DAW-like stream open) and
-`tools/cpu_budget.py` predicts it on the computer from the FM-1's measured costs. `tools/manual_shots.py` renders the manual's screenshots and sets each picture link's `?v=` to the file's hash
+`tools/cpu_budget.py` predicts it on the computer from the FM-1's measured costs; `tools/size_check.py` measures the flash, RAM and pool without JieLi's toolchain (clang for ARM, calibrated against JieLi builds; a test fails over a region or under 10 % of the flash free). `tools/manual_shots.py` renders the manual's screenshots and sets each picture link's `?v=` to the file's hash
 (`tools/doc_links.py --fix` after editing a picture by hand; a test fails if a screenshot or a link is stale). `web/build.sh` builds the browser
 emulator (Emscripten; `web/web_hal.c` stands in for the hardware) into `web/dist/`; the page shows the version it was
 built with (`web/build.sh --release X.Y.Z`, else `dev`). CI builds it and runs its selftest (Chromium and WebKit) on
