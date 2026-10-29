@@ -5,7 +5,7 @@ documents and physics give, in double precision. The reference a later integer e
 
 Each key has one wound string (keys 1-22) or two (23-88: wound to 42, then plain music wire of the parts list's
 gauges). A string is a sum of its modes (partials), f_n = n f0 sqrt(1 + B n^2) (stiffness, B the inharmonicity), each
-decaying at sigma(f) = b1 + b3 f^2. The hammer (rubber under leather: a hard felt law F = K c^p on the compression c)
+decaying at sigma(f) = b1 + b2 f + b3 f^2 (measured on a CP-70's DI). The hammer (rubber under leather: a hard felt law F = K c^p on the compression c)
 strikes the string near its end; their contact is simulated, so the force pulse (its length, its spectrum) comes
 from the hammer's mass and speed against the string's impedance: harder blows are shorter and brighter by themselves.
 The pickup is a piezo under the bridge: it reads the string's force there, T dy/dx = T sum q_n n pi / L (the
@@ -116,12 +116,15 @@ def key_params(k, p=P):
     s["m_h"] = (h["mass_g_low"] * (h["mass_g_high"] / h["mass_g_low"]) ** x) * 1e-3
     s["K"] = h["k_mid"] * math.exp((h["k_slope_per_key"] if k <= 44 else h["k_slope_treble"]) * (k - 44))
     s["beta"] = h["strike_frac_low"] + (h["strike_frac_high"] - h["strike_frac_low"]) * x
-    dc = p["decay"]
-    t60 = dc["t60_low_s"] * (dc["t60_high_s"] / dc["t60_low_s"]) ** x
-    s["t60"], s["b3"] = t60, dc["b3"]
-    s["b1"] = max(6.91 / t60 - dc["b3"] * f1 * f1, 0.05)
+    s["t60"] = 6.91 / sigma(f1, p)
     s["damped"] = k < v(sp["undamped_first"])
     return s
+
+
+def sigma(f, p=P):
+    """a partial's loss at f Hz (1/s): its amplitude goes as exp(-sigma t)"""
+    dc = p["decay"]
+    return dc["b1"] + dc["b2"] * f + dc["b3"] * f * f
 
 
 def partials(s, fmax=18000.0, nmax=90):
@@ -203,7 +206,7 @@ def strike(s, vel, p=P, os_=8):
     for cents in (detunes(s["k"], p) if s["n_str"] == 2 else (0.0,)):
         fc = f * 2 ** (cents / 1200)
         w = 2 * math.pi * fc
-        sig = s["b1"] + s["b3"] * fc * fc
+        sig = sigma(fc, p)
         wd = np.sqrt(np.maximum(w * w - sig * sig, 1.0))
         z = (np.exp(np.outer(sig - 1j * wd, tau)) @ (force / s["n_str"])) * dt
         strings.append(dict(f=fc, sig=sig, wd=wd, A=phi * z / (M * wd)))

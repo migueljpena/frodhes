@@ -22,14 +22,14 @@
     "undamped_first": {"v": 74, "_src": "[S] parts list p18-20: damper heads on keys 1..73 only"}
   },
   "decay": {
-    "_src": "[A] grand-piano-like losses sigma(f) = b1 + b3 f^2 (Chaigne & Askenfelt; Bank): the fundamental's T60 from t60_low at A0 to t60_high at C8, log-linear; b3 the same everywhere. No soundboard ([S]): the real losses may be lower. To be measured.",
-    "t60_low_s": 18.0, "t60_high_s": 0.6, "b3": 1.0e-7,
+    "_src": "[M] each partial's loss sigma(f) = b1 + b2 f + b3 f^2 (1/s; T60 = 6.91 / sigma), fitted to the decays of a CP-70's DI recording (frodhes-refs audio/cp70-yt, YouTube 'I Bought a Yamaha CP70!' 0:01-3:02: 38 chord tails, 0.35 s after the onset to the next one, the median slope per octave band 200-6400 Hz: T60 29.7 / 22.2 / 13.7 / 10.3 / 5.5 s; the fit within 0.5 dB/s). Chords, maybe the pedal, a lossy stream: the order is sure, the values to be checked on single notes. The grand-piano prior it replaces: T60 18 s (A0) .. 0.6 s (C8), 8x faster in the middle (no soundboard: the strings lose far less).",
+    "b1": 0.183, "b2": 2.35e-4, "b3": 0.0,
     "damper_t60_s": 0.25, "pair_double_decay": 0.0
   },
   "hammer": {
     "_src": "[S] hammers of urethane rubber covered by artificial leather (sm p2; 70B: synthetic buckskin over hard rubber), 6 hammer types by range (parts p22), blow 40 mm (sm p16). [A] the felt law F = K x^p with a harder K than felt, the masses and the strike position: grand-piano values.",
     "mass_g_low": 10.0, "mass_g_high": 4.0,
-    "p": 2.5, "k_mid": 3.0e9, "k_slope_per_key": 0.025, "k_slope_treble": 0.07,
+    "p": 2.5, "k_mid": 4.8e10, "k_mid_src": "[M] 16x the grand-felt prior (3e9): the long-term spectrum of a CP-70 chord passage then matches Wingate's DI within 2.5 dB up to 4 kHz (-6 dB at 8 kHz; Hollow Sun's and Amazound's demos agree with that DI at 4-8 kHz); rubber under leather is harder than felt", "k_slope_per_key": 0.025, "k_slope_treble": 0.07,
     "contact_ms_lit": {"_src": "[A] grand pianos at mf (Askenfelt & Jansson 1990, Hall 1986): ~4 ms bass, ~2 ms mid, <0.5 ms top; rubber is harder: shorter", "A0": 3.5, "A4": 1.5, "C8": 0.3},
     "strike_frac_low": 0.125, "strike_frac_high": 0.08,
     "vel_ms_min": 0.5, "vel_ms_max": 5.0

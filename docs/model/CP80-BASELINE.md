@@ -11,9 +11,9 @@ WAVs); its checks are `tests/py/test_cp_model.py`. Sources: [S] the service manu
 | Strings | keys 1-22 one wound string, 23-42 two wound, 43-88 two plain (gauges #18-#13.5) | [S] |
 | Inharmonicity | plain wire: B from the gauge, steel and a tension of 45 % of the wire's strength (A4: 7.3e-4); wound: from the tuning table's octave stretch | [P] |
 | Pair detune | 0.8 +- 0.5 cents between a pair's strings | [A] |
-| Decay | T60 of the fundamental 18 s (A0) to 0.6 s (C8), higher partials faster (b3 f^2) | [A] |
+| Decay | each partial's loss 0.183 + 2.35e-4 f (1/s): T60 ~28 s at 280 Hz, ~15 s at 1.1 kHz, ~5.5 s at 4.5 kHz, fitted to 38 chord tails of a CP-70's DI (the grand-piano prior was 8x faster) | [M] |
 | Dampers | keys 1-73 damped (T60 0.25 s), 74-88 undamped | [S] / [A] |
-| Hammer | rubber under leather: F = K c^p, p 2.5; masses 10-4 g; the contact simulated on the string point by point, the force solved implicitly; 10-130 N, 4.5-0.5 ms | [A], checked against grand-piano literature |
+| Hammer | rubber under leather: F = K c^p, p 2.5, K 16x a grand's felt (fitted to the CP-70 DI's brightness [M]); masses 10-4 g; the contact simulated on the string point by point, the force solved implicitly; 13-163 N, 2-0.4 ms | [M] / [A], checked against grand-piano literature |
 | Pickup | a piezo under the bridge reads the string's force, T dy/dx (partials weighted by n) | [S] |
 | Voicing | every key at one level at vel 80 (the physics leaves the top octave ~18 dB low; the schematic's 0.022 uF on keys 83-88 says the real top was too loud: Yamaha voiced it even) | [A] |
 | BASS / TREBLE / BRILLIANCE | shelves whose gains make the chain give the manual's calibration levels exactly (50 Hz, 5 kHz re 500 Hz); the corners assumed | [C] |
@@ -22,9 +22,15 @@ WAVs); its checks are `tests/py/test_cp_model.py`. Sources: [S] the service manu
 | Tremolo | sine soft-limited, 0.8-10 Hz, depth 15-45 %, two LDRs in antiphase (ch1 / ch2), 3 / 35 ms response | [S] / [A] |
 | CP-70 | the CP-70B's low-pass and its own calibration levels (its treble boosts ~6 dB more to make up for the darker filter) | [S] / [C] |
 
-## What only recordings can give
+## Measured so far
 
-1. The decays (T60 per key and per partial) and a pair's double decay.
+Wingate's CP-70 DI (YouTube "I Bought a Yamaha CP70!", 0:01-3:02, chords): the decays per octave band and the
+long-term spectrum. Hollow Sun's and Amazound's library demos (SoundCloud) agree at 4-8 kHz; Hollow Sun's decays
+come out ~2x faster (a busier part). Audio in frodhes-refs/audio/cp70-yt, for measuring only.
+
+## What only single-note recordings can give
+
+1. The decays per key and per partial (the chords give a band's median), and a pair's double decay.
 2. A pair's detune.
 3. The level over the keys (the voicing) and its change with velocity.
 4. The hammer's contact (the attack's brightness per velocity).
