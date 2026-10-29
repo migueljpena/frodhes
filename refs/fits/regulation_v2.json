@@ -1,0 +1,7 @@
+{
+ "_about": "bell3_v1's sound plus the four additions of 2026-10-27 (reed_model.py header): the per-key regulation, the two-stage damper, the key-return knock. Values from measure_keyvar.py (WoerliTzer line) and the BaltiWurli release tails / WoerliTzer key-release samples.",
+ "_label": "200A v2: cada tecla distinta, apagador y golpe de tecla medidos",
+ "jitter": {"seed": "200A-1", "d_ln": 0.6, "level_db": 2.0, "t60_pct": 25.0, "cents": 4.0},
+ "damp2": {"fast": 0.06, "knee_db": -40.0, "slow": 0.4},
+ "thump": {"hz": 250.0, "q": 0.6, "t60": 0.28, "db": -25.0}
+}

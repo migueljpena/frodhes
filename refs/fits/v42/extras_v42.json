@@ -1,0 +1,11 @@
+{
+ "_about": "v4.2 = v4 (fits/v4/reed_v4c.json + regulation_v4.json + extras_v4.json) plus two changes only: the reed swing x1.3 at the low and middle keys (u_lo, u_mid; u_hi as v4: the bark lives there, the owner 10-27; the fff chord into the preamp 0.148 -> 0.195) and the hammer contact held under 1.25 periods (tc_per: G#5 and up; the clicks of A#5, B5, F#6, G6, G#6 sat on the half-sine nulls); the REG knob anchors (tools/reg_tables.py) in reg_file. The owner (10-27) heard it distort: the preamp drive 6.5 -> 4.5 (the fff 8-note chord compressed 1.9 dB, not 3.4) and out_gain 1.0, not matched (1.155 let tanh near its ceiling pass full scale and clip); about 4 dB quieter than before.",
+ "_label": "200A v4.2: v4 with more bark, no treble clicks",
+ "u_lo": 6.499999999993692,
+ "u_mid": 1.224527940465833,
+ "u_hi": 0.0425536139148426,
+ "tc_per": 1.25,
+ "reg_file": "fits/v42/reg_tables.json",
+ "drive": 4.5,
+ "out_gain": 1.0
+}

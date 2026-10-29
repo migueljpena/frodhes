@@ -1,0 +1,21 @@
+{
+ "_about": "v4.3 = v4.2 with two fixes (the owner, 10-28, after hearing without the Numa's MASTERING 3D): A. the bark raise (x1.3 on the swing) kept up to A4 (69) and faded out by C5 (u_boost), so C5-B5 is back at v4's timbre; tc_per's keys (G#5 up) keep the swing they had without it (tc_per_keep_swing: their h2 back at v4's, the click still gone; no level fix needed). B. the strike's knock (attack: a share of the first mode gone in 20 ms, 1.4 at A1 to 1.5 at E4, 0 from A#4): the spike +3 dB at A1-B4, toward the WoerliTzer's, the bark unchanged. Drive 4.5, out_gain 1.0 as v4.2. Each key's sustain kept at v4.2's (level_like: an output gain per key after the pickup; u_key alone gave back v4's weak notes, A#5 -13 dB, G6 -15).",
+ "_label": "200A v4.3: v4.2 with v4's treble and more strike",
+ "u_boost": {
+  "x": 1.3,
+  "full": 69,
+  "off": 72
+ },
+ "tc_per": 1.25,
+ "tc_per_keep_swing": true,
+ "attack": {
+  "w_lo": 1.4,
+  "w_mid": 1.5,
+  "top": 70,
+  "t60": 0.02
+ },
+ "drive": 4.5,
+ "out_gain": 1.0,
+ "reg_file": "fits/v43/reg_tables.json",
+ "level_like": "bell42_v42"
+}

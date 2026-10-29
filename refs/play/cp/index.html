@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CP-80 Baseline</title>
+<style>
+  :root { --bg: #f6f5f2; --fg: #1d1d1b; --muted: #6b6a66; --card: #ffffff; --line: #dedbd4; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ecebe7; --muted: #a09e98; --card: #22211f; --line: #3a3936; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  audio { width: 100%; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CP-80 baseline</h1>
+  <p class="lead">tools/cp_model.py, from the service manual and physics only (no recordings yet). Strings, hammer,
+    bridge piezo, the preamp fitted to the manual's calibration levels, the 4 kHz Sallen-Key, the antiphase tremolo.</p>
+  <div class="card"><h2>Keys x velocity</h2><p>A0 A1 A2 C4 A4 C6 A6 C8, each at v40 / v80 / v127 (2 s held, then the damper; A#6 up is undamped).</p>
+    <audio controls preload="none" src="cp80_keys_v40_v80_v127.wav"></audio></div>
+  <div class="card"><h2>Progression</h2><p>Cmaj7 Fmaj7 G7 C, then a line over C. Tone knobs at 5, BRILLIANCE MEDIUM.</p>
+    <audio controls preload="none" src="cp80_progression.wav"></audio></div>
+  <div class="card"><h2>Tremolo</h2><p>The same, TREMOLO 5 Hz, DEPTH max. Stereo: ch1 left, ch2 right (antiphase). Use headphones.</p>
+    <audio controls preload="none" src="cp80_progression_tremolo.wav"></audio></div>
+  <div class="card"><h2>BRILLIANCE HIGH</h2><p>+5.5 dB at 5 kHz over MEDIUM.</p>
+    <audio controls preload="none" src="cp80_progression_bril_high.wav"></audio></div>
+  <div class="card"><h2>BRILLIANCE LOW</h2><p>-12 dB at 5 kHz under MEDIUM.</p>
+    <audio controls preload="none" src="cp80_progression_bril_low.wav"></audio></div>
+  <div class="card"><h2>CP-70 filter</h2><p>The same strings through the CP-70B's low-pass (2.75 kHz, Q 0.74) and its own tone calibration, no BRILLIANCE.</p>
+    <audio controls preload="none" src="cp70_progression.wav"></audio></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+ "early": {"w_lo": 1.3, "w_hi": 0.3, "t60": 0.6},
+ "tc_per": 1.0,
+ "_about": "v4.1 fixed keys: the early decay (fit_early.py grid on bell4_v4) and the hammer contact cap (one period)"
+}

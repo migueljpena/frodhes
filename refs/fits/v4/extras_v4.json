@@ -1,0 +1,30 @@
+{
+ "_about": "v4 over the v4 fit (fits/v4/reed_v4.json) and the measured regulation (fits/v4/regulation_v4.json): the damper and the key-return knock as v3; the strike's action noise (fits/v4/worlitzer_layers.csv: ~300 Hz, 8-18 ms, -11 dB bass to -20 dB treble under the tone at the loudest layer, none under mf; band-pass 200 Hz Q 1 gives the 300 Hz centroid); the LDR's lag on the vibrato (3 ms lighting, 35 ms going dark: datasheet-typical, not measured); out_gain so the loudest chord peaks as in bell3_v2.",
+ "_label": "200A v4: real regulation, differentiator pickup, action noise",
+ "damp2": {
+  "fast": 0.06,
+  "knee_db": -40.0,
+  "slow": 0.4
+ },
+ "thump": {
+  "hz": 250.0,
+  "q": 0.6,
+  "t60": 0.28,
+  "db": -25.0
+ },
+ "snoise": {
+  "hz": 200.0,
+  "q": 1.0,
+  "rise": 0.001,
+  "t60": 0.04,
+  "vel0": 64,
+  "vel1": 96,
+  "db_lo": -11.0,
+  "db_hi": -20.0
+ },
+ "trem_ldr": {
+  "on": 0.003,
+  "off": 0.035
+ },
+ "out_gain": "match"
+}

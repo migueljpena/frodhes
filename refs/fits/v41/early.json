@@ -1,0 +1,4 @@
+{
+ "early": {"w_lo": 1.3, "w_hi": 0.3, "t60": 0.6},
+ "_about": "fit_early.py grid on bell4_v4: t60 0.6 s, w 1.3 at key 33 to 0.3 at key 96 (loss 15.1 -> 9.4)"
+}

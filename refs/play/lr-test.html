@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Left-Right Test</title>
+<style>
+  :root { --bg: #f4f1ea; --panel: #fffdf8; --ink: #1f1d1a; --muted: #6d675d; --line: #ddd6c8; --acc: #a0522d; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #171512; --panel: #211e1a; --ink: #eee8dd; --muted: #a39b8d; --line: #3a352e; --acc: #d98b5f; } }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; max-width: 760px; margin-inline: auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  p, li { color: var(--muted); } b { color: var(--ink); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--acc); color: var(--acc); font-weight: 600; }
+  #now { font-variant-numeric: tabular-nums; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Left-Right Test</h1>
+<div class="panel">
+  <p>This page does not use the Wurli model: these are <b>pure tones</b> from the browser, the same on both channels on BOTH. If a note leans to one side here too, the cause is in the gear, the room or the ear, not in the Wurli.</p>
+  <div class="row" id="notes"></div>
+  <div class="row">
+    <button data-ch="both" class="on">BOTH (center)</button>
+    <button data-ch="L">LEFT only</button>
+    <button data-ch="R">RIGHT only</button>
+  </div>
+  <div class="row"><button id="stop">STOP</button></div>
+  <p>Playing: <span id="now">—</span></p>
+</div>
+<div class="panel">
+  <b>SWEEP</b>
+  <p>A tone rising slowly from 110 Hz to 1400 Hz (A2 to F6), in the center, over 40 s. Listen for any moment it leans to one side and comes back.</p>
+  <div class="row"><button id="sweep">SWEEP 110 → 1400 Hz</button></div>
+</div>
+<script>
+const NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const LIST = [48, 50, 52, 60, 62, 64, 72, 74, 76];   // C, D, E in octaves 3, 4 and 5
+let ctx, osc, gain, ch = 'both', midi = null, timer = null;
+const name = m => NAMES[m % 12] + (Math.floor(m / 12) - 1);
+const hz = m => 440 * 2 ** ((m - 69) / 12);
+
+function stop() {
+  if (osc) { gain.gain.setTargetAtTime(0, ctx.currentTime, 0.02); osc.stop(ctx.currentTime + 0.2); osc = null; }
+  clearInterval(timer); timer = null;
+  document.getElementById('now').textContent = '—';
+}
+function start(f0, label) {
+  ctx = ctx || new AudioContext();
+  stop();
+  osc = ctx.createOscillator(); osc.frequency.value = f0;
+  gain = ctx.createGain(); gain.gain.value = 0;
+  gain.gain.setTargetAtTime(0.25, ctx.currentTime, 0.02);
+  const m = ctx.createChannelMerger(2);
+  osc.connect(gain);
+  if (ch !== 'R') gain.connect(m, 0, 0);
+  if (ch !== 'L') gain.connect(m, 0, 1);
+  m.connect(ctx.destination);
+  osc.start();
+  document.getElementById('now').textContent = label;
+  return osc;
+}
+function playNote() {
+  if (midi == null) return;
+  start(hz(midi), `${name(midi)} · ${hz(midi).toFixed(1)} Hz · ${{ both: 'both', L: 'left only', R: 'right only' }[ch]}`);
+}
+const box = document.getElementById('notes');
+for (const m of LIST) {
+  const b = document.createElement('button');
+  b.textContent = name(m);
+  b.onclick = () => { midi = m; playNote(); };
+  box.appendChild(b);
+}
+document.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x === b));
+  ch = b.dataset.ch; playNote();
+});
+document.getElementById('stop').onclick = () => { midi = null; stop(); };
+document.getElementById('sweep').onclick = () => {
+  midi = null; ch = 'both';
+  document.querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x.dataset.ch === 'both'));
+  const o = start(110, '');
+  const t0 = ctx.currentTime;
+  o.frequency.setValueAtTime(110, t0);
+  o.frequency.exponentialRampToValueAtTime(1400, t0 + 40);
+  o.stop(t0 + 40.1);
+  timer = setInterval(() => {
+    const f = 110 * (1400 / 110) ** Math.min((ctx.currentTime - t0) / 40, 1);
+    const m = Math.round(69 + 12 * Math.log2(f / 440));
+    document.getElementById('now').textContent = `${f.toFixed(0)} Hz (≈ ${name(m)})`;
+    if (ctx.currentTime - t0 > 40) stop();
+  }, 100);
+};
+</script>
+</body>
+</html>

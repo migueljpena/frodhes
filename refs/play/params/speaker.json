@@ -1,0 +1,17 @@
+{
+ "hp_hz": 53.3995,
+ "hp_q": 0.4409,
+ "lo_hz": 172.4513,
+ "lo_db": 6.0184,
+ "lo_q": 0.8262,
+ "mid_hz": 711.037,
+ "mid_db": -3.6975,
+ "mid_q": 0.3216,
+ "pr_hz": 1215.9037,
+ "pr_db": 6.9224,
+ "pr_q": 2.0132,
+ "lp_hz": 3254.0155,
+ "lp_q": 0.3,
+ "gain_db": -0.85,
+ "_about": "The 200A's speaker (amp, speaker, mic and room) on the line signal: tools/fit_speaker.py on BaltiWurli's DI / speaker pairs (fits/speaker/h_spkr.csv), rms error 2.8 dB (the room's combs). gain_db -0.85: a chord passage's peaks as through the line (its loudness 1.2 dB under)."
+}
