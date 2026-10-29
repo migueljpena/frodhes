@@ -5,7 +5,7 @@ documents and physics give, in double precision. The reference a later integer e
 
 Each key has one wound string (keys 1-22) or two (23-88: wound to 42, then plain music wire of the parts list's
 gauges). A string is a sum of its modes (partials), f_n = n f0 sqrt(1 + B n^2) (stiffness, B the inharmonicity), each
-decaying at sigma(f) = b1 + b2 f + b3 f^2 (measured on a CP-70's DI). The hammer (rubber under leather: a hard felt law F = K c^p on the compression c)
+decaying in two stages (fast, then slow: measured on single CP-70 notes). The hammer (rubber under leather: a hard felt law F = K c^p on the compression c)
 strikes the string near its end; their contact is simulated, so the force pulse (its length, its spectrum) comes
 from the hammer's mass and speed against the string's impedance: harder blows are shorter and brighter by themselves.
 The pickup is a piezo under the bridge: it reads the string's force there, T dy/dx = T sum q_n n pi / L (the
@@ -116,15 +116,23 @@ def key_params(k, p=P):
     s["m_h"] = (h["mass_g_low"] * (h["mass_g_high"] / h["mass_g_low"]) ** x) * 1e-3
     s["K"] = h["k_mid"] * math.exp((h["k_slope_per_key"] if k <= 44 else h["k_slope_treble"]) * (k - 44))
     s["beta"] = h["strike_frac_low"] + (h["strike_frac_high"] - h["strike_frac_low"]) * x
-    s["t60"] = 6.91 / sigma(f1, p)
+    s["t60"] = float(6.91 / sigma(f1, p))
     s["damped"] = k < v(sp["undamped_first"])
     return s
 
 
-def sigma(f, p=P):
-    """a partial's loss at f Hz (1/s): its amplitude goes as exp(-sigma t)"""
+def sigma(f, p=P, stage="t60_early"):
+    """a partial's loss at f Hz (1/s), its early or late stage: log-log between the measured points, the ends held"""
     dc = p["decay"]
-    return dc["b1"] + dc["b2"] * f + dc["b3"] * f * f
+    lf = np.log(np.clip(f, dc["f_hz"][0], dc["f_hz"][-1]))
+    return 6.91 / np.exp(np.interp(lf, np.log(dc["f_hz"]), np.log(dc[stage])))
+
+
+def decay_env(f, t, p=P):
+    """the two-stage envelope of partials at f (array) over t: (1 - w) e^(-sigma_e t) + w e^(-sigma_l t)"""
+    se, sl = sigma(f, p), sigma(f, p, "t60_late")
+    w = np.exp(-(se - sl) * p["decay"]["knee_s"])
+    return (1 - w)[:, None] * np.exp(-np.outer(se, t)) + w[:, None] * np.exp(-np.outer(sl, t))
 
 
 def partials(s, fmax=18000.0, nmax=90):
@@ -246,13 +254,12 @@ def note(k, vel, dur, tail=1.5, p=P, voiced=True):
     out = np.zeros(nsamp)
     w_slope = s["T"] * n * math.pi / s["L"] * (-1.0) ** n
     damp = 6.91 / p["decay"]["damper_t60_s"] if s["damped"] else 0.0
+    dmp = np.exp(-damp * np.maximum(t - dur, 0.0)) if damp else 1.0
     for st in strings:
+        env = decay_env(st["f"], t, p)
         for i in range(len(st["wd"])):
-            e = np.exp(-st["sig"][i] * t)
-            if damp:
-                e = e * np.exp(-damp * np.maximum(t - dur, 0.0))
             a = st["A"][i]
-            out += w_slope[i] * e * (a.real * np.sin(st["wd"][i] * t) + a.imag * np.cos(st["wd"][i] * t))
+            out += w_slope[i] * env[i] * dmp * (a.real * np.sin(st["wd"][i] * t) + a.imag * np.cos(st["wd"][i] * t))
     if k >= p["pickup"]["top_keys_first"]:
         out *= 10 ** (p["pickup"]["top_keys_db"] / 20)
     return out * 10 ** (voicing_db(k, p) / 20) if voiced else out

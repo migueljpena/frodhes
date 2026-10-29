@@ -38,12 +38,13 @@ def test_tuning_and_strings():
 
 
 def test_the_pitch_rendered():
-    y = m.note(49, 90, 1.0, 0.0)
-    seg = y[int(0.3 * m.FS):int(0.9 * m.FS)]
+    y = m.note(49, 90, 4.5, 0.0)
+    seg = y[int(0.3 * m.FS):int(4.3 * m.FS)]                         # long: the pair's two strings resolved
     sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 20))
     fr = np.fft.rfftfreq(1 << 20, 1 / m.FS)
     band = (fr > 400) & (fr < 480)
-    assert abs(fr[band][np.argmax(sp[band])] - 440.0) < 0.3
+    lo, hi = (440.0 * 2 ** (c / 1200) for c in m.detunes(49))      # the pair's two strings
+    assert lo - 0.3 < fr[band][np.argmax(sp[band])] < hi + 0.3
 
 
 def test_hammer_force_and_contact():

@@ -18,13 +18,16 @@
     "stress_frac": {"v": 0.45, "_src": "[A] the plain strings' tension as a share of the wire's strength (pianos: 0.3..0.6)"},
     "wound": {"len_a0_m": 1.0, "tension_n": 900, "_src": "[A] the case is 1460 x 1006 mm ([S]): A0's speaking length about 1 m; wound tensions 700..1100 N"},
     "b_wound_from_stretch": {"_src": "[P] B of keys 1..42 from the tuning table's octave stretch: the geometric mean of a 2:1 octave (2597 B cents) and a 4:2 (10388 B)", "smooth_keys": 7},
-    "detune_cents": {"v": 0.8, "spread": 0.5, "_src": "[A] a pair's two strings: 0.3..2 cents apart in tuned pianos"},
+    "detune_cents": {"v": 4.0, "spread": 2.0, "_src": "[M] David's CP70: the fundamental's beat (the 2nd partial beating at ~2x) on 12 keys B2-Bb5: 2.0-10.3 cents, median 4.3 (its owner calls it slightly out of tune; a fresh unison is ~0.5-2)"},
     "undamped_first": {"v": 74, "_src": "[S] parts list p18-20: damper heads on keys 1..73 only"}
   },
   "decay": {
-    "_src": "[M] each partial's loss sigma(f) = b1 + b2 f + b3 f^2 (1/s; T60 = 6.91 / sigma), fitted to the decays of a CP-70's DI recording (frodhes-refs audio/cp70-yt, YouTube 'I Bought a Yamaha CP70!' 0:01-3:02: 38 chord tails, 0.35 s after the onset to the next one, the median slope per octave band 200-6400 Hz: T60 29.7 / 22.2 / 13.7 / 10.3 / 5.5 s; the fit within 0.5 dB/s). Chords, maybe the pedal, a lossy stream: the order is sure, the values to be checked on single notes. The grand-piano prior it replaces: T60 18 s (A0) .. 0.6 s (C8), 8x faster in the middle (no soundboard: the strings lose far less).",
-    "b1": 0.183, "b2": 2.35e-4, "b3": 0.0,
-    "damper_t60_s": 0.25, "pair_double_decay": 0.0
+    "_src": "[M] each partial's two-stage decay (a string pair's: fast, then slow), T60 by frequency (log-log between the points), from single notes of a CP-70 (Pianobook 'David's CP70', Conner Sawchuk: 157 samples, F1-Eb7; frodhes-refs tools/measure_cp_notes.py + summarize_cp_notes.py): the median per half-octave of every partial 1-6 of the two loudest layers, early 0.08-1 s and late 1.5-8 s, made non-increasing; late above 2.4 kHz the early times the 2.4 kHz ratio. The late stage's share w = exp(-(sigma_e - sigma_l) knee_s). Replaces the chord-tail fit (Wingate's DI: 3x longer, the pedal and the other strings ringing in it).",
+    "f_hz":      [53, 76, 107, 152, 215, 304, 430, 608, 861, 1217, 1722, 2435, 3444, 4870],
+    "t60_early": [42.8, 19.9, 13.8, 9.5, 9.5, 6.2, 6.2, 5.2, 5.2, 5.2, 3.1, 2.8, 1.9, 1.5],
+    "t60_late":  [40.5, 25.0, 21.8, 19.0, 17.5, 15.7, 10.5, 9.0, 7.8, 7.0, 7.0, 6.7, 4.5, 3.6],
+    "knee_s": 1.25,
+    "damper_t60_s": 0.25
   },
   "hammer": {
     "_src": "[S] hammers of urethane rubber covered by artificial leather (sm p2; 70B: synthetic buckskin over hard rubber), 6 hammer types by range (parts p22), blow 40 mm (sm p16). [A] the felt law F = K x^p with a harder K than felt, the masses and the strike position: grand-piano values.",
@@ -32,7 +35,7 @@
     "p": 2.5, "k_mid": 4.8e10, "k_mid_src": "[M] 16x the grand-felt prior (3e9): the long-term spectrum of a CP-70 chord passage then matches Wingate's DI within 2.5 dB up to 4 kHz (-6 dB at 8 kHz; Hollow Sun's and Amazound's demos agree with that DI at 4-8 kHz); rubber under leather is harder than felt", "k_slope_per_key": 0.025, "k_slope_treble": 0.07,
     "contact_ms_lit": {"_src": "[A] grand pianos at mf (Askenfelt & Jansson 1990, Hall 1986): ~4 ms bass, ~2 ms mid, <0.5 ms top; rubber is harder: shorter", "A0": 3.5, "A4": 1.5, "C8": 0.3},
     "strike_frac_low": 0.125, "strike_frac_high": 0.08,
-    "vel_ms_min": 0.5, "vel_ms_max": 5.0
+    "vel_ms_min": 0.15, "vel_ms_max": 5.0, "vel_src": "[M] 0.15 m/s at vel 1 (was 0.5): David's CP70 spans ~33 dB softest to hardest layer (25-45 per key) and its H2-H6 rise ~+9..+15 dB re H1; the model then gives 33.1 dB and +8.5 dB at A4"
   },
   "pickup": {
     "_src": "[S] a piezo per note under the bridge, all 88 in parallel on one bus (no trim); it reads the string's force on the bridge, T dy/dx. [S] keys 83-88 through a 0.022 uF series capacitor: [A] its divider unknown (the piezos' capacitance), 0 dB here.",
