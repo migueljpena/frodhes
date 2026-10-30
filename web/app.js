@@ -298,6 +298,7 @@ if (location.search.includes("selftest")) {
   const wait = () => {
     if (!M || performance.now() - t0 < 1500) return setTimeout(wait, 100);
     if (location.search.includes("reed")) M._web_midi(0xB0, 115, 0);   // ?selftest&reed: TYPE WURLI 200A (CC 115)
+    if (location.search.includes("cp80")) M._web_midi(0xB0, 79, 0);    // ?selftest&cp80: TYPE CP-80 (CC 79)
     M._web_keys(1 << 7);                               // C4
     setTimeout(() => {
       const p = M._web_audio(16) >> 2, f = M.HEAPF32;

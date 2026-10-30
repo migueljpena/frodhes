@@ -35,7 +35,7 @@ def code_ccs():
 def manual_ccs():
     """the CC numbers listed in the MIDI section's table (first and third columns: "86 / 87", "28-31", "12 / 13")"""
     got = set()
-    for line in section("## 12. MIDI").splitlines():
+    for line in section("## 13. MIDI").splitlines():
         if not line.startswith("| ") or "---" in line:
             continue
         cells = [c.strip() for c in line.strip("|").split("|")]
@@ -62,7 +62,7 @@ def test_assign_list_matches_perf_t():
 
 def test_factory_presets_listed():
     names = re.findall(r'"([^"]+)"', src("presets.c")[src("presets.c").index("PR_FNAME[PR_NF] = {"):].split("};")[0])
-    table = section("## 6. Presets")
+    table = section("## 7. Presets")
     missing = [f"F{i + 1:02d} {n}" for i, n in enumerate(names) if f"F{i + 1:02d} {n}" not in table]
     assert not missing, missing
 
@@ -84,7 +84,7 @@ def test_cc84_row_matches_the_drive_type_bands():
     names = re.findall(r'"([^"]+)"', re.search(r"N_DRV\[\] = \{([^}]*)\}", pc).group(1))
     order = sorted(range(len(lo)), key=lambda t: lo[t])
     want = [f"{lo[t]}–{lo[order[i + 1]] - 1 if i + 1 < len(order) else 127} {names[t]}" for i, t in enumerate(order)]
-    row = next(ln for ln in section("## 12. MIDI").splitlines() if ln.startswith("| 84 |"))
+    row = next(ln for ln in section("## 13. MIDI").splitlines() if ln.startswith("| 84 |"))
     assert ", ".join(want) in row, (want, row)
     page = section("### DRIVE")
     page = page[:page.index("\n### ", 4)]

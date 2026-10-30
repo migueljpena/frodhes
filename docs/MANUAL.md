@@ -1,20 +1,20 @@
 # Frodhes: user manual
 
-**A physically modelled electric piano and Wurlitzer 200A for the M-VAVE FM-1.**
+**A physically modelled electric piano, Wurlitzer 200A and Yamaha CP-80 for the M-VAVE FM-1.**
 
 Frodhes turns the FM-1 into an electric piano. Every note is computed from the physics of a real Rhodes: the hammer
 strikes a tine, the tine rings against its tonebar, and a magnetic pickup turns the motion into sound. As on a real
 instrument, no two keys are quite the same: each one rings a little longer or shorter and a little louder or softer
 than its neighbours (every key stays exactly in tune), and a held note from E2 to C6 has the tine's slow whirl: its
 level wobbles gently, about 2 dB, once or twice a second, as the tine's two ways of swinging trade energy. Struck
-hard, the bass goes a touch sharp and settles as it rings. A Wurlitzer 200A reed piano is computed the same way
-(section 5). No recordings are played back. Around the piano sits a stage-keyboard effects chain: compressor, drive (five overdrive types), a resonant filter,
+hard, the bass goes a touch sharp and settles as it rings. A Wurlitzer 200A reed piano (section 5) and a Yamaha
+CP-80 electric grand (section 6) are computed the same way. No recordings are played back. Around the piano sits a stage-keyboard effects chain: compressor, drive (five overdrive types), a resonant filter,
 tremolo or wah, phaser, chorus, delay and reverb. For playing there is a PERFORM page with four assignable knobs,
 chord mode, a pattern recorder (sequencer), an arpeggiator, scales and tap tempo, USB-MIDI in and out and TRS MIDI in.
 
 Frodhes is an independent open-source project, not affiliated with or endorsed by M-VAVE, the Rhodes or Fender trademark owners or any instrument maker. It comes with no warranty: install it at your own risk (M-VAVE's own firmware can always be put back); see [LICENSING.md](../LICENSING.md).
 
-![The FRODHES page: TYPE (here EARLY FELT), TONE, BELL and KEY VEL](manual/img/piano.png?v=904c35f2)
+![The FRODHES page: TYPE (here EARLY FELT), TONE, BELL and KEY VEL](manual/img/piano.png?v=ecad2653)
 
 ## Contents
 
@@ -23,16 +23,17 @@ Frodhes is an independent open-source project, not affiliated with or endorsed b
 3. [Buttons and knobs](#3-buttons-and-knobs)
 4. [The pages](#4-the-pages)
 5. [WURLI 200A: the reed piano](#5-wurli-200a-the-reed-piano)
-6. [Presets](#6-presets)
-7. [Effects on and off](#7-effects-on-and-off)
-8. [Tempo and sync](#8-tempo-and-sync)
-9. [Scales](#9-scales)
-10. [Sustain and polyphony](#10-sustain-and-polyphony)
-11. [Sound and volume tips](#11-sound-and-volume-tips)
-12. [MIDI](#12-midi)
-13. [If something goes wrong](#13-if-something-goes-wrong)
-14. [Specifications](#14-specifications)
-15. [Appendix: the SMK-37 (experimental)](#15-appendix-the-smk-37-experimental)
+6. [CP-80: the electric grand](#6-cp-80-the-electric-grand)
+7. [Presets](#7-presets)
+8. [Effects on and off](#8-effects-on-and-off)
+9. [Tempo and sync](#9-tempo-and-sync)
+10. [Scales](#10-scales)
+11. [Sustain and polyphony](#11-sustain-and-polyphony)
+12. [Sound and volume tips](#12-sound-and-volume-tips)
+13. [MIDI](#13-midi)
+14. [If something goes wrong](#14-if-something-goes-wrong)
+15. [Specifications](#15-specifications)
+16. [Appendix: the SMK-37 (experimental)](#16-appendix-the-smk-37-experimental)
 
 ## 1. Install
 
@@ -80,7 +81,8 @@ DELAY · REVERB · REVERB 2 · TEMPO · SCALE · CHORD · ARPEGGIO · LFO · SEQ
 
 **The VOICE pages belong to the instrument.** Each TYPE brings its own controls, four to a page: the Rhodes types
 have two VOICE pages (VOICE 1/2: TONE, BARK, BELL, HAMMER; VOICE 2/2: DECAY, RELEASE, NOISE, TUNE), the WURLI 200A
-and 200A AMP four (VOICE 1/4: TONE, BARK, BELL, HAMMER; 2/4: DECAY, RELEASE, NOISE, TUNE; 3/4: the vibrato; 4/4: REG).
+and 200A AMP four (VOICE 1/4: TONE, BARK, BELL, HAMMER; 2/4: DECAY, RELEASE, NOISE, TUNE; 3/4: the vibrato; 4/4: REG),
+the CP-80 two (VOICE 1/2: BASS, MIDDLE, TREBLE, BRILLIANCE; 2/2: TREMOLO, DEPTH, SPEED, TUNE).
 SELECT walks them in order; changing the TYPE changes the pages with it.
 
 **Reading a card.** Each card shows its knob (K1–K4, small), the control's name, and its value on the right in large
@@ -116,7 +118,7 @@ preset or switch an effect it briefly shows what happened, in large letters.
 | --- | --- |
 | **SELECT** (knob) | Next / previous page |
 | **K1 K2 K3 K4** | The four cards on the current page |
-| **ALGORITHM** (knob) | The TYPE (the four Rhodes, the WURLI 200A and 200A AMP), from any page (on SEQUENCER: the step cursor) |
+| **ALGORITHM** (knob) | The TYPE (the four Rhodes, the WURLI 200A and 200A AMP, the CP-80), from any page (on SEQUENCER: the step cursor) |
 | **PRESETS** (knob) | Browse the sounds F01–F17 and your U01–U16 (loads when you stop turning; on SEQUENCER: bar by bar) |
 | **MASTER** (knob) | Volume (it glides as you turn it, without steps) |
 | **HOME** | PERFORM page; press again for the main page (titled FRODHES), and back |
@@ -127,7 +129,7 @@ preset or switch an effect it briefly shows what happened, in large letters.
 | **SEL** | DELAY page; press again there to switch the delay on / off. On ARPEGGIO, and on every page while the arpeggiator is on: the arpeggiator's HOLD on / off |
 | **ARP** | ARPEGGIO page; press again there to switch the arpeggiator on / off |
 | **GLO** | TEMPO page; press again for SETUP, again for MIDI, again for DISPLAY, and back to TEMPO |
-| **FX** | All effects off / on at once (see [7](#7-effects-on-and-off)) |
+| **FX** | All effects off / on at once (see [7](#8-effects-on-and-off)) |
 | **PLAY** | Tap tempo, on every page (ARPEGGIO too); on SEQUENCER, start / stop the loop, except while the arpeggiator is on: then it taps the tempo there too |
 | **REC** | Sustain pedal |
 | **SAVE** | Save the sound to a user preset; hold to undo the last preset load |
@@ -169,19 +171,20 @@ Turning it back to 0 makes it dry again (the effect stays switched on; its butto
 
 The page after PERFORM (press **HOME** twice) carries the instrument's name as its title and holds the essentials.
 
-![The main page](manual/img/piano.png?v=904c35f2)
+![The main page](manual/img/piano.png?v=ecad2653)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
-| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **WURLI 200A**, the reed electric piano, or **200A AMP**, the same through its own amp and speaker (see [WURLI 200A](#5-wurli-200a-the-reed-piano)). Applies to the next notes. |
-| K2 | **TONE** | Where the tine sits against the pickup: lower is rounder and warmer, higher is more bell and midrange (the same as VOICE 1/2's TONE). On the WURLI 200A: **BARK** |
-| K3 | **BELL** | The bright metallic overtone at the start of each note (the same as VOICE 1/2's BELL). On the WURLI 200A: the vibrato's **DEPTH** |
+| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **WURLI 200A**, the reed electric piano, or **200A AMP**, the same through its own amp and speaker (see [WURLI 200A](#5-wurli-200a-the-reed-piano)), or **CP-80**, the Yamaha electric grand (see [CP-80](#6-cp-80-the-electric-grand)). Applies to the next notes. |
+| K2 | **TONE** | Where the tine sits against the pickup: lower is rounder and warmer, higher is more bell and midrange (the same as VOICE 1/2's TONE). On the WURLI 200A: **BARK**; on the CP-80: **BASS** |
+| K3 | **BELL** | The bright metallic overtone at the start of each note (the same as VOICE 1/2's BELL). On the WURLI 200A: the vibrato's **DEPTH**; on the CP-80: **TREBLE** |
 | K4 | **KEY VEL** | How hard the FM-1's own keys strike: the velocity of a medium press (TOUCH on [SETUP](#setup); harder presses play louder, softer ones quieter), and with TOUCH at **FIXED** the velocity of every press. Around 60–80 soft and round, 96 medium (the default), 108–127 hard with bark. MIDI notes keep their own velocity. |
 
 ### VOICE 1/2 and 2/2
 
 The instrument's own pages: on a Rhodes type there are two, right after the main page. On the **WURLI 200A** there
-are four, with the reed piano's controls: see [WURLI 200A](#5-wurli-200a-the-reed-piano).
+are four, with the reed piano's controls: see [WURLI 200A](#5-wurli-200a-the-reed-piano). The **CP-80** has two, its
+panel's tone controls and its tremolo: see [CP-80](#6-cp-80-the-electric-grand).
 
 ![VOICE 1/2](manual/img/voice1.png?v=a12de415)
 
@@ -547,7 +550,7 @@ velocity. TOUCH and KEY VEL belong to the FM-1, not to a preset (a preset does n
 emulator has no velocity: its keys play at KEY VEL.
 
 The bottom line shows the name and the version installed, the battery's reading (BAT, the raw value the battery
-segments are worked out from), and the audio engine's time per block (it must stay under 5800 µs; every voice struck at once with every effect on reaches about 3450 on the Rhodes (3600 while bending, about 3600 with SPREAD at full width and 3750 bending with it; 10 notes), measured on the FM-1 (the WURLI 200A is not measured yet); section 10 gives the whole audio interrupt's time).<!-- FM-1 (2026-10-25, the release package sha256 2ca1d517c430, final-rel/SUMMARY.md), every effect on, TSH8, TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10: app worst (the highest of INF / HALL / PLATE) Rhodes 3468 us, --bend-sweep 3588, SPREAD 127 3576, with bend 3752, VIBES 3944, MARIMBA 3812; 0 shed. --><!-- FM-1 (2026-10-25, build 353d023), every effect on, TSH8, TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10: app worst INFINITE Rhodes 3692/3640/3624 us, --bend-sweep 3768, SPREAD 127 3784, with bend 3912, VIBES 3796, MARIMBA 3740; HALL 3612/3724/3664, PLATE 3644/3860/3708 (Rhodes/VIBES/MARIMBA), 0 shed, USB clean (build/final-rev/cpu_*.log). --><!-- FM-1 (2026-10-24, build 57e0025), every effect on, the heaviest drive TSH8, delay TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10 (x3 on the Rhodes): app time worst Rhodes 3540/3512/3504 us, --bend-sweep 3632, VIBES 3700, MARIMBA 3660, 0 shed, USB clean (build/final2/cpu_*.log). Update with section 10's together. SPREAD 127 on 57e0025 (HALL, every effect, TSH8, TAPE, 10 voices): app worst 3668/3652/3668 us, with bend 3784 (build/final2b/cpu_spread_*.log). -->
+segments are worked out from), and the audio engine's time per block (it must stay under 5800 µs; every voice struck at once with every effect on reaches about 3450 on the Rhodes (3600 while bending, about 3600 with SPREAD at full width and 3750 bending with it; 10 notes), measured on the FM-1 (the WURLI 200A and the CP-80 are not measured yet); section 11 gives the whole audio interrupt's time).<!-- FM-1 (2026-10-25, the release package sha256 2ca1d517c430, final-rel/SUMMARY.md), every effect on, TSH8, TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10: app worst (the highest of INF / HALL / PLATE) Rhodes 3468 us, --bend-sweep 3588, SPREAD 127 3576, with bend 3752, VIBES 3944, MARIMBA 3812; 0 shed. --><!-- FM-1 (2026-10-25, build 353d023), every effect on, TSH8, TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10: app worst INFINITE Rhodes 3692/3640/3624 us, --bend-sweep 3768, SPREAD 127 3784, with bend 3912, VIBES 3796, MARIMBA 3740; HALL 3612/3724/3664, PLATE 3644/3860/3708 (Rhodes/VIBES/MARIMBA), 0 shed, USB clean (build/final-rev/cpu_*.log). --><!-- FM-1 (2026-10-24, build 57e0025), every effect on, the heaviest drive TSH8, delay TAPE, USB 48 kHz, hil_cpu --worst --usb 48000 --voices 10 (x3 on the Rhodes): app time worst Rhodes 3540/3512/3504 us, --bend-sweep 3632, VIBES 3700, MARIMBA 3660, 0 shed, USB clean (build/final2/cpu_*.log). Update with section 10's together. SPREAD 127 on 57e0025 (HALL, every effect, TSH8, TAPE, 10 voices): app worst 3668/3652/3668 us, with bend 3784 (build/final2b/cpu_spread_*.log). -->
 
 ### MIDI
 
@@ -557,7 +560,7 @@ segments are worked out from), and the audio engine's time per block (it must st
 | --- | --- | --- |
 | K1 | **CHANNEL** | **ALL** (the default: every channel is played) or **1–16**: only that channel is heard (notes, CCs and program changes; clock, Start and Stop always are), from USB-MIDI and from the TRS jack alike, and the FM-1 sends its notes on it (on ALL it sends on 1) |
 | K2 | **TRS IN** | **ON** / **OFF**: MIDI from the 3.5 mm TRS MIDI input (for a DAWless setup: a keyboard, a sequencer, a drum machine's clock) |
-| K3 | **CLOCK** | **INT**: its own tempo. **EXT** (the default): follows MIDI clock from USB or the TRS jack when it comes (the tempo and the beats: section 8), and a MIDI **Start** / **Continue** starts the sequencer, **Stop** stops it |
+| K3 | **CLOCK** | **INT**: its own tempo. **EXT** (the default): follows MIDI clock from USB or the TRS jack when it comes (the tempo and the beats: section 9), and a MIDI **Start** / **Continue** starts the sequencer, **Stop** stops it |
 
 Press **GLO** three times to come here (TEMPO, SETUP, MIDI). Everything MIDI does, it does the same from USB and from
 the TRS jack: notes, every CC in the table below, program changes, clock, start and stop.
@@ -587,7 +590,7 @@ noise. Notes outside A1–C7 do not sound, as on the instrument. One step furthe
 through its own amp and speaker in a room (fitted to recordings of a 200A's line and speaker side by side: fuller
 low mids, a presence peak, the top rolled off), with the soft knock of each key coming back up, heard in the room.
 
-![The FRODHES page on the WURLI 200A: TYPE, BARK, the vibrato's DEPTH and KEY VEL](manual/img/piano-200a.png?v=1f785130)
+![The FRODHES page on the WURLI 200A: TYPE, BARK, the vibrato's DEPTH and KEY VEL](manual/img/piano-200a.png?v=37988af5)
 ![VOICE 1/4 on the WURLI 200A](manual/img/voice1-200a.png?v=d16df0ca)
 ![VOICE 2/4 on the WURLI 200A](manual/img/voice2-200a.png?v=a0d161d6)
 ![VOICE 3/4: the 200A's vibrato](manual/img/voice3-200a.png?v=15bb6534)
@@ -615,7 +618,36 @@ right). Turning the TYPE never switches the vibrato on or off: it stays as the s
 **Polyphony:** 10 notes. Its CPU
 time on the FM-1 is not measured yet.
 
-## 6. Presets
+## 6. CP-80: the electric grand
+
+Turn **ALGORITHM** (or the TYPE card) one step past 200A AMP to **CP-80** (TYPE 6): a Yamaha CP-80, the electric grand
+piano of the late 1970s: real strings struck by hammers, read by a piezo pickup under each string's bridge. All 88 keys
+sound, A0 to C8. The lowest 22 keys have one wound string each, the rest two strings a few cents apart, so their notes
+beat gently as on the instrument. Every string rings with its own overtones, slightly stretched by the wire's stiffness;
+each overtone fades in two stages, faster at first, then slower, and the top keys from A#6 up have no damper, so they
+ring on after the key comes up. The hammer is simulated against the string: soft notes are round, hard ones shorter
+and brighter. After the strings, the CP-80's own preamp: its tone controls, its low-pass filter and its tremolo. The
+model comes from the service manual, the physics of the strings and the hammer, and the decays and tuning of a CP-70
+measured note by note. No recordings are played back.
+
+![The FRODHES page on the CP-80: TYPE, BASS, TREBLE and KEY VEL](manual/img/piano-cp80.png?v=490134a6)
+![VOICE 1/2 on the CP-80: the tone controls](manual/img/voice1-cp80.png?v=ec68cedb)
+![VOICE 2/2 on the CP-80: the tremolo and TUNE](manual/img/voice2-cp80.png?v=60338348)
+
+On the FRODHES page, K2 is **BASS** and K3 **TREBLE**. **VOICE 1/2** has the CP-80 panel's tone controls: **BASS**,
+**MIDDLE**, **TREBLE** (5 is the setting the service manual calibrates; 0 and 10 its range) and **BRILLIANCE**
+(**LOW**, **MEDIUM**, **HIGH**: the panel's three-way switch for the top end). **VOICE 2/2**: the CP-80's own
+**TREMOLO** (on / off), **DEPTH**, **SPEED**, and **TUNE**. The tremolo is the instrument's: two outputs swelling in
+turn, so in stereo it moves from side to side (left and right), and summed to mono it stays almost level.
+
+The sustain pedal works as on the Rhodes, half-pedal included, and the release velocity too (a quick lift damps
+harder); the pitch bend (±2 semitones) bends it. SPREAD does not apply: the stereo is the tremolo's. A note struck
+while it still rings hits the same strings again. There is no factory preset for it yet. **Over MIDI:** CC 79 selects
+it; CC 29 BASS, 30 MIDDLE, 31 TREBLE, 28 BRILLIANCE (0–42 LOW, 43–84 MEDIUM, 85–127 HIGH); CC 47 TREMOLO on (≥ 64),
+48 DEPTH, 49 SPEED. **Polyphony:** 10 notes; one more takes over the oldest with a fade over one block (5.8 ms). Its
+CPU time on the FM-1 is not measured yet.
+
+## 7. Presets
 
 ![Browsing presets](manual/img/browse.png?v=172e1e43)
 
@@ -715,7 +747,7 @@ recording goes on undisturbed while the settings or the pattern are saved. The s
 (USB and the TRS jack) alone: a note you play while it runs, a Program Change's preset saved a couple of seconds
 later for instance, sounds at once.
 
-## 7. Effects on and off
+## 8. Effects on and off
 
 Each effect has its own on / off: its page button pressed twice (LFO: tremolo / wah, ENV: phaser, SEL: delay), its
 K1 card on its page (chorus: EFFECT; compressor: THRESH; reverb: TYPE), or turning it up on PERFORM. Switching an effect on whose depth is 0 gives it a useful starting depth, so you always hear it.
@@ -730,7 +762,7 @@ on.
 The order of the chain: **COMP → DRIVE → FILTER → TREM/WAH → PHASER → CHORUS → DELAY → REVERB → limiter.** The limiter at the
 end keeps even big chords of ten notes from ever clipping.
 
-## 8. Tempo and sync
+## 9. Tempo and sync
 
 Tap **PLAY** three times or more in time to set the tempo, or set **BPM** on the TEMPO page. With **CLOCK** on EXT
 (the default; MIDI page), Frodhes follows MIDI clock from USB or the TRS jack, and an external Start / Stop starts and
@@ -777,7 +809,7 @@ where it was). With CLOCK on EXT and a clock coming in:
 The tempo also drives the arpeggiator and the sequencer. The tempo you set by hand (TAP or BPM) is kept when you
 switch off; the one a MIDI clock sets is not, and a clock never causes a save.
 
-## 9. Scales
+## 10. Scales
 
 On the SCALE page, **SNAP** lets every key play but moves out-of-scale notes onto the scale, and **DEGREE** turns the
 white keys into the scale's steps (C plays the root) so you can play any scale with white keys only. Both act on
@@ -785,7 +817,7 @@ the FM-1's keys; notes from USB-MIDI play as sent (except as the root of a DIATO
 While a scale is on, the keys that play its root glow dimly (in DEGREE: the C keys), so you can always find the
 keynote.
 
-## 10. Sustain and polyphony
+## 11. Sustain and polyphony
 
 **REC** is the sustain pedal. **Hold** it like a pedal, or **tap** it to latch the sustain on, and tap again to
 release. The header shows **SUS** while it holds. Over MIDI, CC 64 works with half-pedalling. Letting a MIDI pedal
@@ -800,11 +832,11 @@ audio also has a safety guard: if it ever ran late, the quietest released note w
 letting the sound break up. In testing the worst case (every voice on low notes at full velocity with the pedal and
 every effect on, the reverb on INFINITE, the USB audio at 48 kHz) takes the whole audio interrupt about 3.8 ms on the
 Rhodes while bending (3808 µs) and 4.0 ms with SPREAD at full width and bending (3972 µs), of the 5.8 ms available
-per audio block (the WURLI 200A is not measured yet); the longest single
+per audio block (the WURLI 200A and the CP-80 are not measured yet); the longest single
 block in minutes of the stress test (every voice held by the pedal, chords across the registers) was 3.8 ms at 48 kHz
 and 3.6 ms at 44.1 kHz on the Rhodes (measured on the FM-1), and the guard never acts.<!-- FM-1 (2026-10-25, the release package sha256 2ca1d517c430, final-rel/SUMMARY.md), every effect on, TSH8, TAPE, USB 48 kHz, 10 voices: whole ISR Rhodes bending 3808 us, SPREAD 127 + bend 3972, VIBES 4164, MARIMBA 4032 (the highest of the TYPEs); stress_max longest block Rhodes 48 kHz 3812, 44.1 kHz 3612; 0 shed. --><!-- FM-1 (2026-10-25, int-final after the CPU trims and the RAM hot loops, tools/cpu_check.sh), every effect on, TSH8, TAPE, INFINITE, USB 48 kHz, 10 voices, 3 takes each: whole ISR Rhodes SPREAD 127 + bend 3916-3972 us (4224-4268 before), --bend-sweep 3752-3772, VIBES 4040-4120 (4144-4216 before), MARIMBA 3988-4000; the stress_max figures below are 353d023's. --><!-- FM-1 (2026-10-25, build 353d023), every effect on, TSH8, TAPE, USB 48 kHz, 10 voices: whole ISR INFINITE Rhodes 3936/3892/3880 us, --bend-sweep 4028, SPREAD 127 4040, with bend 4172, VIBES 4052, MARIMBA 4000; HALL 3860/3976/3916, PLATE 3896/4116/3968; 0 shed, USB clean (build/final-rev/cpu_*.log); stress_max whole ISR 48 kHz Rhodes 4064 (final-rev3) / 4060 (final-rev), VIBES 3760, MARIMBA 3524; 44.1 kHz Rhodes 3832, VIBES 3524, MARIMBA 3292; 0 events, 0 shed; soak 8 runs 0 events (build/soak/rounds.txt). --><!-- FM-1 (2026-10-24), every effect on, the heaviest drive TSH8, delay TAPE, USB 48 kHz, 10 voices: hil_cpu --worst --usb 48000 x3 on build 57e0025: whole ISR Rhodes 3784/3760/3756 us (app 3504-3540), --bend-sweep 3880, VIBES 3956, MARIMBA 3916, 0 shed, USB clean (build/final2/cpu_*.log); SPREAD 127 (HALL, every effect, TSH8, TAPE): whole ISR 3916/3908/3920 us, with bend 4036 (build/final2b/cpu_spread_*.log); stress_max (hil_crackle.py) on 57e0025: whole ISR at 48 / 44.1 kHz Rhodes 3788 / 3604 us, VIBES 3460 / 3244, MARIMBA 3224 / 3036, 0 shed, 0 events (48 kHz: one marimba-worst2 USB step that the jack shows too, an hil_crackle false step fixed in d053a88) (build/final2/stress_*-report.txt). Update with SETUP's figure together. -->
 
-## 11. Sound and volume tips
+## 12. Sound and volume tips
 
 - **KEY VEL** on the main page sets the velocity of a medium press (with TOUCH FIXED, of every press). 96–108 is a
   good start; the bark comes in above about 100. If you play softly and the sound stays thin, try TOUCH **LIGHT**
@@ -816,7 +848,7 @@ and 3.6 ms at 44.1 kHz on the Rhodes (measured on the FM-1), and the guard never
 - Every effect is set to keep about the same volume when you switch it on; the compressor's MAKEUP and each preset's
   LEVEL (SETUP) let you fine-tune it.
 
-## 12. MIDI
+## 13. MIDI
 
 Frodhes is a class-compliant USB-MIDI device and also listens to the FM-1's **TRS MIDI input** (3.5 mm; MIDI page:
 TRS IN, CHANNEL). Notes play with their velocity (and go through the arpeggiator when it runs); the FM-1's keys
@@ -827,7 +859,7 @@ also send their notes to the computer.
 makes from them is, so switch MIDI thru off in your computer's software. No clock, CCs or program changes are sent.
 The TRS jack is MIDI in only. **Program Change** 0–15 loads F01–F16, 16–31 loads U01–U16 (as before 0.9.5), and 32 loads F17; 33 and up load nothing.
 
-**Pitch bend** (the pitch wheel, USB or TRS, on CHANNEL) bends the Rhodes and the WURLI 200A ±2 semitones: every note that sounds
+**Pitch bend** (the pitch wheel, USB or TRS, on CHANNEL) bends the Rhodes, the WURLI 200A and the CP-80 ±2 semitones: every note that sounds
 glides with the wheel and a note struck while the wheel is moved starts at the bent pitch. The bend stays across a
 preset change and adds to TUNE. CC 121 (reset all controllers) and pulling the USB cable put it back to 0. (The retuning is genkigenki's work.)
 
@@ -846,8 +878,8 @@ TREM/WAH work on the mono sum, and SPREAD follows their level (a hard drive narr
 | CC | Parameter | CC | Parameter |
 | --- | --- | --- | --- |
 | 64 | Sustain (half-pedal) | 80 | TYPE (0–31 STAGE, 32–63 SUITCASE, 64–95 FELT, 96–127 DYNO) |
-| Pitch bend | ±2 semitones, the Rhodes types and the WURLI 200A | 121 | Reset all controllers: the pitch bend back to 0 |
-| 115 | TYPE of the reed piano: 0–63 WURLI 200A, 64–127 200A AMP | | |
+| Pitch bend | ±2 semitones, the Rhodes types, the WURLI 200A and the CP-80 | 121 | Reset all controllers: the pitch bend back to 0 |
+| 115 | TYPE of the reed piano: 0–63 WURLI 200A, 64–127 200A AMP | 79 | TYPE CP-80 (any value) |
 | 47 / 48 | WURLI 200A VIBRATO on (≥ 64) / DEPTH | 49 / 50 / 51 | WURLI 200A VIBRATO SPEED / SHAPE / SYNC |
 | 10 | Developer: reset (≥ 64): every LFO, the delay / reverb lines and the noise to their start state (for comparing recordings) | | |
 | 81 | DRIVE (AMOUNT) | 91 | REVERB (MIX) |
@@ -884,12 +916,12 @@ earlier firmware gave it sets it up as a new device, named Frodhes, by itself: i
 once (in its MIDI preferences) where the old one was. A Mac keeps the old entry in Audio MIDI Setup's MIDI Studio
 window, greyed out (offline): nothing needs deleting, but you can remove it. It appears as a USB audio input (class-compliant, stereo, 16-bit, 44.1 or 48 kHz): you can record exactly
 what it plays, digitally, without the headphone jack's hiss. It does not play audio from the computer. Saving the
-settings while it is recorded does not disturb the recording (section 6, "What is kept, and when"). The USB audio holds one block (5.8 ms) more
+settings while it is recorded does not disturb the recording (section 7, "What is kept, and when"). The USB audio holds one block (5.8 ms) more
 than the jack in hand, so that no render, however long, can run it dry (that was a click now and then at full
 polyphony): a frame leaves the FM-1 about 6-11 ms after its block is computed, at either rate; a DAW's latency
 compensation takes care of it when you record.
 
-## 13. If something goes wrong
+## 14. If something goes wrong
 
 - **No sound:** check MASTER, that FX has not bypassed a sound you relied on (BYP in the header), LEVEL on SETUP,
   and on the MIDI page that CHANNEL is ALL or the channel your keyboard sends on.
@@ -918,12 +950,12 @@ Frodhes is free software under the GPL-3.0 licence, built on [Dinghy](https://gi
 [Felucca](https://github.com/hugelton/Felucca) and [SLOOP](https://github.com/isod89/sloop-fm1). Source and
 issues: [github.com/leonardoMirabal/frodhes](https://github.com/leonardoMirabal/frodhes).
 
-## 14. Specifications
+## 15. Specifications
 
 | | |
 | --- | --- |
-| **Sound** | A physical model computed live, no samples. Rhodes: hammer, tine, tonebar and pickup, every key a little different, the tine's slow whirl on E2–C6, SPREAD across the stereo field (CC 105); 4 types (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO). WURLI 200A (and 200A AMP, through its amp and speaker): a reed piano, hammer, reed modes and the bell-shaped pickup, a measured 200A's regulation and its vibrato (A1–C7) |
-| **Polyphony** | 10 voices (the Rhodes and the WURLI 200A; the 200A: an 11th note takes over the oldest with a 5 ms fade); an 11th note takes over the quietest released note (else the oldest held one) with a 1.5 ms fade |
+| **Sound** | A physical model computed live, no samples. Rhodes: hammer, tine, tonebar and pickup, every key a little different, the tine's slow whirl on E2–C6, SPREAD across the stereo field (CC 105); 4 types (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO). WURLI 200A (and 200A AMP, through its amp and speaker): a reed piano, hammer, reed modes and the bell-shaped pickup, a measured 200A's regulation and its vibrato (A1–C7). CP-80: 88 keys of strings (one or two a key), the hammer simulated against them, the piezo pickups, its preamp (BASS, MIDDLE, TREBLE, BRILLIANCE) and its stereo tremolo |
+| **Polyphony** | 10 voices (the Rhodes, the WURLI 200A and the CP-80; the 200A and the CP-80: an 11th note takes over the oldest with a 5 ms fade, 5.8 ms on the CP-80); an 11th note takes over the quietest released note (else the oldest held one) with a 1.5 ms fade |
 | **Range** | 88 notes, A0–C8 over MIDI (notes outside play the nearest end); the 27 keys play F3–G5, OCT ±2 octaves, TRANSP ±24 semitones, TUNE ±50 cents |
 | **Velocity** | MIDI 1–127. The FM-1's keys: F3–C5 sense how firmly they land (TOUCH LIGHT / MEDIUM / HEAVY, KEY VEL the velocity of a medium press, default 96), C#5–G5 play the recent average; TOUCH FIXED: every key at KEY VEL (1–127) |
 | **Audio** | 44.1 kHz, integer processing, 256-frame blocks (5.8 ms); output limiter; exact digital silence 200 ms after the sound falls below −66 dBFS |
@@ -948,7 +980,7 @@ issues: [github.com/leonardoMirabal/frodhes](https://github.com/leonardoMirabal/
 | **Sustain** | REC (hold, or tap to latch) and CC 64 with half-pedalling |
 | **Recovery** | Hold OCT− while switching on: the USB rescue. No factory reset |
 
-## 15. Appendix: the SMK-37 (experimental)
+## 16. Appendix: the SMK-37 (experimental)
 
 Frodhes also builds for the SMK-37 (SMK-37 Pro, SMK-37 Elite, MKE-P37: `frodhes-smk37-experimental.fwsc`,
 `frodhes-smk37-elite-experimental.fwsc`, `frodhes-smk37-mke-experimental.fwsc`, on the

@@ -66,13 +66,32 @@ static const ectl_t ENG_REED_C[] = {
 static const char *const ENG_REED_HINT[] = {"HOW THE REED IS STRUCK", "HOW NOTES DIE AWAY", "THE 200A'S VIBRATO",
                                             "10 AS MEASURED, 0 EVEN"};
 
+/* the CP-80 (TYPE 6, the string engine, strings.c): its panel's tone controls (BASS / MIDDLE / TREBLE: 5 the
+ * service manual's centre; BRILLIANCE's three positions) on the Rhodes' cards (BARK, BELL, HAMMER, TONE), its
+ * tremolo on the P_MOT_* parameters (on / off, DEPTH, SPEED), TUNE */
+static const char *const ENG_CP_BRIL[] = {"LOW", "MEDIUM", "HIGH"};
+static const uint8_t ENG_CP_BRIL_AT[] = {0, 64, 127};
+static const ectl_t ENG_CP_C[] = {
+    {P_BARK, "BASS", EK_AMT, EU_NONE, 1},    /* FRODHES K2 */
+    {P_BELL, "MIDDLE", EK_AMT, EU_NONE},
+    {P_HAMMER, "TREBLE", EK_AMT, EU_NONE, 2},   /* FRODHES K3 */
+    {P_TONE, "BRILLIANCE", EK_DETENT, EU_NONE, 0, 3, 21, ENG_CP_BRIL, ENG_CP_BRIL_AT},
+    {P_MOT_ON, "TREMOLO", EK_CHOICE, EU_NONE},
+    {P_MOT_DEPTH, "DEPTH", EK_AMT, EU_NONE},
+    {P_MOT_RATE, "SPEED", EK_AMT, EU_HZ},
+    {S_TUNE, "TUNE", EK_AMT, EU_C},
+};
+static const char *const ENG_CP_HINT[] = {"THE CP-80'S TONE CONTROLS", "ITS TREMOLO, TUNE"};
+
 #define ENG_UI_ROW(c, mk, h) {c, sizeof c / sizeof c[0], mk, h}
 static const engui_t ENG_UI[] = {           /* by TYPE_UI */
     ENG_UI_ROW(ENG_RHODES_C, 15, ENG_RHODES_HINT),
     ENG_UI_ROW(ENG_REED_C, 15, ENG_REED_HINT),   /* make-up: the Rhodes' until the 200A is measured on the FM-1 */
+    ENG_UI_ROW(ENG_CP_C, 15, ENG_CP_HINT),       /* (the same: the CP-80 not measured on the FM-1 yet) */
 };
-static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 1};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
+static const uint8_t TYPE_UI[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 2};   /* TYPE -> its ENG_UI row (params.c N_TYPE) */
 _Static_assert(sizeof ENG_RHODES_HINT / sizeof ENG_RHODES_HINT[0] == (sizeof ENG_RHODES_C / sizeof ENG_RHODES_C[0] + 3u) / 4u &&
-               sizeof ENG_REED_HINT / sizeof ENG_REED_HINT[0] == (sizeof ENG_REED_C / sizeof ENG_REED_C[0] + 3u) / 4u,
+               sizeof ENG_REED_HINT / sizeof ENG_REED_HINT[0] == (sizeof ENG_REED_C / sizeof ENG_REED_C[0] + 3u) / 4u &&
+               sizeof ENG_CP_HINT / sizeof ENG_CP_HINT[0] == (sizeof ENG_CP_C / sizeof ENG_CP_C[0] + 3u) / 4u,
                "one hint per VOICE page");
 #define ENG_VP_MAX 4u                        /* VOICE pages an engine may have (ui.c's page walk) */

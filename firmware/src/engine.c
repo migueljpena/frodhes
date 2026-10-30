@@ -4,6 +4,7 @@
  *   TYPE 0..3  ST77 SUIT FELT DYNO   the Rhodes engine (rhodes.c, unchanged)
  *   TYPE 4     200A                  the reed engine (reed.c, the Wurlitzer 200A): its line
  *   TYPE 5     200A AMP              the same through its amp and speaker
+ *   TYPE 6     CP-80                 the string engine (strings.c, the Yamaha CP-80)
  * (Frodhes' bar engine, VIBES and MARIMBA, is not in this firmware: its TYPEs 4 and 5 were those two; params.c
  * converts records that name them)
  *
@@ -20,11 +21,14 @@
  * 200A <-> 200A AMP is not a change of engine: the reed engine glides its speaker in (reed.c re_amp). */
 #include "rhodes.c"
 #include "reed.c"     /* the reed engine (self-contained: its tables, voices and render) */
+#include "strings.c"  /* the string engine (its tables, voices and render; reed.c's integer helpers) */
 
 #define ENG_RHODES 0u
 #define ENG_REED 1u
-#define ENG_N 2u
+#define ENG_CP 2u
+#define ENG_N 3u
 #define ENG_REED_TYPE 4u                       /* params.c: the 200A (TYPE 5: 200A AMP) */
+#define ENG_CP_TYPE 6u                         /* params.c: the CP-80 */
 #define ENG_RH_NTYPE 4u                        /* TYPE 0..3 the Rhodes, as params.c TYPE_ENGINE / TYPE_SUB */
 
 static volatile uint8_t eng_want;              /* main loop: the engine of the TYPE last set */
@@ -70,6 +74,7 @@ static void eng_set_type(uint32_t t)
 {
     uint8_t w = eng_want;
     if (t == ENG_REED_TYPE || t == ENG_REED_TYPE + 1u) { eng_want = ENG_REED; re_amp = (uint8_t)(t != ENG_REED_TYPE); }
+    else if (t == ENG_CP_TYPE) eng_want = ENG_CP;
     else { rh_type = (uint8_t)(t < ENG_RH_NTYPE ? t : 0u); eng_want = ENG_RHODES; }
     if (eng_want != w) eng_epoch++;
 }
@@ -107,7 +112,7 @@ static void eng_vib_knob(uint32_t k, uint32_t v)
 static int eng_quiet(void)
 {
     if (eq_w != eq_r || eng_swapping || eng_want != eng_cur) return 0;
-    return eng_cur == ENG_REED ? re_quiet() : rh_quiet();
+    return eng_cur == ENG_REED ? re_quiet() : eng_cur == ENG_CP ? cp_quiet() : rh_quiet();
 }
 
 
@@ -119,6 +124,11 @@ static int eng_note_sounding(uint32_t n)
         for (v = 0; v < RE_NV; v++) if (act >> v & 1u && re_notes[v] == n) return 1;
         return 0;
     }
+    if (eng_cur == ENG_CP) {
+        uint32_t act = cp_active_bits;
+        for (v = 0; v < CP_NV; v++) if (act >> v & 1u && cp_notes[v] == n) return 1;
+        return 0;
+    }
     {
         uint32_t act = rh_active_bits;
         for (v = 0; v < RH_NV; v++) if (act >> v & 1u && rh_notes[v] == n) return 1;
@@ -126,7 +136,9 @@ static int eng_note_sounding(uint32_t n)
     return 0;
 }
 
-static uint32_t eng_shed_count(void) { return rh_shed_count + re_shed_count; }
+static uint32_t eng_shed_count(void) { return rh_shed_count + re_shed_count + cp_shed_count; }
+/* the running engine's voices sounding (a bit a voice) */
+static uint32_t eng_active_bits(void) { return eng_cur == ENG_REED ? re_active_bits : eng_cur == ENG_CP ? cp_active_bits : rh_active_bits; }
 
 /* ---- ISR */
 static void eng_rh_kill_all(void)               /* the Rhodes stops at once (after the fade block) */
@@ -139,16 +151,17 @@ static void eng_rh_kill_all(void)               /* the Rhodes stops at once (aft
 
 static void eng_switch(uint32_t want)
 {
-    if (eng_cur == ENG_REED) re_kill_all(); else eng_rh_kill_all();
+    if (eng_cur == ENG_REED) re_kill_all(); else if (eng_cur == ENG_CP) cp_kill_all(); else eng_rh_kill_all();
     eng_cur = (uint8_t)want;
     if (want == ENG_REED) re_pedal(eng_pedal_cc);                   /* the pedal is global */
+    else if (want == ENG_CP) cp_pedal(eng_pedal_cc);
     else rh_post(EV_PEDAL, 0, eng_pedal_cc);
     eng_swapping = 0;
 }
 
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
 static uint64_t eng_h_ms, eng_h_mul, eng_h_blocks;
-static uint32_t eng_h_max_ms, eng_h_max_mul, eng_h_max_us[ENG_N];   /* us: per engine (ENG_RHODES, ENG_REED) */
+static uint32_t eng_h_max_ms, eng_h_max_mul, eng_h_max_us[ENG_N];   /* us: per engine (ENG_RHODES, ENG_REED, ENG_CP) */
 static uint32_t eng_h_max_nv[ENG_N];                                /* the most voices alive at once, per engine */
 static FILE *eng_h_log;
 static int eng_h_log_open;
@@ -156,22 +169,28 @@ static int eng_h_log_open;
 
 static void eng_render(int32_t *mono, uint32_t n)
 {
-    uint32_t want = eng_want == ENG_REED ? ENG_REED : ENG_RHODES, j;
+    uint32_t want = eng_want < ENG_N ? eng_want : ENG_RHODES, j;
     if (want != eng_cur && !eng_swapping) {                         /* another engine */
-        uint32_t busy = eng_cur == ENG_REED ? re_active_bits : rh_active_bits;
+        uint32_t busy = eng_active_bits();
         if (busy) eng_swapping = 1;                                 /* fade the old engine out this block */
         else eng_switch(want);                                      /* nothing sounding: change now */
     }
     if (!eng_swapping)                                              /* events wait while the old engine fades */
         while (eq_r != eq_w) {
             uint32_t e = eq[eq_r & 31u], type = e >> 28, note = e >> 16 & 127u, val = e & 0xFFFFu;
-            if (eng_cur == ENG_REED ? type == EV_NOTE_ON && !re_strike(note, val) : ev_w - ev_r >= 32u) break;
+            if (eng_cur == ENG_REED ? type == EV_NOTE_ON && !re_strike(note, val)
+                : eng_cur == ENG_CP ? type == EV_NOTE_ON && !cp_strike(note, val) : ev_w - ev_r >= 32u) break;
                                                                     /* every voice waits for a note (BUGHUNT #21):
                                                                     * this one next block, in order; the Rhodes'
                                                                     * ring full (its note-ons can wait the same way) */
             eq_r = eq_r + 1u;
             if (type == EV_PEDAL) eng_pedal_cc = (uint8_t)val;
             if (eng_cur == ENG_RHODES) rh_post(type, note, val);    /* drained by rh_render below, in order */
+            else if (eng_cur == ENG_CP) {                           /* the strings (struck above) */
+                if (type == EV_NOTE_OFF) cp_note_off(note, val);
+                else if (type == EV_PEDAL) cp_pedal(val);
+                else if (type == EV_ALL_OFF) cp_all_off();
+            }
             else if (type == EV_NOTE_OFF) re_note_off(note, val);   /* the reed (struck above) */
             else if (type == EV_PEDAL) re_pedal(val);
             else if (type == EV_ALL_OFF) re_all_off();
@@ -179,8 +198,10 @@ static void eng_render(int32_t *mono, uint32_t n)
     if (eng_shed_req) {
         eng_shed_req = 0;
         if (eng_cur == ENG_RHODES) rh_shed_req = 1;                 /* (the reed: its steal, re_strike) */
+        else if (eng_cur == ENG_CP) cp_shed_req = 1;
     }
-    if (eng_cur == ENG_REED) re_render(mono, n);                    /* (both set rh_side_on: SPREAD) */
+    if (eng_cur == ENG_REED) re_render(mono, n);                    /* (each sets rh_side_on: SPREAD, the CP's tremolo) */
+    else if (eng_cur == ENG_CP) cp_render(mono, n);
     else rh_render(mono, n);
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
     {   /* host counters: mode-samples and int64 multiplies this block (Rhodes: estimated from the live modes) */
@@ -190,6 +211,14 @@ static void eng_render(int32_t *mono, uint32_t n)
                 if (re_v[i].alive) {
                     for (m = 0; m < RE_NM; m++) if (re_v[i].m[m].on) { ms += n; mul += 2u * n; ns += 170u * n; }
                     mul += 4u * n; ns += 900u * n;
+                }
+        }
+        else if (eng_cur == ENG_CP) {                      /* each partial 2^-band of a full-rate one (an estimate) */
+            for (i = 0; i < CP_NV; i++)
+                if (cp_v[i].alive) {
+                    const cp_key_t *K = &CP_KEYS[cp_v[i].note - CP_KEY_LO];
+                    for (m = 0; m < CP_NB; m++) { ms += K->nb[m] * (n >> m); mul += 2u * K->nb[m] * (n >> m); ns += 75u * K->nb[m] * (n >> m); }
+                    ns += 170u * cp_v[i].np;                        /* the words a block */
                 }
         }
         else {
@@ -204,7 +233,7 @@ static void eng_render(int32_t *mono, uint32_t n)
         if (mul > eng_h_max_mul) eng_h_max_mul = mul;
         if (ns / 1000u > eng_h_max_us[eng_cur]) eng_h_max_us[eng_cur] = ns / 1000u;
         {
-            uint32_t a = eng_cur == ENG_REED ? re_active_bits : rh_active_bits, c = 0;
+            uint32_t a = eng_active_bits(), c = 0;
             for (; a; a &= a - 1u) c++;
             if (c > eng_h_max_nv[eng_cur]) eng_h_max_nv[eng_cur] = c;
         }
@@ -232,13 +261,13 @@ static void eng_host_report(void)                /* tests/host.c, at the end of 
     printf("mul64 %llu (max per block %u)\n", (unsigned long long)eng_h_mul, eng_h_max_mul);
     printf("cpu-proxy max %u us per block (voices only, P0 costs; + 312 idle, + 1388 with every effect)\n",
            eng_h_max_us[eng_cur]);
-    printf("cpu-proxy-each rhodes %u reed %u\n", eng_h_max_us[ENG_RHODES], eng_h_max_us[ENG_REED]);   /* a run on both */
-    printf("voices max rhodes %u of %u reed %u of %u\n", eng_h_max_nv[ENG_RHODES], (unsigned)RH_NV,
-           eng_h_max_nv[ENG_REED], (unsigned)RE_NV);                /* tools/hil_crackle.py: every voice taken */
+    printf("cpu-proxy-each rhodes %u reed %u cp %u\n", eng_h_max_us[ENG_RHODES], eng_h_max_us[ENG_REED], eng_h_max_us[ENG_CP]);   /* a run on several */
+    printf("voices max rhodes %u of %u reed %u of %u cp %u of %u\n", eng_h_max_nv[ENG_RHODES], (unsigned)RH_NV,
+           eng_h_max_nv[ENG_REED], (unsigned)RE_NV, eng_h_max_nv[ENG_CP], (unsigned)CP_NV);                /* tools/hil_crackle.py: every voice taken */
     printf("ev_drop %u\n", (unsigned)(eq_drop + ev_drop));
     printf("rhodes steals %u\n", (unsigned)rh_h_steals);          /* tools/engine_ab.py */
     printf("cpu-proxy-reed %u voices max %u of %u\n", eng_h_max_us[ENG_REED], eng_h_max_nv[ENG_REED], (unsigned)RE_NV);
-    printf("type %u\n", eng_cur == ENG_REED ? ENG_REED_TYPE + re_amp : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
+    printf("type %u\n", eng_cur == ENG_REED ? ENG_REED_TYPE + re_amp : eng_cur == ENG_CP ? ENG_CP_TYPE : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
     if (eng_h_log) fclose(eng_h_log);
 }
 #endif

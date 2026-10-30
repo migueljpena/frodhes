@@ -156,10 +156,10 @@ static int32_t voice_mono[256];
 static void host_race_check(void)
 {
     static uint8_t bad[16], lost[16];
-    uint32_t i, nv = eng_cur == ENG_REED ? RE_NV : RH_NV;
+    uint32_t i, nv = eng_cur == ENG_REED ? RE_NV : eng_cur == ENG_CP ? CP_NV : RH_NV;
     int calm = eq_r == eq_w && engq_r == engq_w && eng_want == eng_cur && !eng_swapping;
     for (i = 0; i < nv && i < 16u; i++) {
-#define HRC(f) (eng_cur == ENG_REED ? (uint32_t)re_v[i].f : (uint32_t)rv[i].f)
+#define HRC(f) (eng_cur == ENG_REED ? (uint32_t)re_v[i].f : eng_cur == ENG_CP ? (uint32_t)cp_v[i].f : (uint32_t)rv[i].f)
         uint32_t alive = HRC(alive), held = HRC(held), note = HRC(note), pend = HRC(pend), pn = HRC(pend_note);
 #undef HRC
         int want = (out_ref[note & 127u] && !note_to_arp[note & 127u]) || arp_playing == note;
@@ -338,6 +338,13 @@ static void midi_cc(uint32_t cc, uint32_t v)
         for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 1u) { pick = t; break; }
         if (pick && v >= 64u) pick++;
         if (pick) { type_pick((int32_t)pick); ui_mark_param(P_TYPE); }
+        return;
+    }
+    if (cc == 79u) {                                   /* the CP types (TYPE_ENGINE 2): the CP-80 (Frodhes' CC 79 picked
+                                                        * its bar engine's types, VIBES / MARIMBA: the third engine's
+                                                        * here too; 64..127 are kept for a CP-70) */
+        uint32_t t;
+        for (t = 0; t < N_TYPE_N; t++) if (TYPE_ENGINE[t] == 2u) { type_pick((int32_t)t); ui_mark_param(P_TYPE); break; }
         return;
     }
     if (cc == 120u || cc == 123u) {                    /* all notes off: every MIDI note is let go as if its note-off
@@ -582,6 +589,7 @@ static void app_main(void)
         rev_poll();                             /* (rev_types.c: HALL's lines cleared after a TYPE change) */
         rh_cc_poll();                           /* (rhodes.c: the note-on coefficients, when TUNE / DECAY / RELEASE moved) */
         re_knob(RK_TUNE, (int32_t)set.tune * 65536); re_knob(RK_REG, set.reg); re_poll();   /* (reed.c: every key's words, when a VOICE knob moved) */
+        cp_knob(CK_TUNE, (int32_t)set.tune * 65536); cp_poll();   /* (strings.c: the preamp's words, when a tone knob moved) */
         seq_poll();
         arp_poll();
         ui_leds(lit, tempo_beat_led() || (arp_on() && arp_n && arp_playing < 128u));
@@ -788,17 +796,20 @@ static int host_state(const char *key, char *v, unsigned n)
     else if (!strcmp(key, "ledduty")) snprintf(v, n, "%u %u", fm1_led_duty[0], fm1_led_duty[1]);   /* DISPLAY BRIGHTNESS: the keys', the buttons' lit duty /16 */
     else if (!strcmp(key, "reed")) snprintf(v, n, "%d", eng_want == ENG_REED);
     else if (!strcmp(key, "reg")) snprintf(v, n, "%u", (unsigned)set.reg);   /* the 200A's REG (settings) */
-    else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_cur == ENG_REED ? re_active_bits : rh_active_bits));
+    else if (!strcmp(key, "cp")) snprintf(v, n, "%d", eng_want == ENG_CP);
+    else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_active_bits()));
     else if (!strcmp(key, "held")) {
         uint32_t hb = rh_held_bits;
         if (eng_cur == ENG_REED) for (i = hb = 0; i < RE_NV; i++) hb |= (uint32_t)(re_v[i].alive && re_v[i].held) << i;
+        if (eng_cur == ENG_CP) for (i = hb = 0; i < CP_NV; i++) hb |= (uint32_t)(cp_v[i].alive && cp_v[i].held) << i;
         snprintf(v, n, "%u", host_bits(hb));
     }
     else if (key[0] == 'v' && key[1] == 'n' && key[2] >= '0' && key[2] <= '9') {   /* vnN: voices sounding note N
                                                            * (alive, not fading out for a steal; BUGHUNT #21) */
         uint32_t nn = (uint32_t)atoi(key + 2) & 127u;
-        for (i = c = 0; i < (eng_cur == ENG_REED ? RE_NV : RH_NV); i++)
+        for (i = c = 0; i < (eng_cur == ENG_REED ? RE_NV : eng_cur == ENG_CP ? CP_NV : RH_NV); i++)
             c += eng_cur == ENG_REED ? re_v[i].alive && re_v[i].note == nn && re_v[i].fade == 32768
+               : eng_cur == ENG_CP ? cp_v[i].alive && cp_v[i].note == nn && cp_v[i].fade == 32768
                                      : rv[i].alive && rv[i].note == nn && rv[i].fade == 32768;
         snprintf(v, n, "%u", c);
     }

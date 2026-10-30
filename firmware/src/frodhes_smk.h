@@ -333,7 +333,7 @@ static void smk_buttons(uint32_t *pressed, uint32_t *released)
 }
 
 /* ---- the lights: the pads, the SMK's own buttons (ui_leds sets the LEDs from smk_btn_leds) */
-static int smk_sounding(void) { return (eng_cur == ENG_REED ? re_active_bits : rh_active_bits) != 0u; }
+static int smk_sounding(void) { return eng_active_bits() != 0u; }
 static void smk_pad_rgb(uint32_t p, int on, int act)
 {
     const uint8_t *c = !on ? SMK_OFF : act ? SMK_ACT : SMK_ON;

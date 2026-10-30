@@ -1,0 +1,71 @@
+# The CP-80 (TYPE 6, the string engine, strings.c): picked over MIDI (CC 79), a note and its damper, an
+# undamped top key ringing on after its key-up, a pedal chord past the 10 voices (two steals), a voice shed, a re-struck note,
+# the tone knobs and the tremolo, silence at the end. RAW: no effects.
+50 midi 0xB0 119 127
+60 midi 0xB0 79 0
+300 expect state card.2.0 CP-80
+300 expect state cp 1
+# one note, key-up: the damper stops it
+400 midi 0x90 60 100
+900 expect rms > -40
+1500 midi 0x80 60 0
+2500 expect rms < -60
+# C8 has no damper (keys 74-88): it rings on after the key-up
+2600 midi 0x90 108 110
+2700 midi 0x80 108 0
+3200 expect rms > -50
+# pedal down, 12 notes one after the other on 10 voices, then pedal up
+3300 midi 0xB0 64 127
+3400 midi 0x90 41 90
+3440 midi 0x90 45 90
+3480 midi 0x90 48 90
+3520 midi 0x90 52 90
+3560 midi 0x90 55 90
+3600 midi 0x90 57 90
+3640 midi 0x90 60 90
+3680 midi 0x90 64 90
+3720 midi 0x90 67 90
+3760 midi 0x90 69 90
+3780 midi 0x90 72 90
+3800 midi 0x90 76 90
+3900 midi 0x80 41 0
+3900 midi 0x80 45 0
+3900 midi 0x80 48 0
+3900 midi 0x80 52 0
+3900 midi 0x80 55 0
+3900 midi 0x80 57 0
+3900 midi 0x80 60 0
+3900 midi 0x80 64 0
+3900 midi 0x80 67 0
+3900 midi 0x80 69 0
+3900 midi 0x80 72 0
+3900 midi 0x80 76 0
+4000 expect sound
+4000 expect state voices 10
+# the audio ran late (as the FM-1's ISR asks): one voice fades out
+4010 shed
+4100 expect state voices 9
+4110 midi 0xB0 64 0
+6000 expect rms < -60
+6000 expect state voices 0
+# a note struck again while it rings: one voice, louder
+6100 midi 0x90 64 60
+6400 midi 0x90 64 127
+6450 expect state vn64 1
+6800 expect rms > -35
+6900 midi 0x80 64 0
+# BASS, TREBLE at their tops, BRILLIANCE HIGH (CC 29, 31, 28), the tremolo on at full depth (CC 47, 48)
+7000 midi 0xB0 29 127
+7000 midi 0xB0 31 127
+7000 midi 0xB0 28 127
+7000 midi 0xB0 47 127
+7000 midi 0xB0 48 127
+7100 midi 0x90 48 100
+7100 midi 0x90 55 100
+7100 midi 0x90 64 100
+7800 expect sound
+8000 midi 0x80 48 0
+8000 midi 0x80 55 0
+8000 midi 0x80 64 0
+9500 expect rms < -60
+9500 expect state voices 0

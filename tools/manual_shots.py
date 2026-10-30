@@ -3,7 +3,8 @@
 """Screenshots for the manual: the host build walks every page (and a few states) and saves PNGs to docs/manual/img/,
 then composes overview.png (PERFORM, VOICE, PHASER, COMPRESSOR; the README's Screens section: its intro picture is piano.png, the FRODHES page). The page list is the firmware's: a first host run
 walks SELECT and reads each page's name back (the engine's VOICE pages are dynamic: voice1.png, voice2.png on the
-Rhodes; voice1-200a.png .. voice4-200a.png on the WURLI 200A, with piano-200a.png its FRODHES page). Files left in
+Rhodes; voice1-200a.png .. voice4-200a.png on the WURLI 200A, with piano-200a.png its FRODHES page; voice1-cp80.png,
+voice2-cp80.png and piano-cp80.png on the CP-80). Files left in
 the folder from pages that went are listed.
 Into docs/manual/img/ (the default), it then sets every picture link's ?v= in README.md / docs/MANUAL.md to the
 file's hash (tools/doc_links.py --fix). tests/py/test_manual_shots.py runs it into a temporary folder and fails if
@@ -133,6 +134,8 @@ def main():
     PAGES = names(walk_pages())                             # the SELECT order, as the firmware has it
     reed = names(walk_pages(["100 midi 0xB0 115 0"]), "-200a")               # CC 115 0: the WURLI 200A
     reed = reed[reed.index("piano-200a") + 1:reed.index("comp-200a")]        # its own pages (VOICE 1..4)
+    cp = names(walk_pages(["100 midi 0xB0 79 0"]), "-cp80")                  # CC 79: the CP-80
+    cp = cp[cp.index("piano-cp80") + 1:cp.index("comp-cp80")]                # its own pages (VOICE 1..2)
     L, shots, t = ["400 shot"], {400: "splash"}, 100
     if cards is not None:                                   # the rows' design variant (developer CC 11)
         L.insert(0, f"50 midi 0xB0 11 {int(cards)}")           # the start screen, before anything is touched
@@ -208,6 +211,17 @@ def main():
     for name in reed:                                       # SELECT through them, a note on each (live readouts)
         L.append(f"{t} turn 0 1"); t += 100
         L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700   # (the TYPE message has gone)
+        L.append(f"{t} shot"); shots[t] = name; t += 100
+    # the CP-80: its VOICE pages (1/2 the tone controls, 2/2 the tremolo and TUNE), after the 200A's
+    L.append(f"{t} midi 0xC0 0 0"); t += 100                # F01 (the header: not the 200A's preset)
+    L.append(f"{t} midi 0xB0 79 0"); t += 100               # TYPE CP-80
+    L.append(f"{t} btn 8"); t += 100                        # HOME: PERFORM from the 200A's last page ...
+    L.append(f"{t} turn 0 1"); t += 100                     # ... then SELECT: the FRODHES page with TYPE CP-80
+    L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700
+    L.append(f"{t} shot"); shots[t] = "piano-cp80"; t += 100
+    for name in cp:
+        L.append(f"{t} turn 0 1"); t += 100
+        L.append(f"{t} keys 0x80"); L.append(f"{t + 300} keys 0x0"); t += 1700
         L.append(f"{t} shot"); shots[t] = name; t += 100
     L.append(f"{t} end")
     open(tag + ".txt", "w").write("\n".join(L) + "\n")
