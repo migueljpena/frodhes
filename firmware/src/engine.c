@@ -4,7 +4,7 @@
  *   TYPE 0..3  ST77 SUIT FELT DYNO   the Rhodes engine (rhodes.c, unchanged)
  *   TYPE 4     200A                  the reed engine (reed.c, the Wurlitzer 200A): its line
  *   TYPE 5     200A AMP              the same through its amp and speaker
- *   TYPE 6     CP-80                 the string engine (strings.c, the Yamaha CP-80)
+ *   TYPE 6     CP-80                 the string engine (strings.c, the CP-80)
  * (Frodhes' bar engine, VIBES and MARIMBA, is not in this firmware: its TYPEs 4 and 5 were those two; params.c
  * converts records that name them)
  *

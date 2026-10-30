@@ -107,10 +107,16 @@ def test_synced_delay_follows_tempo():
     assert la >= min(lb, lc) - 3, f"echoes over one new delay time {la:.1f} dBFS (held tempos {lb:.1f} / {lc:.1f})"
 
 
-def test_vibes_motor_switch():
+def test_cp_tremolo_switch():
+    """the CP-80's TREMOLO: switching it under a held chord does not click"""
+    x, _, _ = click_x(cc(79, 0, 25) + cc(47, 127, 26), cc(47, 0), notes=(53, 57, 60, 65, 69))
+    assert x <= 10, f"tremolo off: a click {x:.1f}x"
+
+
+def test_motor_switch():
     """VOICE 3/3 MOTOR: 'it fades in and out over about 50 ms, so switching never clicks'; 'Switching the motor on or
     off under a held chord starts or stops the pulse without a jump in level'"""
-    vib = cc(79, 0, 25) + cc(47, 127, 26)
+    vib = cc(47, 127, 26)
     x, a, b = click_x(vib, cc(47, 0), notes=(53, 57, 60, 65, 69))
     assert x <= 10, f"motor off: a click {x:.1f}x"
     assert abs((lvl(a, TE + 100, TE + 400) - lvl(a, TE - 300, TE)) - (lvl(b, TE + 100, TE + 400) - lvl(b, TE - 300, TE))) < 3

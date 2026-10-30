@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools"))
 import monkey as M  # noqa: E402
 from hostrun import run  # noqa: E402
 
-ENGINES = {"rhodes": [], "vibes": [(10, "midi 0xB0 79 0"), (11, "midi 0xB0 104 0")], "marimba": [(10, "midi 0xB0 79 127")]}
+ENGINES = {"rhodes": [], "cp": [(10, "midi 0xB0 79 0"), (11, "midi 0xB0 104 0")]}
 NOTES = [(48, 30), (52, 100), (55, 64), (60, 110), (62, 20), (64, 90), (67, 70), (71, 50), (74, 120), (77, 40)]
 
 

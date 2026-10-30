@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Frodhes string engine: the Yamaha CP-80 (the float model tools/cp_model.py, its algorithm tools/cp_multirate.py;
+/* Frodhes string engine: the CP-80 (the float model tools/cp_model.py, its algorithm tools/cp_multirate.py;
  * tables from tools/gen_cp.py -> firmware/gen/cp_tables.h).
  *
  * A key is the partials of its string (keys 1-22) or its pair of strings (23-88): f_n = n f0 sqrt(1 + B n^2), the
@@ -211,7 +211,7 @@ static void cp_damp(cp_voice_t *v)
 
 static int cp_strike(uint32_t note, uint32_t vel)
 {
-    uint32_t i, best = CP_NV, old = 0xFFFFFFFFu;
+    uint32_t i, h, best = CP_NV, old = 0xFFFFFFFFu;
     if (note < CP_KEY_LO || note >= CP_KEY_LO + CP_NKEY || !vel) return 1;
     if (vel > 127u) vel = 127u;
     for (i = 0; i < CP_NV; i++)                                   /* the strings still sounding: struck again */
@@ -222,9 +222,12 @@ static int cp_strike(uint32_t note, uint32_t vel)
             return 1;
         }
     for (i = 0; i < CP_NV; i++) if (!cp_v[i].alive) { best = i; break; }
-    if (best == CP_NV) {                                          /* every voice taken: the oldest not already given
-                                                                  * a note fades out over a block (as reed.c) */
-        for (i = 0; i < CP_NV; i++) if (!cp_v[i].pend && cp_v[i].age < old) { old = cp_v[i].age; best = i; }
+    if (best == CP_NV) {                                          /* every voice taken: the oldest let go, else the
+                                                                  * oldest held, not already given a note, fades
+                                                                  * out over a block (as reed.c) */
+        for (h = 0; h < 2u && best == CP_NV; h++)
+            for (i = 0; i < CP_NV; i++)
+                if (!cp_v[i].pend && cp_v[i].held == h && cp_v[i].age < old) { old = cp_v[i].age; best = i; }
         if (best == CP_NV) return 0;
         cp_v[best].pend = 1; cp_v[best].pend_note = (uint8_t)note; cp_v[best].pend_vel = (uint8_t)vel;
         if (cp_v[best].fade == 32768) cp_v[best].fade = 32767;
@@ -281,6 +284,7 @@ static void cp_kill_all(void)
     cp_active_bits = 0;
     memset(cp_up_st, 0, sizeof cp_up_st);
     memset(cp_pre_st, 0, sizeof cp_pre_st);
+    cp_tph = 0; cp_tl1 = cp_tl2 = cp_td = 0;
 }
 
 static int cp_quiet(void) { return cp_active_bits == 0 && cp_quiet_blocks >= 2u; }

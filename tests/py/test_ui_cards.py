@@ -39,7 +39,7 @@ STYLE = {1: {"amount": "F", "select": "F", "toggle": "F"}, 2: {"amount": "L", "s
 # every value written in its short form (ui.c CD_LONG / CD_SHORT) in the default build (24 px, breathing):
 # (page, label, short form); the other sizes: no value that does not fit
 SHORT = {("ASSIGN", "PLAYS", s) for s in ("TRM/WAH", "CMP GAIN", "TRM RATE", "TRM SHP", "PHA SPD", "PHA FDBK",
-                                          "CHO SPD", "DLY FDBK")} | {("FRODHES", "TYPE", "200A")}   # (WURLI 200A)
+                                          "CHO SPD", "DLY FDBK", "BRILL")} | {("FRODHES", "TYPE", "200A")}   # (WURLI 200A)
 DEF_PX = 24                                                       # aatext.c UI_VAL_PX
 KEYS = M.KEYS + [f"rowbox{k}" for k in range(4)] + ["cards"]
 SYNC_NAMES = {"1/32", "16T", "1/16", "8T", "16D", "1/8", "4T", "8D", "1/4", "4D", "1/2", "1/1", "2BAR", "4BAR"}

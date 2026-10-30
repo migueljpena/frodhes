@@ -38,7 +38,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENARIOS = {1: "DAW recording: stress_max (USB 44.1 + 48 kHz)", 2: "live on the jack", 3: "preset / TYPE switching",
              4: "controls under load", 5: "update / rescue", 6: "CPU per engine"}
 ALL = (1, 2, 3, 4, 5, 6)
-ENGINES_T2 = ("rhodes", "reed")
+ENGINES_T2 = ("rhodes", "reed", "cp")
 SHOTS = "the screenshots / docs tests (tools/manual_shots.py, test_manual_shots, test_docs_vs_code)"
 SEQ = "the sequencer / arp scripts (tests/scripts/seq.txt, arp*.txt; tools/hil_seq.py)"
 USB2 = "the USB counters at both rates (44.1 and 48 kHz)"
@@ -66,6 +66,8 @@ RULES = [
      "the Rhodes engine (its DSP or tables)"),
     ("engine:reed", ["firmware/src/reed.c", "firmware/gen/reed_tables.h"], ALL, ("reed",), (),
      "the reed engine (the Wurlitzer 200A: its DSP or tables)"),
+    ("engine:cp", ["firmware/src/strings.c", "firmware/gen/cp_tables.h"], ALL, ("cp",), (),
+     "the string engine (the CP-80: its DSP or tables)"),
     ("engine:dispatch", ["firmware/src/engine.c", "firmware/src/fxp.h"], ALL, ENGINES_T2 + ("effects",), (),
      "the engine dispatcher / the fixed-point helpers (every engine's DSP)"),
     ("fx", ["firmware/src/fx.c", "firmware/src/dly_tape.c", "firmware/gen/fx_tables.h"], (1, 4, 6), ("effects",), (),

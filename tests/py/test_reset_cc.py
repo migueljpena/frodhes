@@ -27,7 +27,7 @@ def takes(sel, reset):
 
 
 @pytest.mark.parametrize("sel", [[], ["40 midi 0xB0 80 64"], ["40 midi 0xB0 80 110"], ["40 midi 0xB0 79 0"]],
-                         ids=["ST77", "FELT", "DYNO", "VIBES"])
+                         ids=["ST77", "FELT", "DYNO", "CP80"])
 def test_reset_makes_takes_identical(sel):
     a, b = takes(sel, True)
     assert np.array_equal(a, b), (np.count_nonzero(a - b), np.abs(a - b).max())

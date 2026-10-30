@@ -15,8 +15,8 @@ import pytest
 
 from hostrun import run
 
-ENG = {"rhodes": [], "vibes": ["50 midi 0xB0 79 0", "51 midi 0xB0 47 0"],
-       "marimba": ["50 midi 0xB0 79 127", "51 midi 0xB0 47 127"]}
+ENG = {"rhodes": [], "cp": ["50 midi 0xB0 79 0", "51 midi 0xB0 47 0"],
+       "cp-trem": ["50 midi 0xB0 79 0", "51 midi 0xB0 47 127"]}
 
 
 def lost(r):

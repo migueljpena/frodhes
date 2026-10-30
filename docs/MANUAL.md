@@ -1,13 +1,13 @@
 # Frodhes: user manual
 
-**A physically modelled electric piano, Wurlitzer 200A and Yamaha CP-80 for the M-VAVE FM-1.**
+**A physically modelled electric piano, Wurlitzer 200A and CP-80 for the M-VAVE FM-1.**
 
 Frodhes turns the FM-1 into an electric piano. Every note is computed from the physics of a real Rhodes: the hammer
 strikes a tine, the tine rings against its tonebar, and a magnetic pickup turns the motion into sound. As on a real
 instrument, no two keys are quite the same: each one rings a little longer or shorter and a little louder or softer
 than its neighbours (every key stays exactly in tune), and a held note from E2 to C6 has the tine's slow whirl: its
 level wobbles gently, about 2 dB, once or twice a second, as the tine's two ways of swinging trade energy. Struck
-hard, the bass goes a touch sharp and settles as it rings. A Wurlitzer 200A reed piano (section 5) and a Yamaha
+hard, the bass goes a touch sharp and settles as it rings. A Wurlitzer 200A reed piano (section 5) and a
 CP-80 electric grand (section 6) are computed the same way. No recordings are played back. Around the piano sits a stage-keyboard effects chain: compressor, drive (five overdrive types), a resonant filter,
 tremolo or wah, phaser, chorus, delay and reverb. For playing there is a PERFORM page with four assignable knobs,
 chord mode, a pattern recorder (sequencer), an arpeggiator, scales and tap tempo, USB-MIDI in and out and TRS MIDI in.
@@ -175,7 +175,7 @@ The page after PERFORM (press **HOME** twice) carries the instrument's name as i
 
 | Knob | Card | What it does |
 | --- | --- | --- |
-| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **WURLI 200A**, the reed electric piano, or **200A AMP**, the same through its own amp and speaker (see [WURLI 200A](#5-wurli-200a-the-reed-piano)), or **CP-80**, the Yamaha electric grand (see [CP-80](#6-cp-80-the-electric-grand)). Applies to the next notes. |
+| K1 | **TYPE** | The instrument: **STAGE 77** (the classic stage piano), **SUITCASE** (with its own amp and four 12-inch speakers in a closed cabinet: warm lows, a gently rolled-off treble), **EARLY FELT** (early felt hammers: rounder, darker), **BELL DYNO** (a modified, bell-like voicing: glassy), **WURLI 200A**, the reed electric piano, or **200A AMP**, the same through its own amp and speaker (see [WURLI 200A](#5-wurli-200a-the-reed-piano)), or **CP-80**, the electric grand (see [CP-80](#6-cp-80-the-electric-grand)). Applies to the next notes. |
 | K2 | **TONE** | Where the tine sits against the pickup: lower is rounder and warmer, higher is more bell and midrange (the same as VOICE 1/2's TONE). On the WURLI 200A: **BARK**; on the CP-80: **BASS** |
 | K3 | **BELL** | The bright metallic overtone at the start of each note (the same as VOICE 1/2's BELL). On the WURLI 200A: the vibrato's **DEPTH**; on the CP-80: **TREBLE** |
 | K4 | **KEY VEL** | How hard the FM-1's own keys strike: the velocity of a medium press (TOUCH on [SETUP](#setup); harder presses play louder, softer ones quieter), and with TOUCH at **FIXED** the velocity of every press. Around 60–80 soft and round, 96 medium (the default), 108–127 hard with bark. MIDI notes keep their own velocity. |
@@ -620,7 +620,7 @@ time on the FM-1 is not measured yet.
 
 ## 6. CP-80: the electric grand
 
-Turn **ALGORITHM** (or the TYPE card) one step past 200A AMP to **CP-80** (TYPE 6): a Yamaha CP-80, the electric grand
+Turn **ALGORITHM** (or the TYPE card) one step past 200A AMP to **CP-80** (TYPE 6): a CP-80, the electric grand
 piano of the late 1970s: real strings struck by hammers, read by a piezo pickup under each string's bridge. All 88 keys
 sound, A0 to C8. The lowest 22 keys have one wound string each, the rest two strings a few cents apart, so their notes
 beat gently as on the instrument. Every string rings with its own overtones, slightly stretched by the wire's stiffness;

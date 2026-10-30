@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""The float model of the Yamaha CP-80 (the baseline before any recording): what docs/model/data/cp80.json's
+"""The float model of the CP-80 (the baseline before any recording): what docs/model/data/cp80.json's
 documents and physics give, in double precision. The reference a later integer engine (strings.c) is checked against.
 
 Each key has one wound string (keys 1-22) or two (23-88: wound to 42, then plain music wire of the parts list's

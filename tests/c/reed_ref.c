@@ -24,6 +24,7 @@ static int32_t rh_rel_gain(uint32_t rv) { return 32768 + ((int32_t)(rv ? rv : 64
 static volatile int32_t rh_spread, rh_bend_t;
 static int32_t rh_side[256];
 static uint8_t rh_side_on;
+#define RH_OWN_SECTION(s)
 #include "../../firmware/src/reed.c"
 
 int main(int argc, char **argv)

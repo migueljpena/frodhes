@@ -38,7 +38,7 @@ typedef struct {
 static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "200A", "2AMP", "CP80"};
 static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "WURLI 200A", "200A AMP",
                                           "CP-80"};
-/* TYPE -> engine (0 Rhodes, 1 reeds: reed.c, the Wurlitzer 200A; 2 strings: strings.c, the Yamaha CP-80), the
+/* TYPE -> engine (0 Rhodes, 1 reeds: reed.c, the Wurlitzer 200A; 2 strings: strings.c, the CP-80), the
  * engine's own type index, and the drive row (fx.c, 0..3), in step with N_TYPE. The Rhodes types 0..3 are Frodhes'
  * own; the 200A (4) the reed engine's line, 200A AMP (5) the same through its amp and speaker; the CP-80 (6). Frodhes had VIBES and MARIMBA (its bar engine) at 4 and 5: records
  * that name them are converted (params_retype) */

@@ -1,6 +1,6 @@
 # Frodhes
 
-**A physically modelled electric piano, Wurlitzer 200A and Yamaha CP-80 for the M-VAVE FM-1.**
+**A physically modelled electric piano, Wurlitzer 200A and CP-80 for the M-VAVE FM-1.**
 
 Frodhes is an independent open-source project, not affiliated with or endorsed by M-VAVE, the Rhodes or Fender trademark owners or any instrument maker. It comes with no warranty: install it at your own risk (M-VAVE's own firmware can always be put back); see [LICENSING.md](LICENSING.md).
 
@@ -9,7 +9,7 @@ Frodhes is an independent open-source project, not affiliated with or endorsed b
   <img src="docs/manual/img/piano.png?v=ecad2653" width="380" alt="Frodhes on the FM-1: the FRODHES page (TYPE, TONE, BELL, KEY VEL)">
 </p>
 
-Frodhes turns the FM-1 into an electric piano, a Wurlitzer 200A and a Yamaha CP-80. Every note is computed live from the mechanics of the
+Frodhes turns the FM-1 into an electric piano, a Wurlitzer 200A and a CP-80. Every note is computed live from the mechanics of the
 instrument: on a Rhodes a hammer strikes a tine, the tine rings against its tonebar and a magnetic pickup turns the
 motion into sound, with the bark of hard notes, the bell of the attack, the slow whirl of a held tine and
 keys that each sound a little different; on the Wurli 200A a felt hammer strikes a steel reed that barks past its

@@ -1490,7 +1490,7 @@ static void fx_reset_state(void)
     /* every voice ends and the shared pickup RLC / body states go to 0 (as at an engine change), and this block's
      * voice output is dropped (fx_process): the tails a take left under the gate's -66 dBFS rang on and the next take
      * met them (its level moved up to 5 LU with what was played before, on the FM-1: the presets suite) */
-    eng_rh_kill_all(); re_kill_all();
+    eng_rh_kill_all(); re_kill_all(); cp_kill_all();
     lfo_sh = 0; fl_ic[0] = fl_ic[1] = 0; fl_op = 0;                 /* the filters, the smoothers, the master */
     dr_hp = dr_lp1 = dr_lp2 = dr_tlp = 0; wah_env = wah_lp = wah_bp = 0; cmp_env = 0; cmp_g = 65536;
     dc_l = dc_r = dce_l = dce_r = 0; memset(lk_l, 0, sizeof lk_l); memset(lk_r, 0, sizeof lk_r); lk_pk = 0; lk_g = 32768;
