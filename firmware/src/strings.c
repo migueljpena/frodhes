@@ -373,6 +373,8 @@ static void cp_up(const int32_t *x, int32_t *y, uint32_t n, int32_t (*st)[2])
         }
 }
 
+#define CP_OUT_SH 12                          /* the output's level: -6 dB of the model's, so the hammers' peaks (a crest of
+                                               * 14 dB, the Rhodes' 8) stay under fx.c LIM_T: a six-note chord at v127 */
 static uint8_t cp_shed_req;                   /* ISR (engine.c): the audio ran late: fade out the quietest voice */
 static void cp_shed(void)                     /* (as rhodes.c rh_shed: a released voice first) */
 {
@@ -444,11 +446,11 @@ static void cp_render(int32_t *mono, uint32_t n)
                 cp_td += (dt - cp_td + (dt > cp_td ? 255 : 0)) >> 8;
                 g = (1 << 30) - (int32_t)(((int64_t)cp_td * ((cp_tl1 >> 1) + (cp_tl2 >> 1))) >> 30);
                 sd = (int32_t)(((int64_t)cp_td * ((cp_tl2 - cp_tl1) >> 1)) >> 30);
-                rh_side[i] = (int32_t)(((int64_t)x * sd) >> 41);  /* Q26 x Q30 -> Q15 */
+                rh_side[i] = (int32_t)(((int64_t)x * sd) >> (30 + CP_OUT_SH));  /* Q26 x Q30 -> Q15 */
                 x = (int32_t)(((int64_t)x * g) >> 30);
             }
             else cp_tph += inc;
-            mono[i] = (x + (1 << 10)) >> 11;                       /* Q26 -> Q15 */
+            mono[i] = (x + (1 << (CP_OUT_SH - 1))) >> CP_OUT_SH;     /* Q26 -> Q15, -6 dB */
         }
         rh_side_on = (uint8_t)(trem != 0);
     }

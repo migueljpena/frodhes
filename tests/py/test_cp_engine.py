@@ -64,10 +64,19 @@ def test_the_preamp_and_the_tremolo(ref):
         bus, out = run(ref, [(0, f"knob {k} {v}") for k, v in kn.items()] + notes, nb)
         want = pre.run(bus, bass=G.knob(kn.get(0, 64)), middle=G.knob(kn.get(1, 64)), treble=G.knob(kn.get(2, 64)),
                        bril=["LOW", "MEDIUM", "HIGH"][kn.get(3, 1)])
-        assert db(out - want, want) < -50, kn
+        assert db(out - want / 2, want / 2) < -50, kn   # (strings.c CP_OUT_SH: -6 dB)
     inc = int(round(5.0 / m.FS * 2 ** 32))
     bus, out, side = run(ref, [(0, f"trem 127 {inc}")] + notes, nb, side=True)
-    l, r = m.tremolo(pre.run(bus), 5.0, 1.0)
+    l, r = m.tremolo(pre.run(bus) / 2, 5.0, 1.0)
     s = slice(int(0.3 * m.FS), None)
     assert db(out[s] - (l[s] + r[s]) / 2, (l[s] + r[s]) / 2) < -45
     assert db(side[s] - (l[s] - r[s]) / 2, (l[s] - r[s]) / 2) < -45
+
+
+@pytest.mark.parametrize("trem", [0, 127])
+def test_a_hard_chord_stays_under_the_limiter(ref, trem):
+    """six notes at v127, the tremolo's side too: under fx.c LIM_T (-2.7 dBFS), so the hammers' peaks are not squashed"""
+    notes = [(0, f"on {n} 127") for n in (36, 43, 52, 60, 64, 67)]
+    inc = int(round(5.0 / m.FS * 2 ** 32))
+    _, out, side = run(ref, [(0, f"trem {trem} {inc}")] + notes, 150, side=True)
+    assert max(np.abs(out + side).max(), np.abs(out - side).max()) < 24000 / 32768
