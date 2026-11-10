@@ -1,0 +1,51 @@
+# FREE (0.9.7, RECORDING K1): on an empty pattern a free take; SEQ's press on the "1" after the last bar closes it,
+# its length sets the loop: the bars (1, 2, 4, 8) whose tempo is nearest the tempo set. Keys: C4 = 7, E4 = 11, G4 = 14.
+# Buttons: SEQ 11, PLAY 12. Encoders: SELECT 0, K1 = 2. 120 BPM.
+100 btn 11
+200 turn 0 1
+250 turn 2 1
+260 turn 2 1
+270 turn 2 1
+300 expect state card0 FREE
+350 turn 0 -1
+400 btn 11
+450 expect state play 0
+# a take of 2.4 s (four notes 600 ms apart, SEQ pressed at 2.4 s): 1 bar at 100 BPM (2 bars would be 200)
+1000 keys 0x80
+1100 keys 0
+1600 keys 0x800
+1700 keys 0
+2200 keys 0x4000
+2300 keys 0
+2800 keys 0x80
+2900 keys 0
+3400 press 11
+3450 release 11
+3500 expect state play 1
+3510 expect state rec 0
+3520 expect state notes 4
+3530 expect state bpm 100.0
+# PLAY drops a take: cleared, then a new one stopped by PLAY
+3600 btn 12
+3700 press 11
+4800 release 11
+4900 expect state notes 0
+5000 btn 11
+5100 keys 0x80
+5200 keys 0
+5300 btn 12
+5400 expect state notes 0
+5410 expect state play 0
+5420 expect state rec 1
+# (REC stays armed after a dropped take) a take of 2.0 s at 100 BPM: 1 bar would be 120 BPM, 2 bars 240: 1 bar, 120 BPM
+6000 keys 0x80
+6100 keys 0
+7000 keys 0x800
+7100 keys 0
+8000 press 11
+8050 release 11
+8100 expect state bpm 120.0
+8110 expect state notes 2
+8120 expect state play 1
+8200 btn 12
+8300 end

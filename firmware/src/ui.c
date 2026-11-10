@@ -602,7 +602,7 @@ static int32_t slot_val(uint32_t s, int32_t *hi)
     case S_SQQUANT: *hi = 5; return SQ_QUANT;
     case S_SQSWING: *hi = 25; return SQ_SWING - 50;
     case S_SQEDIT: *hi = 1; return sq_erase;
-    case S_SQSTART: *hi = 2; return SQ_START;
+    case S_SQSTART: *hi = 3; return SQ_START;
     case S_SQCLICK: *hi = 2; return SQ_CLICK;
     case S_SQCLVL: *hi = 10; return SQ_CLVL ? SQ_CLVL : 5u;
     case S_SQHIST: *hi = 1; return sq_un != 0u;
@@ -695,7 +695,7 @@ static void slot_text(uint32_t s, char *v)
     case S_SQQUANT: p_strcpy(v, SQ_QUANT_NAME[SQ_QUANT], 5); return;
     case S_SQSWING: { uint32_t n = 0; p_fmt_int(v, SQ_SWING); while (v[n]) n++; v[n++] = '%'; v[n] = 0; return; }
     case S_SQEDIT: p_strcpy(v, sq_erase ? "ERASE" : sq_browsing() ? "DELETE" : "UNDO", 6); return;
-    case S_SQSTART: { static const char *const N[3] = {"STEP", "NOTE", "COUNT"}; p_strcpy(v, N[SQ_START <= 2u ? SQ_START : 0u], 5); return; }
+    case S_SQSTART: { static const char *const N[4] = {"STEP", "NOTE", "COUNT", "FREE"}; p_strcpy(v, N[SQ_START <= 3u ? SQ_START : 0u], 5); return; }
     case S_SQCLICK: { static const char *const N[3] = {"OFF", "REC", "ON"}; p_strcpy(v, N[SQ_CLICK <= 2u ? SQ_CLICK : 0u], 3); return; }
     case S_SQCLVL: p_fmt_int(v, (int32_t)(SQ_CLVL ? SQ_CLVL : 5u)); return;
     case S_SQHIST: p_strcpy(v, sq_un ? "REDO" : "UNDO", 4); return;
@@ -805,7 +805,7 @@ static void slot_turn(uint32_t s, int32_t d)
             ui_say(m);
         } else { sq_erase = (uint8_t)!sq_erase; if (sq_erase && seq_rec) seq_toggle_rec(); ui_say(sq_erase ? "ERASE: HOLD KEYS" : "ERASE OFF"); }
         break;
-    case S_SQSTART: SQ_START = (uint8_t)clampi((int32_t)SQ_START + sgn(d), 0, 2); sq_count = 0; break;
+    case S_SQSTART: SQ_START = (uint8_t)clampi((int32_t)SQ_START + sgn(d), 0, 3); sq_count = 0; break;
     case S_SQCLICK: SQ_CLICK = (uint8_t)clampi((int32_t)SQ_CLICK + sgn(d), 0, 2); break;
     case S_SQCLVL: SQ_CLVL = (uint8_t)clampi((int32_t)(SQ_CLVL ? SQ_CLVL : 5u) + sgn(d), 1, 10); sq_click_req = 1; break;   /* (a click: hear it) */
     case S_SQSHIFT: seq_shift(d); sq_roll_dirty = 1; break;
@@ -1515,12 +1515,14 @@ static void draw_footer(void)
         char t[32];
         uint32_t n = 0;
         if (sq_count) { p_strcpy(t, "COUNT IN: ", 10); n = 10; p_fmt_int(t + n, (int32_t)sq_count - 1); }
+        else if (sq_free) { p_strcpy(t, "FREE TAKE: ", 11); n = 11; p_fmt_int(t + n, (int32_t)((fm1_ms - sq_free_t0) / 1000u)); while (t[n]) n++; p_strcpy(t + n, " S", 2); }
+        else if (seq_rec && !seq_play && SQ_START == 3u && !sq_n) p_strcpy(t, "FREE: PLAY, SEQ ON THE 1", 24);
         else if (seq_rec && !seq_play && SQ_START == 1u) p_strcpy(t, "REC: PLAY TO START", 18);
         else if (seq_rec && !seq_play && SQ_START == 2u) p_strcpy(t, "REC: PLAY = COUNT IN", 20);
         else if (seq_rec) p_strcpy(t, seq_play ? "REC: OVERDUB" : "STEP REC: PLAY NOTES", 20);
         else if (sq_erase) p_strcpy(t, "ERASE: HOLD KEYS", 20);
         else { p_strcpy(t, seq_play ? "PLAYING  " : "STOPPED  ", 10); n = 9; p_fmt_int(t + n, (int32_t)sq_n); while (t[n]) n++; p_strcpy(t + n, " NOTES", 6); }
-        ft_c(7, t, seq_rec || sq_erase || sq_count ? UI_ACC : FC_LAB);
+        ft_c(7, t, seq_rec || sq_erase || sq_count || sq_free ? UI_ACC : FC_LAB);
         ft_c(22, "SEQ: REC   HOLD SEQ: CLEAR", FC_DIM);
     } else if (ui_page == PG_ARP) {
         ft_c(7, ARP_HOLD ? "HOLD ON: NOTES KEEP PLAYING" : "HOLD OFF", ARP_HOLD ? UI_ACC : FC_LAB);

@@ -523,14 +523,14 @@ stored when the loop is stopped).
 
 ### RECORDING
 
-![RECORDING](manual/img/recording.png?v=35a28c95)
+![RECORDING](manual/img/recording.png?v=7a036f60)
 
 The sequencer's second page (SELECT one step on from SEQUENCER): how a recording starts, a click to play to, and
 UNDO / REDO. These belong to the FM-1, not to a preset.
 
 | Knob | Card | What it does |
 | --- | --- | --- |
-| K1 | **START** | **STEP**: as before: REC armed with the loop stopped is step recording, PLAY starts the loop. **NOTE**: REC armed and stopped, **your first note starts the loop** on bar 1, beat 1 (no PLAY; no step recording). **COUNT**: REC armed and stopped, **PLAY counts a bar in** (four clicks, the first higher; COUNT IN 4..1 at the bottom of SEQUENCER), then the loop starts recording on the next beat; notes played during the count only sound; PLAY during it calls it off. With an external MIDI clock the clock starts the loop |
+| K1 | **START** | **STEP**: as before: REC armed with the loop stopped is step recording, PLAY starts the loop. **NOTE**: REC armed and stopped, **your first note starts the loop** on bar 1, beat 1 (no PLAY; no step recording). **COUNT**: REC armed and stopped, **PLAY counts a bar in** (four clicks, the first higher; COUNT IN 4..1 at the bottom of SEQUENCER), then the loop starts recording on the next beat; notes played during the count only sound; PLAY during it calls it off. **FREE**: on an **empty** pattern, a **free take**: REC armed, play freely, no click, no tempo; the footer counts the seconds. Press **SEQ on the "1" after your last bar**: the time from your first note to that press is the loop. The FM-1 picks 1, 2, 4 or 8 bars at the tempo nearest the one set (within 3 % it keeps the tempo set; 40–240 BPM), puts your notes in it where you played them and plays it at once (REC off: SEQ again to overdub). PLAY during a take drops it (REC stays armed); a take closes by itself after 30 s. On a pattern with notes FREE works as NOTE. With an external MIDI clock the clock starts the loop |
 | K2 | **CLICK** | **OFF**, **REC** (a click on every beat while recording), **ON** (while the loop plays). The bar's first beat clicks higher. The count-in always clicks. The click is never recorded into the pattern; it is in the jack's and the USB's sound |
 | K3 | **LEVEL** | The click's level, 1–10 (each turn plays a click) |
 | K4 | **UNDO/REDO** | Turn **left: UNDO** the last pass (as EDIT on SEQUENCER), **right: REDO** the last UNDO (the card shows REDO while there is one). Recording, ERASE, DELETE or CLEAR drops what REDO could bring back; REDO is not kept when the FM-1 is switched off |

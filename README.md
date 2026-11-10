@@ -96,7 +96,7 @@ the MIDI map.
 | **ARPEGGIO** | OFF / UP / DOWN / UP-DN / ORDER / RANDOM | RATE | OCTAVES | GATE | ARP (there: on / off; SEL: HOLD, on every page while the arp is on) |
 | **LFO** | SHAPE | RATE | SYNC | RETRIG | (SELECT) |
 | **SEQUENCER** | BARS 1–16 | QUANT | SWING | EDIT (UNDO / ERASE) | SEQ (there: REC, hold: CLEAR; PLAY: start / stop, tap tempo while the arp is on) |
-| **RECORDING** | START (STEP / NOTE / COUNT) | CLICK (OFF / REC / ON) | LEVEL | UNDO / REDO | (SELECT) |
+| **RECORDING** | START (STEP / NOTE / COUNT / FREE) | CLICK (OFF / REC / ON) | LEVEL | UNDO / REDO | (SELECT) |
 | **PATTERN** | SHIFT (a 16th) | LENGTH (x2 / 1/2) | TRANSPOSE | | (SELECT) |
 | **ASSIGN** | what K1 plays | what K2 plays | what K3 plays | what K4 plays | (SELECT) |
 | **SETUP** | DELAY TONE | LEVEL | USB VOL (KNOB / FIXED) | TOUCH (LIGHT / MEDIUM / HEAVY / FIXED) | GLO twice |

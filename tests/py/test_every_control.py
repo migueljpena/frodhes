@@ -1150,6 +1150,19 @@ def _seqpattern():
     return float(ok), 1.0, f"{pa} -> {pb}, {na} -> {nb}"
 
 
+@case("SEQ-FREE")
+def _seqfree():
+    """START FREE (0.9.7): a free take of four notes 600 ms apart closed by SEQ's press at 2.4 s: 1 bar at 100 BPM,
+    the notes where they were played, the loop in phase with the press (not its release)"""
+    lines = CLEAN + ["40 btn 11", "60 turn 0 1"] + detents(2, 1, 3, 80) + ["100 turn 0 -1", "150 btn 11"]
+    for i, t in enumerate((1000, 1600, 2200, 2800)):
+        lines += [f"{t} keys {[0x80, 0x800, 0x4000, 0x80][i]:#x}", f"{t + 100} keys 0"]
+    w = R(lines + ["3400 press 11", "3480 release 11", "8000 btn 12", "8010 dump"], 8100)
+    ph = sorted({(t - 3400) % 2400 for t, _ in ons(w, 3500)})
+    ok = w.state(8010)["bpm"] == "100.0" and len(ph) == 4 and all(abs(a - b) <= 8 or abs(a - b) >= 2392 for a, b in zip(ph, (0, 600, 1200, 1800)))
+    return float(ok), 1.0, f"{w.state(8010)['bpm']} BPM, {ph}"
+
+
 @case("SEQ-STEP")
 def _seqstep():
     """step recording (REC while stopped): notes on the cursor's steps, QUANT 1/16, then played back 125 ms apart"""

@@ -11,7 +11,8 @@
  *   EDIT            left: UNDO the last pass recorded; right: ERASE on / off (hold keys: their notes go as the loop
  *                   passes them)
  *   RECORDING page  START (STEP: armed and stopped = step recording, PLAY starts the loop; NOTE: the first note played
- *                   starts the loop on bar 1, beat 1; COUNT: PLAY counts a bar in, then the loop records), CLICK (OFF,
+ *                   starts the loop on bar 1, beat 1; COUNT: PLAY counts a bar in, then the loop records; FREE: on an
+ *                   empty pattern a free take, the loop's length sets the tempo, else as NOTE), CLICK (OFF,
  *                   REC: while recording, ON: while playing; a count-in always clicks), its LEVEL, and UNDO / REDO
  *
  *   PATTERN page   SHIFT (every note a 16th later / earlier, around the loop), LENGTH (right x2: the loop twice as
@@ -56,7 +57,7 @@ static const char *const SQ_QUANT_NAME[6] = {"OFF", "1/4", "1/8", "1/16", "1/8T"
 #define SQ_BARS (set.seq_bars)
 #define SQ_QUANT (set.seq_quant)
 #define SQ_SWING (set.seq_swing)
-#define SQ_START (set.seq_rsv[0])                   /* 0.9.7: 0 STEP, 1 NOTE, 2 COUNT (records before: 0, as it was) */
+#define SQ_START (set.seq_rsv[0])                   /* 0.9.7: 0 STEP, 1 NOTE, 2 COUNT, 3 FREE (records before: 0) */
 #define SQ_CLICK (set.seq_rsv[1])                   /* 0.9.7: 0 OFF, 1 REC, 2 ON */
 #define SQ_CLVL (set.seq_rsv[2])                    /* 0.9.7: the click's LEVEL 1..10 (0: 5) */
 #define SQ_LAT_MS 12u                               /* a key's sound comes ~12 ms after it (the scan, the audio's blocks:
@@ -66,6 +67,9 @@ static uint32_t sq_un;                              /* REDO's stack: the last sq
                                                      * notes pushed together (one take) */
 static uint8_t sq_count;                            /* COUNT: beats of the count-in still to come (0: none) */
 static uint32_t sq_count_t;                         /* its next beat (fm1_ms) */
+static uint8_t sq_free;                             /* FREE: a free take runs (from its first note, sq_free_t0) */
+static uint32_t sq_free_t0;
+#define SQ_FREE_MAX 30000u                          /* a free take closes by itself after 30 s */
 static volatile uint8_t sq_click_req;               /* the audio's click (frodhes.c app_click): 1 a beat, 2 a bar's first */
 static void ui_mark(uint32_t e);
 
@@ -76,7 +80,7 @@ static void seq_sanitize(void)
     if (SQ_BARS < 1u || SQ_BARS > 16u) SQ_BARS = 4;
     if (SQ_QUANT > 5u) SQ_QUANT = 3;
     if (SQ_SWING < 50u || SQ_SWING > 75u) SQ_SWING = 50;
-    if (SQ_START > 2u) SQ_START = 0;
+    if (SQ_START > 3u) SQ_START = 0;
     if (SQ_CLICK > 2u) SQ_CLICK = 0;
     if (SQ_CLVL > 10u) SQ_CLVL = 0;
 }
@@ -164,9 +168,51 @@ static void seq_stop(void)                              /* stop: back to the sta
     ui_mark(6); ui_mark(7);
 }
 static int seq_counting(void) { return sq_count != 0u; }
+static void seq_clear(void);
+
+/* FREE: the free take closes at t_end (SEQ's press): its length T is the loop. The bars (1, 2, 4, 8) whose tempo
+ * (B bars in T) is nearest the tempo set, within 40..240 BPM; within 3 % the tempo set stays. The notes were kept in
+ * ms from the take's first (tick / len); now in the loop's ticks. The loop plays at once, REC off */
+static void sq_free_close(uint32_t t_end)
+{
+    static const uint8_t BB[4] = {1, 2, 4, 8};
+    uint32_t T = t_end - sq_free_t0, n, i, best = 0, bd = 0xFFFFFFFFu, b10 = set.bpm10, L;
+    sq_free = 0;
+    if (T < 400u) { seq_clear(); return; }              /* (a slip: nothing kept) */
+    for (n = 0; n < 128u; n++)                          /* the notes still held end with the take */
+        if (rec_start[n] != 0xFFFFu) { uint32_t l = T - rec_start[n]; sq_add(rec_start[n], l < 6u ? 6u : l, n, rec_vel[n]); rec_start[n] = 0xFFFFu; }
+    for (i = 0; i < 4u; i++) {
+        uint32_t bpm = BB[i] * 4u * 600000u / T, dd = bpm > b10 ? bpm - b10 : b10 - bpm;
+        if (bpm < 400u || bpm > 2400u) continue;
+        if (dd < bd) { bd = dd; best = i; }
+    }
+    if (bd == 0xFFFFFFFFu) best = T > 4000u ? 3u : 0u;  /* (no tempo in range: the longest or the shortest) */
+    {
+        uint32_t bpm = BB[best] * 4u * 600000u / T;
+        if (bpm < 400u) bpm = 400u;
+        if (bpm > 2400u) bpm = 2400u;
+        if (bd * 100u > b10 * 3u) tempo_set10(bpm);    /* (within 3 %: the tempo set stays) */
+    }
+    SQ_BARS = BB[best];
+    L = sq_len();
+    for (i = 0; i < sq_n; i++) {                        /* ms -> ticks (ms < 2^15, L <= 3072: 32-bit) */
+        uint32_t t = sq_ev[i].tick * L / T, l = sq_ev[i].len * L / T;
+        sq_ev[i].tick = (uint16_t)(t < L ? t : L - 1u);
+        sq_ev[i].len = (uint16_t)(l < 6u ? 6u : l);
+    }
+    sq_changed();
+    seq_rec = 0;
+    seq_start();
+    {   /* in phase with the press (the "1"), not the release: the loop already that far on */
+        uint32_t late = fm1_ms - t_end;
+        if (late < 1000u) sq_pos = late * ((SQ_PPQ << 16) / (beat_ms ? beat_ms : 500u));
+    }
+    ui_mark(10);
+}
 static void seq_toggle_play(void)
 {
     if (sq_count) { sq_count = 0; ui_mark(6); return; }  /* PLAY during the count-in: called off */
+    if (sq_free) { sq_free = 0; seq_clear(); ui_mark(6); return; }   /* PLAY during a free take: dropped */
     if (seq_play) { seq_stop(); return; }
     if (seq_rec && SQ_START == 2u && !clk_live()) {     /* COUNT: a bar of clicks first (an external clock: at once) */
         sq_count = 5; sq_count_t = fm1_ms; ui_mark(6);
@@ -176,6 +222,10 @@ static void seq_toggle_play(void)
 }
 static void seq_toggle_rec(void)
 {
+    if (sq_free) {                                      /* SEQ closes the free take: at its press (a release comes later) */
+        sq_free_close(fm1_ms - sq_btn_t < 1000u ? sq_btn_t : fm1_ms);
+        return;
+    }
     if (seq_rec) { sq_rec_close_all(); seq_rec = 0; sq_count = 0; }
     else { seq_rec = 1; sq_erase = 0; sq_take++; }
     ui_mark(6); ui_mark(10);
@@ -186,6 +236,7 @@ static void seq_clear(void)
     sq_all_off();
     for (n = 0; n < 128u; n++) rec_start[n] = 0xFFFFu;
     sq_n = 0;
+    sq_free = 0;
     sq_edited();
 }
 static uint32_t seq_undo(void)                          /* the last pass recorded goes: how many notes */
@@ -316,6 +367,11 @@ static void live_note_on(uint32_t n, uint32_t vel)
         if (SQ_START == 0u) { st_note_on(n, vel); return; }   /* STEP, stopped: step recording */
         if (SQ_START == 2u || clk_live()) return;       /* COUNT: only PLAY starts it (a count-in: the notes only
                                                          * sound); an external clock starts it */
+        if (SQ_START == 3u && (sq_free || !sq_n)) {     /* FREE on an empty pattern: the free take, in ms */
+            if (!sq_free) { sq_free = 1; sq_free_t0 = fm1_ms; sq_take++; ui_mark(6); }
+            if (rec_start[n] == 0xFFFFu && fm1_ms - sq_free_t0 < 32768u) { rec_start[n] = (uint16_t)(fm1_ms - sq_free_t0); rec_vel[n] = (uint8_t)vel; }
+            return;
+        }
         seq_start();                                    /* NOTE: this note starts the loop, on bar 1 beat 1 */
         rec_start[n] = 0; rec_vel[n] = (uint8_t)vel;
         return;
@@ -326,6 +382,14 @@ static void live_note_off(uint32_t n)
 {
     if (n > 127u) return;
     if (live_held[n]) live_held[n]--;
+    if (sq_free) {                                      /* the free take: the note's length in ms */
+        if (!live_held[n] && rec_start[n] != 0xFFFFu) {
+            uint32_t l = fm1_ms - sq_free_t0 - rec_start[n];
+            sq_add(rec_start[n], l < 6u ? 6u : l > 32767u ? 32767u : l, n, rec_vel[n]);
+            rec_start[n] = 0xFFFFu;
+        }
+        return;
+    }
     if (seq_rec && !seq_play && !sq_erase && SQ_START == 0u) { st_note_off(); return; }
     if (!live_held[n]) sq_rec_close(n);
 }
@@ -334,6 +398,7 @@ static void seq_poll(void)
 {
     uint32_t L = sq_len(), dt, p0, p1, i;
     int noon = 0, jump = 0;
+    if (sq_free && fm1_ms - sq_free_t0 >= SQ_FREE_MAX) sq_free_close(fm1_ms);   /* (30 s: it closes itself) */
     if (sq_count) {                                     /* the count-in: four clicks a beat apart (the first accented),
                                                          * the loop on the fifth beat (sq_count 5 .. 2 click, 1 starts) */
         if ((int32_t)(fm1_ms - sq_count_t) < 0) return;
