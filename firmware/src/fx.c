@@ -740,7 +740,7 @@ FR_RAM __attribute__((noinline)) static void fx_phaser(int32_t *L, int32_t *R, u
                                                          * phaser +4.2 dB over both held renders, the control sweep) */
     if (!ph_w) {                                        /* switched on from rest: the allpasses start from 0 (their
                                                          * states were stale), under the fade in */
-        memset(&ph_st, 0, sizeof ph_st);
+        FR_FAR(memset)(&ph_st, 0, sizeof ph_st);       /* (memset is in XIP: beyond a direct call from RAM) */
     }
     if (ph_cq < 0) { ph_cq = ct; ph_gq = gt; ph_dq = depth << 8; ph_fq = fbk; }   /* (switched on: at once) */
     w1 = FR_FAR(xf_pre)(ph_w, on, L, R, n);
