@@ -527,8 +527,7 @@ static int re_strike(uint32_t note, uint32_t vel)
         if (best == RE_NV) return 0;                              /* every voice waits for a note: next block */
         re_v[best].pend = 1; re_v[best].pend_note = (uint8_t)note; re_v[best].pend_vel = (uint8_t)vel;
         if (re_v[best].fade == 32768) re_v[best].fade = 32767;
-        re_shed_count++;
-        re_noise(note, vel, &R->k[note - RE_KEY_LO]);
+        re_noise(note, vel, &R->k[note - RE_KEY_LO]);              /* (a steal: not a shed voice, as rhodes.c) */
         return 1;
     }
     re_noise(note, vel, &R->k[note - RE_KEY_LO]);

@@ -249,8 +249,7 @@ static int cp_strike(uint32_t note, uint32_t vel)
         if (best == CP_NV) return 0;
         cp_v[best].pend = 1; cp_v[best].pend_note = (uint8_t)note; cp_v[best].pend_vel = (uint8_t)vel;
         if (cp_v[best].fade == 32768) cp_v[best].fade = 32767;
-        cp_shed_count++;
-        return 1;
+        return 1;                                                 /* (a steal: not a shed voice, as rh_strike) */
     }
     CP_PF(2, cp_start(&cp_v[best], note, vel));
     return 1;
