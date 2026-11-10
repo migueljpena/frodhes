@@ -14,6 +14,10 @@
  *                   starts the loop on bar 1, beat 1; COUNT: PLAY counts a bar in, then the loop records), CLICK (OFF,
  *                   REC: while recording, ON: while playing; a count-in always clicks), its LEVEL, and UNDO / REDO
  *
+ *   PATTERN page   SHIFT (every note a 16th later / earlier, around the loop), LENGTH (right x2: the loop twice as
+ *                   long, its notes copied after themselves, or, with notes kept past its end, those back; left 1/2:
+ *                   half as long, the rest kept as BARS keeps it), TRANSPOSE (every note a semitone up / down)
+ *
  * Live recording takes back the time between a key and its sound (SQ_LAT_MS): what is played on the beat as heard
  * lands on the beat. An UNDO keeps what it took on a stack at the array's top (sq_un), for REDO; any new edit drops it.
  *
@@ -219,6 +223,57 @@ static uint32_t seq_redo(void)                          /* the last UNDO's notes
     sq_all_off();
     sq_changed();
     return got;
+}
+
+/* ---- the PATTERN page: the whole pattern at once (main loop; the loop never stops). The cards show how far it moved
+ * since the FM-1 started (not saved) */
+static int32_t sq_shift_n, sq_trans_n;
+static void seq_shift(int32_t d)                        /* every note a 16th (24 ticks) later (d > 0) or earlier */
+{
+    uint32_t L = sq_len(), i;
+    for (i = 0; i < sq_n; i++)
+        if (sq_ev[i].tick < L) sq_ev[i].tick = (uint16_t)((sq_ev[i].tick + L + (d > 0 ? 24u : L - 24u)) % L);
+    sq_shift_n += d > 0 ? 1 : -1;
+    sq_all_off();
+    sq_edited();
+}
+static uint32_t seq_transpose(int32_t d)                /* every note a semitone up / down: how many could not move */
+{
+    uint32_t i, stuck = 0;
+    for (i = 0; i < sq_n; i++) {
+        int32_t n = (int32_t)sq_ev[i].note + (d > 0 ? 1 : -1);
+        if (n < 0 || n > 127) { stuck++; continue; }
+        sq_ev[i].note = (uint8_t)n;
+    }
+    sq_trans_n += d > 0 ? 1 : -1;
+    sq_all_off();
+    sq_edited();
+    return stuck;
+}
+/* LENGTH: d > 0 doubles the loop (up to 16 bars): notes kept past its end (a shorter BARS hid them) come back as they
+ * were, else every note is copied a loop later (those that do not fit the 448 stay out: the count); d < 0 halves it
+ * (from 1 bar: nothing), the notes past the new end kept. Returns the notes that did not fit */
+static uint32_t seq_length(int32_t d)
+{
+    uint32_t L = sq_len(), i, n0 = sq_n, past = 0, lost = 0;
+    if (d < 0) {
+        if (SQ_BARS < 2u) return 0;
+        SQ_BARS = (uint8_t)(SQ_BARS / 2u);
+    } else {
+        if (SQ_BARS > 8u) return 0;
+        for (i = 0; i < sq_n; i++) if (sq_ev[i].tick >= L) past++;
+        SQ_BARS = (uint8_t)(SQ_BARS * 2u);
+        if (!past)
+            for (i = 0; i < n0; i++) {
+                if (sq_n >= SQ_MAXEV) { lost++; continue; }
+                sq_ev[sq_n] = sq_ev[i];
+                sq_ev[sq_n].tick = (uint16_t)(sq_ev[i].tick + L);
+                sq_n++;
+            }
+    }
+    sq_all_off();
+    sq_edited();
+    return lost;
 }
 
 /* step recording (armed and stopped): the notes go on the cursor's step, as long as the QUANT grid (stretched by

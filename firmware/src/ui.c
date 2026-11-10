@@ -5,7 +5,7 @@
  *
  *   SELECT     turns through the pages (the order of the chain):
  *              PERFORM FRODHES (the main page) VOICE DECAY COMP DRIVE FILTER TREM/WAH PHASER CHORUS DELAY REVERB
- *              REVERB 2 TEMPO SCALE CHORD ARPEGGIO LFO SEQUENCER RECORDING ASSIGN SETUP MIDI (PG_ORDER)
+ *              REVERB 2 TEMPO SCALE CHORD ARPEGGIO LFO SEQUENCER RECORDING PATTERN ASSIGN SETUP MIDI (PG_ORDER)
  *   K1..K4     the four cards of the page, always
  *   ALGORITHM  TYPE (on SEQUENCER: a cursor, step by step)   PRESETS  sounds (presets.c; on SEQUENCER: bar by bar)
  *   shortcuts  HOME = PERFORM (again: the main page), EDIT = CHORD (on it: chord mode on / off), LFO / ENV / SEL =
@@ -29,15 +29,16 @@ static void tempo_set10(uint32_t b);
  * engines' pages came from their tables (eng_pages.h): VOICE 1/n .. n/n, one PG_VOICE page with its number ui_vp */
 enum { PG_PERF, PG_ASSIGN, PG_PIANO, PG_VOICE, PG_RETIRED4, PG_COMP, PG_FILTER, PG_TREM, PG_PHA, PG_CHO, PG_DELAY,
        PG_TEMPO, PG_SCALE, PG_CHORD, PG_SEQ, PG_ARP, PG_LFO, PG_SETUP, PG_MIDI, PG_DRIVE, PG_REVERB, PG_DISPLAY,
-       PG_REVERB2, PG_SEQ2, PG_N };                     /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; RECORDING
-                                                         * (0.9.7): the sequencer's START, CLICK, LEVEL, UNDO / REDO */
+       PG_REVERB2, PG_SEQ2, PG_SEQ3, PG_N };                     /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; RECORDING
+                                                         * (0.9.7): the sequencer's START, CLICK, LEVEL, UNDO / REDO;
+                                                         * PATTERN (0.9.7): SHIFT, LENGTH, TRANSPOSE */
 enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL = 8, E_N = 9, E_CARDS = 10 };   /* E_CARDS: all four;
                                     * E_METER: COMP's meter / SEQUENCER's cells, E_ROLL: SEQUENCER's NOW / NEXT */
 /* card slots: a parameter id (< P_COUNT) or one of these */
 enum { S_KVEL = 64, S_TUNE, S_BPM, S_CLOCK, S_SCMODE, S_SCALE, S_ROOT, S_TRANS, S_TWKIND, S_PERF0, S_ASG0 = S_PERF0 + 4,
        S_ARPMODE = S_ASG0 + 4, S_ARPRATE, S_ARPOCT, S_ARPGATE, S_USBVOL, S_CHTYPE, S_CHINV, S_CHVOICE, S_CHSTRUM,
        S_SQBARS, S_SQQUANT, S_SQSWING, S_SQEDIT, S_MCH, S_TRS, S_COLOR, S_BRIGHT, S_LEDS, S_TOUCH, S_REG,
-       S_SQSTART, S_SQCLICK, S_SQCLVL, S_SQHIST, S_NONE = 0xFF };
+       S_SQSTART, S_SQCLICK, S_SQCLVL, S_SQHIST, S_SQSHIFT, S_SQLEN, S_SQTRANS, S_NONE = 0xFF };
 #ifndef FM1_NENC                                       /* the HAL's encoders and buttons (the FM-1: 7, 14; the SMK-37:
                                                          * 8, 18); the host and the emulator stand in for the FM-1 */
 #define FM1_NENC 7u
@@ -108,10 +109,10 @@ static uint32_t sq_delete_step(void);
 static void sq_browse(int32_t d);
 /* the SELECT order (0.9.3, user: the instrument pages next to each other right after PERFORM; ASSIGN, rarely used,
  * next to SETUP); VOICE stands for all the engine's VOICE pages */
-#define PG_NORD 23u
+#define PG_NORD 24u
 static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_COMP, PG_DRIVE, PG_FILTER, PG_TREM, PG_PHA,
                                           PG_CHO, PG_DELAY, PG_REVERB, PG_REVERB2, PG_TEMPO, PG_SCALE, PG_CHORD, PG_ARP,
-                                          PG_LFO, PG_SEQ, PG_SEQ2, PG_ASSIGN, PG_SETUP, PG_MIDI, PG_DISPLAY};   /* DRIVE before FILTER
+                                          PG_LFO, PG_SEQ, PG_SEQ2, PG_SEQ3, PG_ASSIGN, PG_SETUP, PG_MIDI, PG_DISPLAY};   /* DRIVE before FILTER
                                     * (0.9.5, the user), REVERB the last effect, as in the chain, its second page right
                                     * after it (0.9.5); SEQUENCER after LFO (user, TODO 3) */
 static uint8_t ui_vp;                                   /* the VOICE page shown: 0 .. vp_count() - 1 */
@@ -141,7 +142,7 @@ static uint32_t pg_at(uint32_t k, uint32_t *vp)         /* the k-th page (and it
 static const char *const PAGE_TITLE[PG_N] = {"PERFORM", "ASSIGN", "FRODHES", "VOICE", "", "COMPRESSOR", "FILTER", "TREM/WAH",
                                              "PHASER", "CHORUS", "DELAY", "TEMPO", "SCALE", "CHORD", "SEQUENCER",
                                              "ARPEGGIO", "LFO", "SETUP", "MIDI", "DRIVE", "REVERB", "DISPLAY",
-                                             "REVERB 2", "RECORDING"};
+                                             "REVERB 2", "RECORDING", "PATTERN"};
 static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 / K3: the engine's (slot_at) */
     {S_PERF0, S_PERF0 + 1, S_PERF0 + 2, S_PERF0 + 3},
     {S_ASG0, S_ASG0 + 1, S_ASG0 + 2, S_ASG0 + 3},
@@ -167,6 +168,7 @@ static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 
     {S_COLOR, S_BRIGHT, UI_LEDS, S_NONE},
     {P_RV_PREDLY, P_RV_SIZE, P_RV_MOD, P_RV_LOCUT},     /* REVERB 2: PRE-DELAY moved here from REVERB */
     {S_SQSTART, S_SQCLICK, S_SQCLVL, S_SQHIST},         /* RECORDING (seq.c) */
+    {S_SQSHIFT, S_SQLEN, S_SQTRANS, S_NONE},            /* PATTERN (seq.c) */
 };
 static const char *const PAGE_LAB[PG_N][4] = {
     {"", "", "", ""},                                   /* PERFORM: the assigned parameter's name (slot_label) */
@@ -193,6 +195,7 @@ static const char *const PAGE_LAB[PG_N][4] = {
     {"COLOR", "BRIGHTNESS", UI_LEDS_LAB, ""},
     {"PRE-DELAY", "SIZE", "MOD", "LOW CUT"},
     {"START", "CLICK", "LEVEL", "UNDO/REDO"},
+    {"SHIFT", "LENGTH", "TRANSPOSE", ""},
 };
 static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EACH PERFORM KNOB PLAYS",
                                             "FX: ALL EFFECTS ON / OFF", "", "",
@@ -201,7 +204,7 @@ static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EA
                                             "EDIT: CHORDS ON / OFF", "", "ARP: ON / OFF   SEL: HOLD", "MOVES THE FILTER (ITS LFO)", "",
                                             "USB AND TRS: THE SAME CHANNEL", "K1: THE DRIVE TYPE", "NEXT PAGE: SIZE, MOD, LOW CUT",
                                             "THE SCREEN AND THE KEY LIGHTS", "SIZE AUTO: MIX SETS THE SIZE",
-                                            "HOW THE SEQUENCER RECORDS"};
+                                            "HOW THE SEQUENCER RECORDS", "THE WHOLE PATTERN AT ONCE"};
 /* the reverb's TYPE card (P_RV_TYPE, as the drive's: 0 OFF, then the types; params.c N_RV / N_RV_LONG) */
 #define RV_INF 3u                                       /* INFINITE: DECAY 120..126 SUSTAIN (the tail holds, the input
                                                          * open), 127 FREEZE (the input closed): rev_ctl_t.freeze */
@@ -603,6 +606,9 @@ static int32_t slot_val(uint32_t s, int32_t *hi)
     case S_SQCLICK: *hi = 2; return SQ_CLICK;
     case S_SQCLVL: *hi = 10; return SQ_CLVL ? SQ_CLVL : 5u;
     case S_SQHIST: *hi = 1; return sq_un != 0u;
+    case S_SQSHIFT: *hi = 0; return 0;
+    case S_SQLEN: *hi = 16; return SQ_BARS;
+    case S_SQTRANS: *hi = 0; return 0;
     default: *hi = 0; return 0;
     }
 }
@@ -693,6 +699,14 @@ static void slot_text(uint32_t s, char *v)
     case S_SQCLICK: { static const char *const N[3] = {"OFF", "REC", "ON"}; p_strcpy(v, N[SQ_CLICK <= 2u ? SQ_CLICK : 0u], 3); return; }
     case S_SQCLVL: p_fmt_int(v, (int32_t)(SQ_CLVL ? SQ_CLVL : 5u)); return;
     case S_SQHIST: p_strcpy(v, sq_un ? "REDO" : "UNDO", 4); return;
+    case S_SQSHIFT: case S_SQTRANS: {                   /* how far, signed: +3, -1, 0 */
+        int32_t x = s == S_SQSHIFT ? sq_shift_n : sq_trans_n;
+        uint32_t k = 0;
+        if (x > 0) v[k++] = '+';
+        p_fmt_int(v + k, x);
+        return;
+    }
+    case S_SQLEN: p_fmt_int(v, SQ_BARS); return;          /* (the bars, as BARS: the label says LENGTH) */
     case S_ARPOCT: p_fmt_int(v, ARP_OCT + 1); return;
     case S_ARPGATE: { uint32_t n = 0; p_fmt_int(v, ARP_GATE); while (v[n]) n++; v[n++] = '%'; v[n] = 0; return; }
     case S_NONE: return;
@@ -794,6 +808,15 @@ static void slot_turn(uint32_t s, int32_t d)
     case S_SQSTART: SQ_START = (uint8_t)clampi((int32_t)SQ_START + sgn(d), 0, 2); sq_count = 0; break;
     case S_SQCLICK: SQ_CLICK = (uint8_t)clampi((int32_t)SQ_CLICK + sgn(d), 0, 2); break;
     case S_SQCLVL: SQ_CLVL = (uint8_t)clampi((int32_t)(SQ_CLVL ? SQ_CLVL : 5u) + sgn(d), 1, 10); sq_click_req = 1; break;   /* (a click: hear it) */
+    case S_SQSHIFT: seq_shift(d); sq_roll_dirty = 1; break;
+    case S_SQTRANS: if (seq_transpose(d)) ui_say("SOME NOTES AT THE END OF THE RANGE"); sq_roll_dirty = 1; break;
+    case S_SQLEN: {
+        uint32_t b = SQ_BARS, lost = seq_length(d);
+        if (SQ_BARS == b) ui_say(d > 0 ? "16 BARS AT MOST" : "1 BAR AT LEAST");
+        else if (lost) ui_say("FULL: SOME NOTES NOT COPIED");
+        sq_roll_dirty = 1;
+        break;
+    }
     case S_SQHIST: {                                    /* left: UNDO the last pass; right: REDO the last UNDO */
         char m[24];
         uint32_t n = d < 0 ? seq_undo() : seq_redo(), k = 0;

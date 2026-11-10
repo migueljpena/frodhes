@@ -32,10 +32,10 @@ PEDAL = [cc(22, 64, 127)]
 SHORT = [cc(23, 103, 0), cc(24, 104, 0)]            # RELEASE 0, NOISE 0: a note let go stops at once
 # the SELECT order (ui.c PG_ORDER) and the page ids the dump's card.<page>.<k> use (ui.c PG_*)
 ORDER = ["PERF", "PIANO", "VOICE", "DECAY", "COMP", "DRIVE", "FILTER", "TREM", "PHA", "CHO", "DELAY", "REVERB",
-         "REVERB2", "TEMPO", "SCALE", "CHORD", "ARP", "LFO", "SEQ", "SEQ2", "ASSIGN", "SETUP", "MIDI", "DISPLAY"]   # (a Rhodes TYPE: no MOTOR page)
+         "REVERB2", "TEMPO", "SCALE", "CHORD", "ARP", "LFO", "SEQ", "SEQ2", "SEQ3", "ASSIGN", "SETUP", "MIDI", "DISPLAY"]   # (a Rhodes TYPE: no MOTOR page)
 PG = {n: i for i, n in enumerate(["PERF", "ASSIGN", "PIANO", "VOICE", "DECAY", "COMP", "FILTER", "TREM", "PHA", "CHO",
                                   "DELAY", "TEMPO", "SCALE", "CHORD", "SEQ", "ARP", "LFO", "SETUP", "MIDI",
-                                  "DRIVE", "REVERB", "DISPLAY", "REVERB2", "SEQ2"])}
+                                  "DRIVE", "REVERB", "DISPLAY", "REVERB2", "SEQ2", "SEQ3"])}
 BTN = {"OCT-": 0, "OCT+": 1, "FX": 2, "SEL": 3, "ENV": 4, "LFO": 5, "EDIT": 6, "GLO": 7, "HOME": 8, "SAVE": 9,
        "ARP": 10, "SEQ": 11, "PLAY": 12, "REC": 13}
 C4 = 261.63
@@ -1135,6 +1135,19 @@ def _seqedit():
     got = (u.state(4100)["notes"], u.state(4300)["notes"], e.state(2110)["card3"], e.state(4400)["notes"], c.state(4300)["notes"])
     assert got == ("4", "3", "ERASE", "2", "0"), got
     return 1.0, 1.0, "ok"
+
+
+@case("SEQ-PATTERN")
+def _seqpattern():
+    """PATTERN (0.9.7, two SELECT detents on from SEQUENCER): SHIFT +1 plays every note a 16th (125 ms) later,
+    TRANSPOSE +2 two semitones up"""
+    base = SEQ_BASE + SEQ_LIVE
+    a = R(base + ["4000 btn 12"], 4100)
+    b = R(base + ["2100 turn 0 1", "2110 turn 0 1", "2120 turn 2 1", "2130 turn 4 1", "2140 turn 4 1", "6000 btn 12"], 6100)
+    pa, pb = seq_phases(a), seq_phases(b, t0=2200)
+    na = sorted({n for _, n in ons(a, 2100)}); nb = sorted({n for _, n in ons(b, 2200)})
+    ok = len(pa) == len(pb) == 3 and all(abs((y - x) % 2000 - 125) <= 3 for x, y in zip(pa, pb)) and nb == [n + 2 for n in na]
+    return float(ok), 1.0, f"{pa} -> {pb}, {na} -> {nb}"
 
 
 @case("SEQ-STEP")

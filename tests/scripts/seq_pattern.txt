@@ -1,0 +1,47 @@
+# PATTERN (0.9.7): SHIFT, LENGTH, TRANSPOSE on the whole pattern. Keys: C4 = 7, E4 = 11. Buttons: SEQ 11, PLAY 12.
+# Encoders: SELECT 0, K1..K4 = 2..5. Two notes recorded (START NOTE: the first note starts the loop), 1 bar.
+100 btn 11
+150 midi 0xB0 61 1
+200 turn 0 1
+250 expect state page RECORDING
+300 turn 2 1
+350 turn 0 -1
+400 btn 11
+450 keys 0x80
+550 keys 0
+700 keys 0x800
+800 keys 0
+900 btn 11
+950 btn 12
+1000 expect state notes 2
+# PATTERN: two on from SEQUENCER
+1050 turn 0 1
+1060 turn 0 1
+1100 expect state page PATTERN
+1110 expect state card0 0
+1120 expect state card1 1
+# TRANSPOSE +2, SHIFT +1
+1200 turn 4 1
+1210 turn 4 1
+1250 expect state card2 +2
+1300 turn 2 1
+1350 expect state card0 +1
+1360 expect state notes 2
+# LENGTH x2: 2 bars, the notes copied (4); 1/2: 1 bar, the copies kept past the end (4); x2: they come back (still 4)
+1400 turn 3 1
+1450 expect state card1 2
+1460 expect state notes 4
+1500 turn 3 -1
+1550 expect state card1 1
+1560 expect state notes 4
+1600 turn 3 1
+1650 expect state card1 2
+1660 expect state notes 4
+# x2 to 16 bars, then no further
+1700 turn 3 1
+1710 turn 3 1
+1720 turn 3 1
+1750 expect state card1 16
+1800 turn 3 1
+1850 expect state card1 16
+1900 end
