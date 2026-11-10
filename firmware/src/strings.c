@@ -217,11 +217,21 @@ static void cp_damp(cp_voice_t *v)
     v->damp = v->held || !CP_KEYS[v->note - CP_KEY_LO].damped ? 0 : (int32_t)(((int64_t)CP_DAMP * w) >> 15);
 }
 
+/* The strikes' budget: partials started a block. A strike works out every partial of its key at once (~50 a key):
+ * ten v127 notes in one block took ~1.8 ms of the 5.8 ms (FM-1, 2026-11-10: 5.7 ms in all, voices shed). Over the
+ * budget, the strike waits for the next block (cp_strike 0: engine.c keeps it and what follows, in order): a chord
+ * struck in one block spreads over two or three (5.8 ms each). The first strike of a block always goes. */
+#define CP_HIT_BUDGET 200u
+static uint32_t cp_hit_used;                  /* partials started this block (cp_render clears it) */
+
 static int cp_strike(uint32_t note, uint32_t vel)
 {
-    uint32_t i, h, best = CP_NV, old = 0xFFFFFFFFu;
+    uint32_t i, h, best = CP_NV, old = 0xFFFFFFFFu, np = 0;
     if (note < CP_KEY_LO || note >= CP_KEY_LO + CP_NKEY || !vel) return 1;
     if (vel > 127u) vel = 127u;
+    for (i = 0; i < CP_NB; i++) np += CP_KEYS[note - CP_KEY_LO].nb[i];
+    if (cp_hit_used && cp_hit_used + np > CP_HIT_BUDGET) return 0;   /* over the budget: next block */
+    cp_hit_used += np;
     for (i = 0; i < CP_NV; i++)                                   /* the strings still sounding: struck again */
         if (cp_v[i].alive && cp_v[i].fade == 32768 && cp_v[i].note == note) {
             cp_voice_t *v = &cp_v[i];
@@ -290,6 +300,7 @@ static void cp_kill_all(void)
     uint32_t i;
     for (i = 0; i < CP_NV; i++) { cp_v[i].alive = 0; cp_v[i].pend = 0; }
     cp_active_bits = 0;
+    cp_hit_used = 0;
     memset(cp_up_st, 0, sizeof cp_up_st);
     memset(cp_pre_st, 0, sizeof cp_pre_st);
     cp_tph = 0; cp_tl1 = cp_tl2 = cp_td = 0;
@@ -424,6 +435,7 @@ static void cp_render(int32_t *mono, uint32_t n)
     }
     cp_active_bits = act;
     cp_quiet_blocks = act ? 0u : cp_quiet_blocks + 1u;
+    cp_hit_used = 0;                                              /* the next block's strikes: a fresh budget */
     PROF_STAMP(3);                                                /* (developer build: the voices) */
     cp_up(b4, b3, 16u, cp_up_st[3]);                              /* the bands up: 2.76 -> 5.5 -> 11 -> 22 -> 44.1 kHz */
     cp_up(b3, b2, 32u, cp_up_st[2]);

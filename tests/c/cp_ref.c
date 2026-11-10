@@ -48,8 +48,8 @@ int main(int argc, char **argv)
                     if (fscanf(ev, "%d", &b) != 1) return 1;
                 have = 1;
             }
-            if (et != t) break;
-            if (!strcmp(kind, "on")) { if (!cp_strike((uint32_t)a, (uint32_t)b)) return 3; }
+            if (et > t) break;                                   /* (a strike put off: it and what follows, later) */
+            if (!strcmp(kind, "on")) { if (!cp_strike((uint32_t)a, (uint32_t)b)) break; }   /* over the budget: next block, as engine.c */
             else if (!strcmp(kind, "off")) cp_note_off((uint32_t)a, 0);
             else if (!strcmp(kind, "offv")) cp_note_off((uint32_t)a, (uint32_t)b);
             else if (!strcmp(kind, "ped")) cp_pedal((uint32_t)a);
