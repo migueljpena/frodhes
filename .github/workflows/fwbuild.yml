@@ -37,6 +37,17 @@ jobs:
           mv build/frodhes.fwsc build/prof/frodhes.fwsc
           mv build/release.fwsc build/frodhes.fwsc
           sha256sum build/prof/frodhes.fwsc
+      - name: an experiment (two engines at once, 5 voices each; never shipped)
+        run: |
+          cp build/frodhes.fwsc build/release.fwsc
+          APP_DEFS="-DFR_DUAL_EXP -DFR_VOICES=5u" ./build.sh
+          mkdir -p build/dual && mv build/frodhes.fwsc build/dual/frodhes.fwsc
+          mv build/release.fwsc build/frodhes.fwsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frodhes-dual-fwsc
+          path: build/dual/frodhes.fwsc
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: frodhes-prof-fwsc

@@ -178,6 +178,14 @@ static void eng_render(int32_t *mono, uint32_t n)
     if (!eng_swapping)                                              /* events wait while the old engine fades */
         while (eq_r != eq_w) {
             uint32_t e = eq[eq_r & 31u], type = e >> 28, note = e >> 16 & 127u, val = e & 0xFFFFu;
+#ifdef FR_DUAL_EXP
+            /* developer experiment only (APP_DEFS="-DFR_DUAL_EXP -DFR_VOICES=5u", never shipped): with the 200A or the
+             * CP-80, the even notes go to the Rhodes, both engines render: two engines at once, for hil_cpu */
+            if (eng_cur != ENG_RHODES && (type == EV_NOTE_ON || type == EV_NOTE_OFF) && !(note & 1u)) {
+                rh_post(type, note, val); eq_r = eq_r + 1u; continue;
+            }
+            if (eng_cur != ENG_RHODES && (type == EV_PEDAL || type == EV_ALL_OFF)) rh_post(type, note, val);
+#endif
             if (eng_cur == ENG_REED ? type == EV_NOTE_ON && !re_strike(note, val)
                 : eng_cur == ENG_CP ? type == EV_NOTE_ON && !cp_strike(note, val) : ev_w - ev_r >= 32u) break;
                                                                     /* every voice waits for a note (BUGHUNT #21):
@@ -210,6 +218,14 @@ static void eng_render(int32_t *mono, uint32_t n)
     if (eng_cur == ENG_REED) re_render(mono, n);                    /* (each sets rh_side_on: SPREAD, the CP's tremolo) */
     else if (eng_cur == ENG_CP) cp_render(mono, n);
     else rh_render(mono, n);
+#ifdef FR_DUAL_EXP
+    if (eng_cur != ENG_RHODES) {                                    /* the experiment's Rhodes, summed in */
+        static int32_t rx[256];
+        uint32_t i;
+        rh_render(rx, n);
+        for (i = 0; i < n; i++) mono[i] += rx[i];
+    }
+#endif
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
     {   /* host counters: mode-samples and int64 multiplies this block (Rhodes: estimated from the live modes) */
         uint32_t ms = 0, mul = 0, ns = 0, i, m;
