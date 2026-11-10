@@ -1,0 +1,31 @@
+name: fwbuild
+# A development build of the FM-1 firmware: every push to wurli (or a manual run) builds build/frodhes.fwsc on
+# x86_64 Linux (the JieLi toolchain runs on nothing else) and keeps it as the run's artifact "frodhes-fwsc",
+# for installing on the FM-1 with tools/fm1_install.py. Nothing is published or released.
+on:
+  push:
+    branches: [wurli]
+  workflow_dispatch:
+concurrency:
+  group: fwbuild-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install Pillow numpy==2.5.4 scipy==1.18.1
+      - name: the JieLi toolchain and the 3 AC79 SDK files (checked by sha256 in the build)
+        run: |
+          sh tools/get_toolchain.sh .local/jieli
+          sh tools/get_sdk.sh .local/fw-AC79_AIoT_SDK
+      - name: build
+        run: |
+          ./build.sh
+          ls -l build/frodhes.fwsc
+          sha256sum build/frodhes.fwsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frodhes-fwsc
+          path: build/frodhes.fwsc
+          if-no-files-found: error
