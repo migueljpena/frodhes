@@ -14,6 +14,7 @@
 #include <string.h>
 #define CP_TAP 1
 #define RH_OWN_SECTION(s)
+#define PROF_STAMP(i) ((void)0)
 static const uint16_t PEDAL_W[128] = {
 #define W8(x) x, x, x, x, x, x, x, x
     W8(32767), W8(32767), W8(32767), W8(32767), W8(32767), 32767, 32767, 29491, 28945, 28399, 27853, 27307, 26761,

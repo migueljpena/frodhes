@@ -29,3 +29,16 @@ jobs:
           name: frodhes-fwsc
           path: build/frodhes.fwsc
           if-no-files-found: error
+      - name: the developer build with the stage timers (APP_DEFS=-DRH_PROF_STAGES; hil_cpu.py --stages), never shipped
+        run: |
+          mkdir -p build/prof
+          cp build/frodhes.fwsc build/release.fwsc
+          APP_DEFS=-DRH_PROF_STAGES ./build.sh
+          mv build/frodhes.fwsc build/prof/frodhes.fwsc
+          mv build/release.fwsc build/frodhes.fwsc
+          sha256sum build/prof/frodhes.fwsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frodhes-prof-fwsc
+          path: build/prof/frodhes.fwsc
+          if-no-files-found: error

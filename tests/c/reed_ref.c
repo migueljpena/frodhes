@@ -25,6 +25,7 @@ static volatile int32_t rh_spread, rh_bend_t;
 static int32_t rh_side[256];
 static uint8_t rh_side_on;
 #define RH_OWN_SECTION(s)
+#define PROF_STAMP(i) ((void)0)
 #include "../../firmware/src/reed.c"
 
 int main(int argc, char **argv)

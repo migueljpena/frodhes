@@ -415,10 +415,12 @@ static void cp_render(int32_t *mono, uint32_t n)
     }
     cp_active_bits = act;
     cp_quiet_blocks = act ? 0u : cp_quiet_blocks + 1u;
+    PROF_STAMP(3);                                                /* (developer build: the voices) */
     cp_up(b4, b3, 16u, cp_up_st[3]);                              /* the bands up: 2.76 -> 5.5 -> 11 -> 22 -> 44.1 kHz */
     cp_up(b3, b2, 32u, cp_up_st[2]);
     cp_up(b2, b1, 64u, cp_up_st[1]);
     cp_up(b1, b0, 128u, cp_up_st[0]);
+    PROF_STAMP(4);                                                /* (the interpolators) */
 #ifdef CP_TAP
     memcpy(cp_tap, b0, sizeof b0);                                /* host: the strings' bus (Q26), before the preamp */
 #endif

@@ -110,7 +110,7 @@ STAGES = {1: "engine (eng_render)", 2: "fx copy", 3: "compressor", 4: "filter + 
 def default_voices(eng):
     """the firmware's voice count for an engine: rhodes.c RH_VOICES (the Rhodes) or reed.c RE_VOICES (the 200A)"""
     import re
-    key, f = ("RH_VOICES", "rhodes.c") if eng == "rhodes" else ("RE_VOICES", "reed.c")
+    key, f = {"rhodes": ("RH_VOICES", "rhodes.c"), "cp80": ("CP_VOICES", "strings.c")}.get(eng, ("RE_VOICES", "reed.c"))
     src = open(os.path.join(os.path.dirname(__file__), "..", "firmware", "src", f)).read()
     return int(re.search(r"#define " + key + r" (\d+)u", src).group(1))
 
@@ -299,6 +299,12 @@ def run_cpu(argv):  # noqa: C901
             cc(47, 127 if d.get("TW_SW") else 0)      # the vibrato with the effects (P_MOT_ON: its own CC), else off
             if d.get("TW_SW"):
                 cc(17, 64)
+        if eng == "cp80":
+            cc(79, 0)                                 # the CP-80 (frodhes.c CC 79: the CP engine's first TYPE)
+        if "--set" in sys.argv:                       # --set CC:V[,CC:V]: sent after every reset (an A/B of one knob)
+            for pr in sys.argv[sys.argv.index("--set") + 1].split(","):
+                c_, v_ = pr.split(":")
+                cc(int(c_), int(v_))
         if kmode is not None:                         # the key converter's developer mode (keyvel.h CC 41), again
             cc(41, KEYADC[kmode])                     # after every reset (it is not a parameter: CC 120 keeps it)
         time.sleep(0.3)

@@ -195,6 +195,7 @@ static void eng_render(int32_t *mono, uint32_t n)
             else if (type == EV_PEDAL) re_pedal(val);
             else if (type == EV_ALL_OFF) re_all_off();
         }
+    PROF_STAMP(2);                                                  /* (developer build: the events, the strikes) */
     if (eng_shed_req) {
         eng_shed_req = 0;
         if (eng_cur == ENG_RHODES) rh_shed_req = 1;                 /* (the reed: its steal, re_strike) */

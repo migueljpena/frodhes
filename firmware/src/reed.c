@@ -809,8 +809,10 @@ static void re_render(int32_t *mono, uint32_t n)
         }
         if (v->alive) { act |= 1u << i; re_notes[i] = v->note; }
     }
+    PROF_STAMP(3);                                                /* (developer build: the voices) */
     for (i = 0; i < RE_NSN; i++)
         for (j = 0; j < n && re_sn[i].on; j++) ns[j] += re_sn_next(&re_sn[i]);
+    PROF_STAMP(4);                                                /* (the action noises) */
     re_active_bits = act;
     re_quiet_blocks = act ? 0u : re_quiet_blocks + 1u;
     if (!side) s1r = re_s1;
