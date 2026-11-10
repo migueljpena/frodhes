@@ -6,7 +6,7 @@ Frodhes is an independent open-source project, not affiliated with or endorsed b
 
 <p align="center">
   <img src="docs/manual/img/thumbnail.png?v=b66b64bc" width="380" alt="Frodhes: the start screen (FRODHES, ELECTRIC PIANO + WURLI 200A)">
-  <img src="docs/manual/img/piano.png?v=ecad2653" width="380" alt="Frodhes on the FM-1: the FRODHES page (TYPE, TONE, BELL, KEY VEL)">
+  <img src="docs/manual/img/piano.png?v=125eefe7" width="380" alt="Frodhes on the FM-1: the FRODHES page (TYPE, TONE, BELL, KEY VEL)">
 </p>
 
 Frodhes turns the FM-1 into an electric piano, a Wurlitzer 200A and a CP-80. Every note is computed live from the mechanics of the
@@ -29,7 +29,7 @@ code compiled to WebAssembly, with the FM-1's screen, knobs, buttons and keys (c
 
 ## Screens
 
-![The PERFORM, VOICE, PHASER and COMPRESSOR pages](docs/manual/img/overview.png?v=02b23618)
+![The PERFORM, VOICE, PHASER and COMPRESSOR pages](docs/manual/img/overview.png?v=a0f11614)
 
 Every page is in the
 [manual](docs/MANUAL.md), with its screenshot.
@@ -96,6 +96,7 @@ the MIDI map.
 | **ARPEGGIO** | OFF / UP / DOWN / UP-DN / ORDER / RANDOM | RATE | OCTAVES | GATE | ARP (there: on / off; SEL: HOLD, on every page while the arp is on) |
 | **LFO** | SHAPE | RATE | SYNC | RETRIG | (SELECT) |
 | **SEQUENCER** | BARS 1–16 | QUANT | SWING | EDIT (UNDO / ERASE) | SEQ (there: REC, hold: CLEAR; PLAY: start / stop, tap tempo while the arp is on) |
+| **RECORDING** | START (STEP / NOTE / COUNT) | CLICK (OFF / REC / ON) | LEVEL | UNDO / REDO | (SELECT) |
 | **ASSIGN** | what K1 plays | what K2 plays | what K3 plays | what K4 plays | (SELECT) |
 | **SETUP** | DELAY TONE | LEVEL | USB VOL (KNOB / FIXED) | TOUCH (LIGHT / MEDIUM / HEAVY / FIXED) | GLO twice |
 | **MIDI** | CHANNEL (ALL / 1–16) | TRS IN (ON / OFF) | CLOCK (INT / EXT) | | GLO three times |

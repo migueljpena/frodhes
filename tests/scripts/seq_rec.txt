@@ -1,0 +1,61 @@
+# RECORDING (0.9.7): the sequencer's START, CLICK, LEVEL, UNDO / REDO. Keys: C4 = 7, E4 = 11. Buttons: SEQ 11, PLAY 12.
+# Encoders: SELECT 0, K1..K4 = 2..5. 120 BPM: a beat 500 ms.
+# the page: right after SEQUENCER; START STEP and CLICK OFF in a record made before it
+100 btn 11
+150 expect state page SEQUENCER
+200 turn 0 1
+250 expect state page RECORDING
+260 expect state label0 START
+270 expect state card0 STEP
+280 expect state card1 OFF
+290 expect state card2 5
+# START NOTE: armed and stopped, the first note starts the loop (no PLAY)
+300 turn 2 1
+350 expect state card0 NOTE
+400 turn 0 -1
+450 expect state page SEQUENCER
+500 midi 0xB0 61 1
+550 btn 11
+600 expect state play 0
+650 keys 0x80
+700 expect state play 1
+750 keys 0
+900 keys 0x800
+1000 keys 0
+1100 btn 11
+1150 expect state notes 2
+# UNDO / REDO (K4 on RECORDING): the pass goes, then comes back
+1200 turn 0 1
+1250 turn 5 -1
+1300 expect state notes 0
+1310 expect state card3 REDO
+1350 turn 5 1
+1400 expect state notes 2
+1450 expect state card3 UNDO
+# START COUNT: armed and stopped, PLAY counts a bar in (4 clicks a beat apart), the loop on the fifth beat
+1500 turn 2 1
+1550 expect state card0 COUNT
+1600 turn 0 -1
+1650 btn 12
+1700 expect state play 0
+1750 btn 11
+1800 btn 12
+1900 expect state play 0
+2320 expect rms > -70
+3700 expect state play 0
+3900 expect state play 1
+4000 btn 12
+4050 btn 11
+# CLICK ON: a click on every beat while it plays (here the pattern cleared: only the clicks sound)
+4100 press 11
+5300 release 11
+5350 expect state notes 0
+5400 turn 0 1
+5450 turn 3 1
+5460 turn 3 1
+5500 expect state card1 ON
+5550 turn 0 -1
+5600 btn 12
+5620 expect rms > -70
+6000 btn 12
+6100 end

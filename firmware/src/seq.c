@@ -10,6 +10,12 @@
  *   QUANT           OFF, 1/4, 1/8, 1/16, 1/8T, 1/16T        SWING 50..75 % (the off-beats of 1/8 and 1/16)
  *   EDIT            left: UNDO the last pass recorded; right: ERASE on / off (hold keys: their notes go as the loop
  *                   passes them)
+ *   RECORDING page  START (STEP: armed and stopped = step recording, PLAY starts the loop; NOTE: the first note played
+ *                   starts the loop on bar 1, beat 1; COUNT: PLAY counts a bar in, then the loop records), CLICK (OFF,
+ *                   REC: while recording, ON: while playing; a count-in always clicks), its LEVEL, and UNDO / REDO
+ *
+ * Live recording takes back the time between a key and its sound (SQ_LAT_MS): what is played on the beat as heard
+ * lands on the beat. An UNDO keeps what it took on a stack at the array's top (sq_un), for REDO; any new edit drops it.
  *
  * Recording armed while stopped is step recording: the notes go on the cursor's step (live_note_on). The page (ui.c) shows NOW / NEXT and the
  * bar's 16 cells. The notes play through notes.c (the
@@ -46,6 +52,17 @@ static const char *const SQ_QUANT_NAME[6] = {"OFF", "1/4", "1/8", "1/16", "1/8T"
 #define SQ_BARS (set.seq_bars)
 #define SQ_QUANT (set.seq_quant)
 #define SQ_SWING (set.seq_swing)
+#define SQ_START (set.seq_rsv[0])                   /* 0.9.7: 0 STEP, 1 NOTE, 2 COUNT (records before: 0, as it was) */
+#define SQ_CLICK (set.seq_rsv[1])                   /* 0.9.7: 0 OFF, 1 REC, 2 ON */
+#define SQ_CLVL (set.seq_rsv[2])                    /* 0.9.7: the click's LEVEL 1..10 (0: 5) */
+#define SQ_LAT_MS 12u                               /* a key's sound comes ~12 ms after it (the scan, the audio's blocks:
+                                                     * as SLOOP measured on the same platform): live notes are recorded
+                                                     * that much earlier */
+static uint32_t sq_un;                              /* REDO's stack: the last sq_un of sq_ev[] (top down), each UNDO's
+                                                     * notes pushed together (one take) */
+static uint8_t sq_count;                            /* COUNT: beats of the count-in still to come (0: none) */
+static uint32_t sq_count_t;                         /* its next beat (fm1_ms) */
+static volatile uint8_t sq_click_req;               /* the audio's click (frodhes.c app_click): 1 a beat, 2 a bar's first */
 static void ui_mark(uint32_t e);
 
 static uint32_t sq_len(void) { return (uint32_t)SQ_BARS * 4u * SQ_PPQ; }
@@ -55,9 +72,13 @@ static void seq_sanitize(void)
     if (SQ_BARS < 1u || SQ_BARS > 16u) SQ_BARS = 4;
     if (SQ_QUANT > 5u) SQ_QUANT = 3;
     if (SQ_SWING < 50u || SQ_SWING > 75u) SQ_SWING = 50;
+    if (SQ_START > 2u) SQ_START = 0;
+    if (SQ_CLICK > 2u) SQ_CLICK = 0;
+    if (SQ_CLVL > 10u) SQ_CLVL = 0;
 }
 static uint8_t sq_sv_fail;                          /* the pattern's saves that failed since the last edit */
 static void sq_changed(void) { sq_dirty = 1; sq_roll_dirty = 1; sq_change_t = fm1_ms; sq_sv_fail = 0; }
+static void sq_edited(void) { sq_un = 0; sq_changed(); }   /* an edit: REDO's stack goes */
 
 /* where a note plays: its tick on the QUANT grid (with SWING), inside the loop */
 static uint32_t sq_at(const sq_ev_t *e)
@@ -84,15 +105,21 @@ static void sq_all_off(void)
 static void sq_add(uint32_t tick, uint32_t len, uint32_t note, uint32_t vel)
 {
     sq_ev_t *e;
+    sq_un = 0;                                          /* (a new note: what UNDO took cannot come back) */
     if (sq_n >= SQ_MAXEV) return;
     e = &sq_ev[sq_n++];
     e->tick = (uint16_t)tick; e->len = (uint16_t)len; e->note = (uint8_t)note; e->vel = (uint8_t)vel;
     e->take = sq_take; e->rsv = 0;
     sq_changed();
 }
+static uint32_t sq_rec_tick(void)                       /* the loop's tick SQ_LAT_MS ago: where a live note was heard */
+{
+    uint32_t L = sq_len(), lat = SQ_LAT_MS * ((SQ_PPQ << 16) / (beat_ms ? beat_ms : 500u));
+    return ((sq_pos + (L << 16) - lat) % (L << 16)) >> 16;
+}
 static void sq_rec_close(uint32_t n)                    /* a recorded note ends: it becomes an event */
 {
-    uint32_t L = sq_len(), t = sq_tick(), len;
+    uint32_t L = sq_len(), t = sq_rec_tick(), len;
     if (rec_start[n] == 0xFFFFu) return;
     len = (t + L - rec_start[n]) % L;
     if (len < 6u) len = 6u;
@@ -132,10 +159,20 @@ static void seq_stop(void)                              /* stop: back to the sta
     sq_cur = 0; sq_cur_t = fm1_ms;
     ui_mark(6); ui_mark(7);
 }
-static void seq_toggle_play(void) { if (seq_play) seq_stop(); else seq_start(); }
+static int seq_counting(void) { return sq_count != 0u; }
+static void seq_toggle_play(void)
+{
+    if (sq_count) { sq_count = 0; ui_mark(6); return; }  /* PLAY during the count-in: called off */
+    if (seq_play) { seq_stop(); return; }
+    if (seq_rec && SQ_START == 2u && !clk_live()) {     /* COUNT: a bar of clicks first (an external clock: at once) */
+        sq_count = 5; sq_count_t = fm1_ms; ui_mark(6);
+        return;
+    }
+    seq_start();
+}
 static void seq_toggle_rec(void)
 {
-    if (seq_rec) { sq_rec_close_all(); seq_rec = 0; }
+    if (seq_rec) { sq_rec_close_all(); seq_rec = 0; sq_count = 0; }
     else { seq_rec = 1; sq_erase = 0; sq_take++; }
     ui_mark(6); ui_mark(10);
 }
@@ -145,7 +182,7 @@ static void seq_clear(void)
     sq_all_off();
     for (n = 0; n < 128u; n++) rec_start[n] = 0xFFFFu;
     sq_n = 0;
-    sq_changed();
+    sq_edited();
 }
 static uint32_t seq_undo(void)                          /* the last pass recorded goes: how many notes */
 {
@@ -156,8 +193,29 @@ static uint32_t seq_undo(void)                          /* the last pass recorde
         uint32_t d = (uint8_t)(sq_take - sq_ev[i].take);
         if (d < best) { best = d; hi = sq_ev[i].take; }
     }
-    for (i = j = 0; i < sq_n; i++) { if (sq_ev[i].take == hi) got++; else sq_ev[j++] = sq_ev[i]; }
-    sq_n = j;
+    for (i = sq_n; i-- > 0;) {                          /* its notes onto REDO's stack (the array's top, down): each
+                                                         * taken out first (the rest moves down one), then pushed into
+                                                         * the place that frees, so a full array loses nothing */
+        sq_ev_t e = sq_ev[i];
+        if (e.take != hi) continue;
+        for (j = i; j + 1u < sq_n; j++) sq_ev[j] = sq_ev[j + 1u];
+        sq_n--; got++;
+        sq_un++; sq_ev[SQ_MAXEV - sq_un] = e;
+    }
+    sq_all_off();
+    sq_changed();
+    return got;
+}
+static uint32_t seq_redo(void)                          /* the last UNDO's notes come back: how many */
+{
+    uint32_t got = 0;
+    uint8_t tk;
+    if (!sq_un) return 0;
+    tk = sq_ev[SQ_MAXEV - sq_un].take;                  /* the last pushed: the lowest of the stack */
+    while (sq_un && sq_ev[SQ_MAXEV - sq_un].take == tk && sq_n < SQ_MAXEV - sq_un) {
+        sq_ev[sq_n++] = sq_ev[SQ_MAXEV - sq_un];
+        sq_un--; got++;
+    }
     sq_all_off();
     sq_changed();
     return got;
@@ -199,14 +257,21 @@ static void live_note_on(uint32_t n, uint32_t vel)
     if (n > 127u) return;
     live_held[n]++;
     if (!seq_rec || sq_erase) return;
-    if (!seq_play) { st_note_on(n, vel); return; }      /* stopped: step recording */
-    if (rec_start[n] == 0xFFFFu) { rec_start[n] = (uint16_t)sq_tick(); rec_vel[n] = (uint8_t)vel; }
+    if (!seq_play) {
+        if (SQ_START == 0u) { st_note_on(n, vel); return; }   /* STEP, stopped: step recording */
+        if (SQ_START == 2u || clk_live()) return;       /* COUNT: only PLAY starts it (a count-in: the notes only
+                                                         * sound); an external clock starts it */
+        seq_start();                                    /* NOTE: this note starts the loop, on bar 1 beat 1 */
+        rec_start[n] = 0; rec_vel[n] = (uint8_t)vel;
+        return;
+    }
+    if (rec_start[n] == 0xFFFFu) { rec_start[n] = (uint16_t)sq_rec_tick(); rec_vel[n] = (uint8_t)vel; }
 }
 static void live_note_off(uint32_t n)
 {
     if (n > 127u) return;
     if (live_held[n]) live_held[n]--;
-    if (seq_rec && !seq_play && !sq_erase) { st_note_off(); return; }
+    if (seq_rec && !seq_play && !sq_erase && SQ_START == 0u) { st_note_off(); return; }
     if (!live_held[n]) sq_rec_close(n);
 }
 
@@ -214,6 +279,16 @@ static void seq_poll(void)
 {
     uint32_t L = sq_len(), dt, p0, p1, i;
     int noon = 0, jump = 0;
+    if (sq_count) {                                     /* the count-in: four clicks a beat apart (the first accented),
+                                                         * the loop on the fifth beat (sq_count 5 .. 2 click, 1 starts) */
+        if ((int32_t)(fm1_ms - sq_count_t) < 0) return;
+        if (sq_count == 1u) { sq_count = 0; seq_start(); return; }
+        sq_click_req = (uint8_t)(sq_count == 5u ? 2u : 1u);
+        sq_count_t += beat_ms ? beat_ms : 500u;
+        sq_count--;
+        ui_mark(6);
+        return;
+    }
     if (!seq_play) return;
     dt = fm1_ms - sq_last_ms;
     sq_last_ms = fm1_ms;
@@ -255,6 +330,10 @@ static void seq_poll(void)
     }
     p0 = sq_prev % L; p1 = sq_tick();
     if (p0 == p1) return;
+    if (SQ_CLICK == 2u || (SQ_CLICK == 1u && seq_rec)) {   /* the click: a beat passed (the bar's first accented) */
+        uint32_t b;
+        for (b = 0; b < L; b += SQ_PPQ) if (sq_in(b, p0, p1)) sq_click_req = (uint8_t)(b % (4u * SQ_PPQ) ? 1u : 2u);
+    }
     for (i = 0; i < sq_nact;) {                         /* note offs first: a repeated note restarts cleanly */
         if (sq_in(sq_act[i].off, p0, p1)) { out_off(sq_act[i].note); sq_act[i] = sq_act[--sq_nact]; }
         else i++;
@@ -265,7 +344,7 @@ static void seq_poll(void)
         if (e->tick >= L) { i++; continue; }            /* past the loop (BARS made shorter): kept, silent */
         t = sq_at(e);
         if (!noon && sq_in(t, p0, p1)) {
-            if (sq_erase && live_held[e->note]) { sq_ev[i] = sq_ev[--sq_n]; sq_changed(); continue; }
+            if (sq_erase && live_held[e->note]) { sq_ev[i] = sq_ev[--sq_n]; sq_edited(); continue; }
             if (sq_nact < SQ_MAXACT) {
                 out_on(e->note, e->vel, 1);
                 sq_act[sq_nact].note = e->note;
@@ -368,7 +447,7 @@ static void seq_load(void)                              /* the pattern: its own,
     sq_hdr_t h, o;
     uint32_t n, q = 0, at = sq_newest(SQ_A, SQ_B, &h), own = at != 0u;
     for (n = 0; n < 128u; n++) rec_start[n] = 0xFFFFu;
-    sq_n = 0;
+    sq_n = 0; sq_un = 0;
     if (own) { q = h.seq; sq_sv_tgt = at == SQ_A ? SQ_B : SQ_A; }   /* (the next save: the other sector than its own
                                                          * newest; none: A) */
     sq_old = 0;

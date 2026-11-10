@@ -32,10 +32,10 @@ PEDAL = [cc(22, 64, 127)]
 SHORT = [cc(23, 103, 0), cc(24, 104, 0)]            # RELEASE 0, NOISE 0: a note let go stops at once
 # the SELECT order (ui.c PG_ORDER) and the page ids the dump's card.<page>.<k> use (ui.c PG_*)
 ORDER = ["PERF", "PIANO", "VOICE", "DECAY", "COMP", "DRIVE", "FILTER", "TREM", "PHA", "CHO", "DELAY", "REVERB",
-         "REVERB2", "TEMPO", "SCALE", "CHORD", "ARP", "LFO", "SEQ", "ASSIGN", "SETUP", "MIDI", "DISPLAY"]   # (a Rhodes TYPE: no MOTOR page)
+         "REVERB2", "TEMPO", "SCALE", "CHORD", "ARP", "LFO", "SEQ", "SEQ2", "ASSIGN", "SETUP", "MIDI", "DISPLAY"]   # (a Rhodes TYPE: no MOTOR page)
 PG = {n: i for i, n in enumerate(["PERF", "ASSIGN", "PIANO", "VOICE", "DECAY", "COMP", "FILTER", "TREM", "PHA", "CHO",
                                   "DELAY", "TEMPO", "SCALE", "CHORD", "SEQ", "ARP", "LFO", "SETUP", "MIDI",
-                                  "DRIVE", "REVERB", "DISPLAY", "REVERB2"])}
+                                  "DRIVE", "REVERB", "DISPLAY", "REVERB2", "SEQ2"])}
 BTN = {"OCT-": 0, "OCT+": 1, "FX": 2, "SEL": 3, "ENV": 4, "LFO": 5, "EDIT": 6, "GLO": 7, "HOME": 8, "SAVE": 9,
        "ARP": 10, "SEQ": 11, "PLAY": 12, "REC": 13}
 C4 = 261.63
@@ -1101,7 +1101,9 @@ def _seqrec():
     w = R(SEQ_BASE + SEQ_LIVE + ["4200 btn 12", "4210 dump"], 6500)
     ph = seq_phases(w)
     assert w.state(4210)["play"] == "0" and not ons(w, 4250)
-    ok = len(ph) == 3 and all(abs(a - b) <= 3 for a, b in zip(ph, (50, 580, 1127)))
+    # (0.9.7: live notes are recorded SQ_LAT_MS = 12 ms earlier, where they were heard; to the tick, 5.2 ms at 120
+    # BPM, so 12-17 ms earlier than played)
+    ok = len(ph) == 3 and all(abs(a - b) <= 6 for a, b in zip(ph, (50 - 14, 580 - 14, 1127 - 14)))
     return float(ok), 1.0, f"{ph}"
 
 

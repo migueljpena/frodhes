@@ -170,6 +170,32 @@ static void host_race_check(void)
     }
 }
 #endif
+/* the sequencer's click (seq.c CLICK, the count-in): a 30 ms triangle blip after the effects and the limiter (never in
+ * the pattern; on the jack and the USB audio alike), 1.6 kHz a beat, 2.4 kHz a bar's first, fading out straight; its
+ * LEVEL 1..10 = -35 .. -15 dBFS (the bar's +3 dB). Its own function: called only while a click sounds, app_audio's
+ * registers stay as they were (drive.c) */
+static uint32_t clk_left, clk_ph, clk_inc;
+static int32_t clk_amp;
+#define CLK_LEN 1323u
+static __attribute__((noinline)) void app_click(int32_t *out, uint32_t n)
+{
+    uint32_t i, req = sq_click_req;
+    if (req) {
+        static const int16_t LV[11] = {2600, 580, 820, 1160, 1640, 2600, 3270, 4120, 5180, 6520, 8200};   /* (0: 5) */
+        sq_click_req = 0;
+        clk_left = CLK_LEN; clk_ph = 0;
+        clk_inc = req == 2u ? 233723244u : 155815496u;   /* 2.4 / 1.6 kHz at 44.1 kHz, Q32 */
+        clk_amp = LV[SQ_CLVL <= 10u ? SQ_CLVL : 0u] * (req == 2u ? 23 : 16) / 16;
+    }
+    for (i = 0; i < n && clk_left; i++, clk_left--) {
+        int32_t tri = (int32_t)(clk_ph >> 16), v;        /* 0 .. 65535 */
+        tri = (tri < 32768 ? tri : 65535 - tri) * 2 - 32768;   /* -32768 .. 32766 */
+        v = ((tri * clk_amp) >> 15) * (int32_t)clk_left / (int32_t)CLK_LEN;   /* (32-bit: |tri amp| < 2^29) */
+        clk_ph += clk_inc;
+        out[2u * i] = clampi(out[2u * i] + v, -32767, 32767);
+        out[2u * i + 1u] = clampi(out[2u * i + 1u] + v, -32767, 32767);
+    }
+}
 /* noinline (0.9.5): with the filter and the tremolo out of it, app_audio became small enough for the compiler to
  * inline it into the audio interrupt (fm1_alnk0_irq): its own function, as before (tools/build.py counts its loops) */
 static __attribute__((noinline)) void app_audio(int32_t *out, uint32_t n)
@@ -203,6 +229,7 @@ static __attribute__((noinline)) void app_audio(int32_t *out, uint32_t n)
         }
     }
 #endif
+    if (sq_click_req || clk_left) app_click(out, n);
     blk_ph[0] = tw_ph; blk_ph[1] = cp_ph; blk_ph[2] = ph_ph; blk_ph[3] = lfo_ph; blk_ph[4] = re_vph;
     blk_ms = ms0;                                  /* the LFOs at this block's end, for the clock's phase lock (tempo.c) */
     blk_n = blk_n + 1u;

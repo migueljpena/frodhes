@@ -60,17 +60,19 @@
 2900 btn 3
 2950 expect state p.13 1
 2950 expect led 3 1
-# the SELECT order: ... SCALE CHORD ARPEGGIO LFO SEQUENCER ASSIGN SETUP MIDI
+# the SELECT order: ... SCALE CHORD ARPEGGIO LFO SEQUENCER RECORDING ASSIGN SETUP MIDI
 3000 btn 10
 3100 turn 0 1
 3150 expect state page LFO
 3200 turn 0 1
 3250 expect state page SEQUENCER
 3300 turn 0 1
+3301 turn 0 1
 3350 expect state page ASSIGN
 3400 turn 0 -1
 3450 turn 0 -1
 3500 turn 0 -1
+3501 turn 0 -1
 3550 expect state page ARPEGGIO
 3600 turn 0 -1
 3650 expect state page CHORD
