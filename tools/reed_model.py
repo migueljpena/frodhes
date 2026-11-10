@@ -349,6 +349,25 @@ def snoise_vel(vel, S):
     return min(max((vel - S["vel0"]) / (S["vel1"] - S["vel0"]), 0.0), 1.0)
 
 
+def snoise_pre(midi, vel, P, n):
+    """snoise before its band-passes (n samples): the LCG noise x the rise and T60 x the key's gain x the velocity's
+    share. render_notes sums every strike's and band-passes the sum once (snoise_bus): the band-passes are the same
+    for every key, so the FM-1 runs one pair for all of them instead of one a strike (ten v127 notes: ~0.9 ms of the
+    5.8 ms block, 2026-11-10). Only the envelope's place moves (before the filter, not after): the 1 ms rise is
+    smoothed by the band-pass; the T60 and the spectrum are the same."""
+    S = P["snoise"]
+    x = lcg((midi * 2654435761) ^ 0x5BD1E995, n)
+    t = np.arange(n) / FS
+    env = np.minimum(t / S["rise"], 1.0) * np.exp(-6.907755 * t / S["t60"])
+    return x * env * key_of(midi, P, "sn", 0.0) * snoise_vel(vel, S)
+
+
+def snoise_bus(x, S):
+    """The action noises' shared band-passes (twice, at S["hz"]) on their sum."""
+    b, a = biquad_bp(S["hz"], S["q"])
+    return lfilter(b, a, lfilter(b, a, x))
+
+
 def snoise(midi, vel, P, n):
     """The strike's action noise (n samples), in the line signal after the preamp: the key and the hammer's travel
     through the reed bar, picked up. The WoerliTzer line samples: from mf up a burst of 8-18 ms ahead of the tone,
@@ -498,7 +517,7 @@ def render_notes(notes, dur, P=DEFAULT, spk=None):
         for j, (i0, i1, vel) in enumerate(ns):
             x[i0:] += reed(midi, vel, n - i0, P)
             if "snoise" in P and snoise_vel(vel, P["snoise"]) > 0:
-                k = snoise(midi, vel, P, min(int(0.1 * FS), n - i0))
+                k = snoise_pre(midi, vel, P, min(int(0.1 * FS), n - i0))
                 sn[i0:i0 + len(k)] += k
             if i1 < n:
                 nxt = ns[j + 1][0] if j + 1 < len(ns) else n
@@ -512,6 +531,8 @@ def render_notes(notes, dur, P=DEFAULT, spk=None):
                 if i1 < n:
                     k = thump(midi, P, min(int(0.5 * FS), n - i1))
                     kn[i1:i1 + len(k)] += k
+    if "snoise" in P:
+        sn = snoise_bus(sn, P["snoise"])   # one band-pass pair for every strike's noise (snoise_pre)
     y = mix_stage(y, P) + sn          # the action noise: picked up, so on the line too
     # out_gain: a set's fixed output level (export_play: its loudest chord peaks where bell3_v2's does)
     return ((speaker(y, spk) + kn) if spk else y) * P.get("out_gain", 1.0)

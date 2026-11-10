@@ -151,6 +151,15 @@ static inline int64_t cp_eu(int64_t u32)
 /* ---- the voices (ISR) */
 static int32_t cp_tf = 1 << 30;               /* this block's tuning and bend (Q30) */
 
+#if defined(RH_PROF_STAGES) && !defined(DINGHY_HOST)
+/* developer build only: a strike's time split (24 MHz ticks a block, engine.c puts them in stages 5..7 for hil_cpu
+ * --stages): 0 cp_decay, 1 cp_amp, 2 the whole cp_start / cp_hit */
+static uint32_t cp_pf[3];
+#define CP_PF(k, s) do { uint32_t t_ = fm1_ticks(); s; cp_pf[k] += fm1_ticks() - t_; } while (0)
+#else
+#define CP_PF(k, s) do { s; } while (0)
+#endif
+
 /* the strike of note at vel added to voice v's partials (fresh: their states zero), its stages from the start */
 static void cp_hit(cp_voice_t *v, uint32_t note, uint32_t vel)
 {
@@ -166,10 +175,9 @@ static void cp_hit(cp_voice_t *v, uint32_t note, uint32_t vel)
         while (!left && b + 1u < CP_NB) left = K->nb[++b];
         left--;
         inc = cp_inc(CP_INC[K->p0 + j], v->tf);
-        cp_decay(CP_INC[K->p0 + j], b, &p->sl, &p->ds, &r0d);
+        CP_PF(0, cp_decay(CP_INC[K->p0 + j], b, &p->sl, &p->ds, &r0d));
         p->rho = (int32_t)(((int64_t)r0d * cp_eu(-(int64_t)p->ds >> 1)) >> 30);   /* the first block's middle */
-        cp_amp(K, layer, j, np, &r0, &i0);
-        cp_amp(K, layer + 1u, j, np, &r1, &i1);
+        CP_PF(1, cp_amp(K, layer, j, np, &r0, &i0); cp_amp(K, layer + 1u, j, np, &r1, &i1));
         zr = ((r0 + (((r1 - r0) * t) >> 16)) * vh) >> 16;          /* x the hammer's speed (Q16) */
         zi = ((i0 + (((i1 - i0) * t) >> 16)) * vh) >> 16;
         p->c = re_cos32(inc);
@@ -217,7 +225,7 @@ static int cp_strike(uint32_t note, uint32_t vel)
     for (i = 0; i < CP_NV; i++)                                   /* the strings still sounding: struck again */
         if (cp_v[i].alive && cp_v[i].fade == 32768 && cp_v[i].note == note) {
             cp_voice_t *v = &cp_v[i];
-            cp_hit(v, note, vel);                                 /* (added: the strings move on as they were) */
+            CP_PF(2, cp_hit(v, note, vel));                       /* (added: the strings move on as they were) */
             v->held = 1; v->damp = 0; v->quiet = 0; v->age = ++cp_ages;
             return 1;
         }
@@ -234,7 +242,7 @@ static int cp_strike(uint32_t note, uint32_t vel)
         cp_shed_count++;
         return 1;
     }
-    cp_start(&cp_v[best], note, vel);
+    CP_PF(2, cp_start(&cp_v[best], note, vel));
     return 1;
 }
 

@@ -196,6 +196,12 @@ static void eng_render(int32_t *mono, uint32_t n)
             else if (type == EV_ALL_OFF) re_all_off();
         }
     PROF_STAMP(2);                                                  /* (developer build: the events, the strikes) */
+#if defined(RH_PROF_STAGES) && !defined(DINGHY_HOST)
+    {   /* the CP's strike split (strings.c cp_pf) as stages 5 (decays), 6 (amplitudes), 7 (the strikes in all) */
+        uint32_t k_;
+        for (k_ = 0; k_ < 3u; k_++) { if (cp_pf[k_] > prof_st_max[5u + k_]) prof_st_max[5u + k_] = cp_pf[k_]; cp_pf[k_] = 0; }
+    }
+#endif
     if (eng_shed_req) {
         eng_shed_req = 0;
         if (eng_cur == ENG_RHODES) rh_shed_req = 1;                 /* (the reed: its steal, re_strike) */
