@@ -290,7 +290,7 @@ static void cp_kill_all(void)
 static int cp_quiet(void) { return cp_active_bits == 0 && cp_quiet_blocks >= 2u; }
 
 /* one partial, n samples of its band into u: plain (gain 1) */
-static void cp_run(cp_part_t *p, int32_t k1, int32_t k2, int32_t *u, uint32_t n)
+static FR_RAM __attribute__((noinline)) void cp_run(cp_part_t *p, int32_t k1, int32_t k2, int32_t *u, uint32_t n)
 {
     int32_t x1 = p->x1, x2 = p->x2;
     uint32_t i;
@@ -303,7 +303,8 @@ static void cp_run(cp_part_t *p, int32_t k1, int32_t k2, int32_t *u, uint32_t n)
 }
 
 /* with a gain g (Q30) moving by dg a sample: the beat, a fade */
-static void cp_run_g(cp_part_t *p, int32_t k1, int32_t k2, int32_t g, int32_t dg, int32_t *u, uint32_t n)
+static FR_RAM __attribute__((noinline)) void cp_run_g(cp_part_t *p, int32_t k1, int32_t k2, int32_t g, int32_t dg,
+                                                      int32_t *u, uint32_t n)   /* (both in RAM: leaves, FR_FAR) */
 {
     int32_t x1 = p->x1, x2 = p->x2;
     uint32_t i;
@@ -341,10 +342,10 @@ static void cp_voice(cp_voice_t *v, int32_t *const *buf)
                 int32_t g0 = re_cos32(p->bph), g1 = re_cos32(p->bph + p->binc);
                 p->bph += p->binc;
                 if (f0 != 32768) { g0 = (int32_t)(((int64_t)g0 * f0) >> 15); g1 = (int32_t)(((int64_t)g1 * f1) >> 15); }
-                cp_run_g(p, k1, k2, g0, (g1 - g0) >> sh, buf[b], n);
+                FR_FAR(cp_run_g)(p, k1, k2, g0, (g1 - g0) >> sh, buf[b], n);
             }
-            else if (f0 != 32768) cp_run_g(p, k1, k2, f0 << 15, ((f1 - f0) << 15) >> sh, buf[b], n);
-            else cp_run(p, k1, k2, buf[b], n);
+            else if (f0 != 32768) FR_FAR(cp_run_g)(p, k1, k2, f0 << 15, ((f1 - f0) << 15) >> sh, buf[b], n);
+            else FR_FAR(cp_run)(p, k1, k2, buf[b], n);
             a = p->x1 < 0 ? -p->x1 : p->x1;
             if (a > peak) peak = a;
             a = p->x2 < 0 ? -p->x2 : p->x2;

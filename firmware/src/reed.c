@@ -28,6 +28,10 @@
 #endif
 #endif
 #define RE_NV RE_VOICES
+#ifndef FR_RAM
+#define FR_RAM                                  /* (frodhes.c: the audio hot loops in RAM) */
+#define FR_FAR(fn) fn
+#endif
 #ifndef RING_PUBLISH
 #define RING_PUBLISH() do { } while (0)     /* host mode: one thread, no barrier needed */
 #endif
@@ -634,7 +638,8 @@ static void re_kill_all(void)
 static int re_quiet(void) { return re_active_bits == 0 && re_quiet_blocks >= 2u; }
 
 /* one mode, n samples, its sum into u (Q26); the force f (or none) */
-static void re_run(re_ms_t *s, const re_mw_t *w, uint32_t st, const int32_t *f, int32_t *u, uint32_t n)
+static FR_RAM __attribute__((noinline)) void re_run(re_ms_t *s, const re_mw_t *w, uint32_t st, const int32_t *f,
+                                                    int32_t *u, uint32_t n)   /* (in RAM: a leaf, called by FR_FAR) */
 {
     int32_t x1 = s->x1, x2 = s->x2, err = s->err, k1 = w->k[st][0], k2 = w->k[st][1], g = s->g;
     uint32_t i;
@@ -672,6 +677,31 @@ static int32_t re_sn_next(re_sn_t *q)                            /* one sample o
     q->env = (int32_t)(((int64_t)q->env * RE_SN_DEC) >> 30);
     if (++q->i >= RE_SN_LEN) q->on = 0;
     return (int32_t)(((((int64_t)x * e) >> 30) * q->g) >> 28);
+}
+
+/* re_sn_next over n samples into ns, after the rise (q->i >= RE_SN_RISE: no division), the state in registers: the
+ * same samples. In RAM (a leaf): ten v127 notes' noises cost ~1.1 ms of the block from XIP (FM-1, 2026-11-10) */
+static FR_RAM __attribute__((noinline)) void re_sn_block(re_sn_t *q, int32_t *ns, uint32_t n)
+{
+    uint32_t s = q->s, i = q->i, j;
+    int32_t env = q->env, g = q->g;
+    int32_t a0 = q->f[0][0], a1 = q->f[0][1], a2 = q->f[0][2], a3 = q->f[0][3];
+    int32_t c0 = q->f[1][0], c1 = q->f[1][1], c2 = q->f[1][2], c3 = q->f[1][3];
+    for (j = 0; j < n; j++) {
+        int32_t x, y, e = env;
+        s = 1664525u * s + 1013904223u;
+        x = (int32_t)((s >> 8) << 7) - (1 << 30);
+        y = (int32_t)(((int64_t)RE_SN_B0 * ((int64_t)x - a1) - (int64_t)RE_SN_A1 * a2 - (int64_t)RE_SN_A2 * a3) >> 30);
+        a1 = a0; a0 = x; a3 = a2; a2 = y; x = y;
+        y = (int32_t)(((int64_t)RE_SN_B0 * ((int64_t)x - c1) - (int64_t)RE_SN_A1 * c2 - (int64_t)RE_SN_A2 * c3) >> 30);
+        c1 = c0; c0 = x; c3 = c2; c2 = y; x = y;
+        env = (int32_t)(((int64_t)env * RE_SN_DEC) >> 30);
+        ns[j] += (int32_t)(((((int64_t)x * e) >> 30) * g) >> 28);
+        if (++i >= RE_SN_LEN) { q->on = 0; break; }
+    }
+    q->s = s; q->i = i; q->env = env;
+    q->f[0][0] = a0; q->f[0][1] = a1; q->f[0][2] = a2; q->f[0][3] = a3;
+    q->f[1][0] = c0; q->f[1][1] = c1; q->f[1][2] = c2; q->f[1][3] = c3;
 }
 
 /* cos(2 pi ph) (ph Q32), Q30: the quarter sine table */
@@ -774,8 +804,8 @@ static void re_render(int32_t *mono, uint32_t n)
             else if (v->stage == 1u && v->rel + seg > v->knee + 1u) seg = v->rel >= v->knee + 1u ? 0u : v->knee + 1u - v->rel;
             if (!seg) { re_set_stage(v, 2, re_ex(re_ad(v, 2) - re_ad(v, 1))); continue; }
             for (m = 0; m < 3u; m++)
-                if (v->m[m].on) re_run(&v->m[m], &v->rk.m[m], v->stage, pl ? &v->pbuf[v->pi] : 0, u + j, seg);
-            if (v->m[3].on) re_run(&v->m[3], &v->rk.m[3], v->stage, bl ? &v->bbuf[v->bi] : 0, u + j, seg);
+                if (v->m[m].on) FR_FAR(re_run)(&v->m[m], &v->rk.m[m], v->stage, pl ? &v->pbuf[v->pi] : 0, u + j, seg);
+            if (v->m[3].on) FR_FAR(re_run)(&v->m[3], &v->rk.m[3], v->stage, bl ? &v->bbuf[v->bi] : 0, u + j, seg);
             if (pl) v->pi += seg;
             if (bl) v->bi += seg;
             if (v->rpend || v->rel) v->rel += seg;
@@ -810,8 +840,10 @@ static void re_render(int32_t *mono, uint32_t n)
         if (v->alive) { act |= 1u << i; re_notes[i] = v->note; }
     }
     PROF_STAMP(3);                                                /* (developer build: the voices) */
-    for (i = 0; i < RE_NSN; i++)
-        for (j = 0; j < n && re_sn[i].on; j++) ns[j] += re_sn_next(&re_sn[i]);
+    for (i = 0; i < RE_NSN; i++) {                                /* the rise (a division a sample) here, the rest in RAM */
+        for (j = 0; j < n && re_sn[i].on && re_sn[i].i < RE_SN_RISE; j++) ns[j] += re_sn_next(&re_sn[i]);
+        if (j < n && re_sn[i].on) FR_FAR(re_sn_block)(&re_sn[i], ns + j, n - j);
+    }
     PROF_STAMP(4);                                                /* (the action noises) */
     re_active_bits = act;
     re_quiet_blocks = act ? 0u : re_quiet_blocks + 1u;
