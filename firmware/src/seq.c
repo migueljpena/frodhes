@@ -19,6 +19,15 @@
  *                   long, its notes copied after themselves, or, with notes kept past its end, those back; left 1/2:
  *                   half as long, the rest kept as BARS keeps it), TRANSPOSE (every note a semitone up / down)
  *
+ *   PATTERN K4      SECTION A..D: four patterns sharing the 448 notes (stopped: at once; playing: on the next bar; an
+ *                   empty one starts as a copy of the one playing); each keeps its own BARS
+ *   SONG page       LOOP / SONG; a chain of 8 steps, each a section and how many times it plays (x1..x4); in SONG,
+ *                   PLAY plays the chain from its first step, round and round
+ *
+ * The sections: one array. The section playing is sq_ev[0 .. sq_n) (every reader as before), the others right after it
+ * (sq_ev[sq_n .. sq_n + sq_pk), their own section in each event's rsv byte), REDO's stack at the array's top. Saved
+ * together, the flash format as before (a pattern saved before reads as section A).
+ *
  * Live recording takes back the time between a key and its sound (SQ_LAT_MS): what is played on the beat as heard
  * lands on the beat. An UNDO keeps what it took on a stack at the array's top (sq_un), for REDO; any new edit drops it.
  *
@@ -60,6 +69,15 @@ static const char *const SQ_QUANT_NAME[6] = {"OFF", "1/4", "1/8", "1/16", "1/8T"
 #define SQ_START (set.seq_rsv[0])                   /* 0.9.7: 0 STEP, 1 NOTE, 2 COUNT, 3 FREE (records before: 0) */
 #define SQ_CLICK (set.seq_rsv[1])                   /* 0.9.7: 0 OFF, 1 REC, 2 ON */
 #define SQ_CLVL (set.seq_rsv[2])                    /* 0.9.7: the click's LEVEL 1..10 (0: 5) */
+#define SQ_SEC (set.seq_rsv[3])                     /* 0.9.7: the section playing, 0..3 (A..D) */
+#define SQ_SBARS(k) (set.seq_rsv[4u + (k)])         /* 0.9.7: each section's BARS (0: not set yet) */
+#define SQ_SONG (set.seq_rsv[8])                    /* 0.9.7: 0 LOOP, 1 SONG */
+#define SQ_CHAIN(i) (set.seq_rsv[9u + (i)])         /* 0.9.7: the song's 8 steps: section + 1 (0: the end) | (times - 1) << 4 */
+#define SQ_NCHAIN 8u
+static uint32_t sq_pk;                              /* the other sections' notes, right after the playing one's */
+static uint8_t sq_sec_next = 0xFFu;                 /* a section asked for while playing: from the next bar */
+static uint8_t sq_song_i, sq_song_pass;             /* SONG: the step playing, its passes so far */
+static uint8_t sq_fresh;                            /* the first pass since PLAY (its start looks like a loop's end) */
 #define SQ_LAT_MS 12u                               /* a key's sound comes ~12 ms after it (the scan, the audio's blocks:
                                                      * as SLOOP measured on the same platform): live notes are recorded
                                                      * that much earlier */
@@ -83,6 +101,28 @@ static void seq_sanitize(void)
     if (SQ_START > 3u) SQ_START = 0;
     if (SQ_CLICK > 2u) SQ_CLICK = 0;
     if (SQ_CLVL > 10u) SQ_CLVL = 0;
+    if (SQ_SEC > 3u) SQ_SEC = 0;
+    if (SQ_SONG > 1u) SQ_SONG = 0;
+    {
+        uint32_t k;
+        for (k = 0; k < 4u; k++) if (SQ_SBARS(k) > 16u) SQ_SBARS(k) = 0;
+        for (k = 0; k < SQ_NCHAIN; k++) if ((SQ_CHAIN(k) & 15u) > 4u) SQ_CHAIN(k) = 0;
+    }
+}
+/* the other sections' notes follow the playing one's: room for k more at sq_n (they move up), or the gap closed
+ * after the playing one's shrank from n0 (they move down) */
+static void sq_grow(uint32_t k) { if (sq_pk) memmove(&sq_ev[sq_n + k], &sq_ev[sq_n], sq_pk * sizeof(sq_ev_t)); }
+static void sq_shrunk(uint32_t n0) { if (sq_pk && n0 != sq_n) memmove(&sq_ev[sq_n], &sq_ev[n0], sq_pk * sizeof(sq_ev_t)); }
+/* the events of section t first: [0, the count) of [0, tot) (in place, the order otherwise free) */
+static uint32_t sq_partition(uint32_t tot, uint32_t t)
+{
+    uint32_t i = 0, j = tot;
+    while (i < j) {
+        if (sq_ev[i].rsv == t) { i++; continue; }
+        j--;
+        { sq_ev_t e = sq_ev[i]; sq_ev[i] = sq_ev[j]; sq_ev[j] = e; }
+    }
+    return i;
 }
 static uint8_t sq_sv_fail;                          /* the pattern's saves that failed since the last edit */
 static void sq_changed(void) { sq_dirty = 1; sq_roll_dirty = 1; sq_change_t = fm1_ms; sq_sv_fail = 0; }
@@ -114,10 +154,11 @@ static void sq_add(uint32_t tick, uint32_t len, uint32_t note, uint32_t vel)
 {
     sq_ev_t *e;
     sq_un = 0;                                          /* (a new note: what UNDO took cannot come back) */
-    if (sq_n >= SQ_MAXEV) return;
+    if (sq_n + sq_pk >= SQ_MAXEV) return;
+    sq_grow(1);
     e = &sq_ev[sq_n++];
     e->tick = (uint16_t)tick; e->len = (uint16_t)len; e->note = (uint8_t)note; e->vel = (uint8_t)vel;
-    e->take = sq_take; e->rsv = 0;
+    e->take = sq_take; e->rsv = SQ_SEC;
     sq_changed();
 }
 static uint32_t sq_rec_tick(void)                       /* the loop's tick SQ_LAT_MS ago: where a live note was heard */
@@ -136,8 +177,16 @@ static void sq_rec_close(uint32_t n)                    /* a recorded note ends:
 }
 static void sq_rec_close_all(void) { uint32_t n; for (n = 0; n < 128u; n++) sq_rec_close(n); }
 
+static uint32_t sq_sec_set(uint32_t t);
+static uint32_t sq_song_from(uint32_t k);
 static void seq_start(void)
 {
+    sq_sec_next = 0xFFu;
+    sq_fresh = 1;
+    if (SQ_SONG && (sq_song_i = (uint8_t)sq_song_from(0)) != 0xFFu) {   /* SONG: from the chain's first step */
+        sq_song_pass = 0;
+        sq_sec_set((SQ_CHAIN(sq_song_i) & 15u) - 1u);
+    }
     seq_play = 1;
     sq_pos = 0; sq_prev = sq_len() - 1u; sq_last_ms = fm1_ms;
     sq_ext = 0;                                         /* (a clock: taken up from here, seq_poll) */
@@ -235,7 +284,7 @@ static void seq_clear(void)
     uint32_t n;
     sq_all_off();
     for (n = 0; n < 128u; n++) rec_start[n] = 0xFFFFu;
-    sq_n = 0;
+    n = sq_n; sq_n = 0; sq_shrunk(n);                   /* (the section playing only: the others stay) */
     sq_free = 0;
     sq_edited();
 }
@@ -255,6 +304,7 @@ static uint32_t seq_undo(void)                          /* the last pass recorde
         if (e.take != hi) continue;
         for (j = i; j + 1u < sq_n; j++) sq_ev[j] = sq_ev[j + 1u];
         sq_n--; got++;
+        sq_shrunk(sq_n + 1u);                           /* (the other sections down one first: the stack's place) */
         sq_un++; sq_ev[SQ_MAXEV - sq_un] = e;
     }
     sq_all_off();
@@ -267,13 +317,55 @@ static uint32_t seq_redo(void)                          /* the last UNDO's notes
     uint8_t tk;
     if (!sq_un) return 0;
     tk = sq_ev[SQ_MAXEV - sq_un].take;                  /* the last pushed: the lowest of the stack */
-    while (sq_un && sq_ev[SQ_MAXEV - sq_un].take == tk && sq_n < SQ_MAXEV - sq_un) {
-        sq_ev[sq_n++] = sq_ev[SQ_MAXEV - sq_un];
-        sq_un--; got++;
+    while (sq_un && sq_ev[SQ_MAXEV - sq_un].take == tk) {
+        sq_ev_t e = sq_ev[SQ_MAXEV - sq_un];
+        sq_un--;
+        sq_grow(1);                                     /* (into the slot the stack just freed, at most) */
+        sq_ev[sq_n++] = e; got++;
     }
     sq_all_off();
     sq_changed();
     return got;
+}
+
+/* ---- the sections: t becomes the one playing (main loop). An empty one starts as a copy of the one playing (when the
+ * 448 have room): 1 = copied. The BARS go with each section. REDO's stack goes */
+static uint32_t sq_sec_set(uint32_t t)
+{
+    uint32_t i, tot = sq_n + sq_pk, c = 0, cp = 0;
+    if (t > 3u || t == SQ_SEC) return 0;
+    sq_rec_close_all();
+    sq_all_off();
+    sq_un = 0;
+    for (i = 0; i < sq_n; i++) sq_ev[i].rsv = SQ_SEC;
+    SQ_SBARS(SQ_SEC) = SQ_BARS;
+    for (i = sq_n; i < tot; i++) if (sq_ev[i].rsv == t) c++;
+    if (!c && sq_n && tot + sq_n <= SQ_MAXEV) {          /* empty: a copy of the one playing */
+        for (i = 0; i < sq_n; i++) { sq_ev[tot + i] = sq_ev[i]; sq_ev[tot + i].rsv = (uint8_t)t; }
+        tot += sq_n; cp = 1;
+        SQ_SBARS(t) = SQ_BARS;
+    }
+    sq_n = sq_partition(tot, t);
+    sq_pk = tot - sq_n;
+    SQ_SEC = (uint8_t)t;
+    if (SQ_SBARS(t)) SQ_BARS = SQ_SBARS(t);
+    sq_changed();
+    ui_mark(6); ui_mark(7);
+    return cp;
+}
+static uint32_t sq_sec_notes(uint32_t t)               /* a section's notes */
+{
+    uint32_t i, c = 0;
+    if (t == SQ_SEC) return sq_n;
+    for (i = sq_n; i < sq_n + sq_pk; i++) if (sq_ev[i].rsv == t) c++;
+    return c;
+}
+/* SONG: the chain's step k (from k on, the first with a section; none: 0xFF) */
+static uint32_t sq_song_from(uint32_t k)
+{
+    uint32_t i;
+    for (i = 0; i < SQ_NCHAIN; i++) { uint32_t j = (k + i) % SQ_NCHAIN; if (SQ_CHAIN(j) & 15u) return j; }
+    return 0xFFu;
 }
 
 /* ---- the PATTERN page: the whole pattern at once (main loop; the loop never stops). The cards show how far it moved
@@ -316,7 +408,8 @@ static uint32_t seq_length(int32_t d)
         SQ_BARS = (uint8_t)(SQ_BARS * 2u);
         if (!past)
             for (i = 0; i < n0; i++) {
-                if (sq_n >= SQ_MAXEV) { lost++; continue; }
+                if (sq_n + sq_pk >= SQ_MAXEV) { lost++; continue; }
+                sq_grow(1);
                 sq_ev[sq_n] = sq_ev[i];
                 sq_ev[sq_n].tick = (uint16_t)(sq_ev[i].tick + L);
                 sq_n++;
@@ -450,6 +543,33 @@ static void seq_poll(void)
     }
     p0 = sq_prev % L; p1 = sq_tick();
     if (p0 == p1) return;
+    {   /* a section change: one asked for (from the next bar), or the SONG's next step (at the loop's end): the new
+         * section from its start, as far into it as this pass went past that line */
+        uint32_t to = 0xFFu, at = 0, b;
+        if (sq_sec_next != 0xFFu)
+            for (b = 0; b < L; b += 4u * SQ_PPQ) if (sq_in(b, p0, p1)) { to = sq_sec_next; at = b; break; }
+        if (SQ_SONG && sq_song_i != 0xFFu && p1 < p0 && !sq_fresh && sq_sec_next == 0xFFu) {   /* the loop came round */
+            uint32_t times = (SQ_CHAIN(sq_song_i) >> 4 & 3u) + 1u;
+            if (++sq_song_pass >= times) {
+                sq_song_pass = 0;
+                sq_song_i = (uint8_t)sq_song_from((sq_song_i + 1u) % SQ_NCHAIN);
+                if (sq_song_i != 0xFFu) { to = (SQ_CHAIN(sq_song_i) & 15u) - 1u; at = 0; }
+            }
+        }
+        sq_fresh = 0;
+        if (to != 0xFFu) {
+            uint32_t past = (p1 + L - at) % L;
+            sq_sec_next = 0xFFu;
+            if (to != SQ_SEC) {
+                sq_sec_set(to);
+                L = sq_len();
+                if (past >= L) past = 0;
+                sq_pos = past << 16;
+                sq_ext = 0;                             /* (a clock: taken up from here) */
+                p0 = L - 1u; p1 = past;
+            }
+        }
+    }
     if (SQ_CLICK == 2u || (SQ_CLICK == 1u && seq_rec)) {   /* the click: a beat passed (the bar's first accented) */
         uint32_t b;
         for (b = 0; b < L; b += SQ_PPQ) if (sq_in(b, p0, p1)) sq_click_req = (uint8_t)(b % (4u * SQ_PPQ) ? 1u : 2u);
@@ -464,7 +584,7 @@ static void seq_poll(void)
         if (e->tick >= L) { i++; continue; }            /* past the loop (BARS made shorter): kept, silent */
         t = sq_at(e);
         if (!noon && sq_in(t, p0, p1)) {
-            if (sq_erase && live_held[e->note]) { sq_ev[i] = sq_ev[--sq_n]; sq_edited(); continue; }
+            if (sq_erase && live_held[e->note]) { sq_ev[i] = sq_ev[--sq_n]; sq_shrunk(sq_n + 1u); sq_edited(); continue; }
             if (sq_nact < SQ_MAXACT) {
                 out_on(e->note, e->vel, 1);
                 sq_act[sq_nact].note = e->note;
@@ -567,17 +687,18 @@ static void seq_load(void)                              /* the pattern: its own,
     sq_hdr_t h, o;
     uint32_t n, q = 0, at = sq_newest(SQ_A, SQ_B, &h), own = at != 0u;
     for (n = 0; n < 128u; n++) rec_start[n] = 0xFFFFu;
-    sq_n = 0; sq_un = 0;
+    sq_n = 0; sq_un = 0; sq_pk = 0;
     if (own) { q = h.seq; sq_sv_tgt = at == SQ_A ? SQ_B : SQ_A; }   /* (the next save: the other sector than its own
                                                          * newest; none: A) */
     sq_old = 0;
     if ((st_mig & 4u) && (n = sq_newest(OLD_SQ_A, OLD_SQ_B, &o)) != 0u) { at = n; sq_old = 1; }
     if (!at) return;
-    if (!sq_valid(at, &h)) { sq_n = 0; return; }       /* (re-reads it into sq_ev) */
-    sq_n = h.n;
+    if (!sq_valid(at, &h)) { sq_n = 0; sq_pk = 0; return; }   /* (re-reads it into sq_ev) */
+    sq_n = sq_partition(h.n, SQ_SEC);                   /* the section playing first, the others after it */
+    sq_pk = h.n - sq_n;
     sq_flash_seq = own && (int32_t)(q - h.seq) > 0 ? q : h.seq;   /* (a pattern taken over its own: the next save
                                                          * newer than both) */
-    for (n = 0; n < sq_n; n++) if (sq_ev[n].take > sq_take) sq_take = sq_ev[n].take;
+    for (n = 0; n < sq_n + sq_pk; n++) if (sq_ev[n].take > sq_take) sq_take = sq_ev[n].take;
 }
 static int set_save_busy(void);                         /* frodhes.c: the settings' auto save runs */
 static sq_hdr_t sq_sv_h;                                /* the save's header (written last: a cut save stays invalid) */
@@ -626,10 +747,14 @@ static void sq_sv_begin(void)                           /* a save starts (seq_sa
     uint32_t at;
     sq_dirty = 0;
     at = sq_sv_tgt;
-    sq_sv_h.magic = SQ_MAGIC; sq_sv_h.seq = ++sq_flash_seq; sq_sv_h.n = sq_n;
-    sq_sv_h.crc = crc32((const uint8_t *)sq_ev, sq_n * sizeof(sq_ev_t));   /* (an edit while it writes: the crc
+    {   /* every section (the playing one's events marked as its: they were recorded as it, a pattern from before is A) */
+        uint32_t i;
+        for (i = 0; i < sq_n; i++) sq_ev[i].rsv = SQ_SEC;
+    }
+    sq_sv_h.magic = SQ_MAGIC; sq_sv_h.seq = ++sq_flash_seq; sq_sv_h.n = sq_n + sq_pk;
+    sq_sv_h.crc = crc32((const uint8_t *)sq_ev, (sq_n + sq_pk) * sizeof(sq_ev_t));   /* (an edit while it writes: the crc
                                                          * fails, the load takes the other sector, a new save follows) */
-    sq_sv_at = at; sq_sv_off = sizeof(sq_hdr_t); sq_sv_end = sizeof(sq_hdr_t) + sq_n * sizeof(sq_ev_t);
+    sq_sv_at = at; sq_sv_off = sizeof(sq_hdr_t); sq_sv_end = sizeof(sq_hdr_t) + (sq_n + sq_pk) * sizeof(sq_ev_t);
     sq_sv_step = 1;
     if (sq_op_start(at, 0, 0, 0) < 0) sq_sv_failed();   /* the erase first */
 }

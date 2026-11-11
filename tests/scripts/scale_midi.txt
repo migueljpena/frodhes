@@ -17,6 +17,7 @@
 475 turn 0 -1
 476 turn 0 -1
 477 turn 0 -1
+478 turn 0 -1
 500 expect state page SCALE
 550 turn 2 1
 600 expect state card0 SNAP

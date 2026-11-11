@@ -157,6 +157,29 @@ def test_power_cycle_keeps_everything(eng):
     assert (s2["oct"], s2["vcard.1.3"], s2["bpm"], s2["card.14.0"]) == ("1", "+7", "108.0", "2")
 
 
+def test_sections_survive_a_power_cycle():
+    """0.9.7 SECTIONS: A with three notes, B (a copy, cleared) with one, C empty; switched off on B: on again B plays
+    (one note) with its own BARS, A still has its three, the song's chain is kept (the pattern sector holds them all)"""
+    fl = flash_file("sections")
+    lines = [cc(20, 61, 1), cc(30, 63, 127)]                            # 1 bar, step-record
+    for i, n in enumerate((60, 64, 67)):
+        lines += [f"{100 + 60 * i} midi 0x90 {n} 100", f"{130 + 60 * i} midi 0x80 {n} 0"]
+    lines += [cc(400, 63, 0), "450 btn 11",                             # SEQUENCER
+              "500 turn 0 1", "510 turn 0 1", "550 turn 5 1",           # PATTERN: B (a copy of A)
+              cc(600, 43, 127), cc(650, 61, 2), cc(700, 63, 127),       # CLEAR B, 2 bars, one note
+              "750 midi 0x90 72 100", "780 midi 0x80 72 0", cc(850, 63, 0),
+              "900 turn 0 1", "950 turn 2 1", "960 turn 4 1",           # SONG: SONG, step 1 = A
+              "5000 dump"]
+    r1 = run("sections1", lines, 5500, flash=fl)
+    s1 = r1.state(5000)
+    assert (s1["notes"], s1["card.14.0"]) == ("1", "2") and r1.seq_saves, (s1["notes"], s1["card.14.0"], r1.seq_saves)
+    r2 = boot("sections2", fl, ["150 btn 11", "200 turn 0 1", "210 turn 0 1", "250 turn 5 -1", "300 dump",
+                                "350 turn 0 1", "400 dump"], 500)
+    s2a, s2b, s2c = r2.state(100), r2.state(300), r2.state(400)
+    got = (s2a["notes"], s2a["card.14.0"], s2b["card3"], s2b["notes"], s2b["card.14.0"], s2c["card0"], s2c["card2"])
+    assert got == ("1", "2", "A", "3", "1", "SONG", "A"), got
+
+
 def test_save_timing():
     """the settings are saved 2 s after the last setup change (USB VOL, CC 114), and only once it is silent (the erase
     would stall the audio): a change with nothing playing saves at once after 2 s; a change while a note rings waits

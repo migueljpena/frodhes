@@ -1,0 +1,85 @@
+# SECTIONS and SONG (0.9.7): PATTERN K4 SECTION A..D (stopped: at once; playing: from the next bar; an empty one starts
+# as a copy), SONG (two on from PATTERN): LOOP / SONG, the chain's steps. Keys: C4 = 7, E4 = 11, G4 = 14. Buttons:
+# SEQ 11, PLAY 12. Encoders: SELECT 0, K1..K4 = 2..5. 1 bar at 120 BPM = 2 s.
+# A: two notes (START NOTE)
+100 btn 11
+150 midi 0xB0 61 1
+200 turn 0 1
+250 turn 2 1
+300 turn 0 -1
+350 btn 11
+400 keys 0x80
+500 keys 0
+700 keys 0x800
+800 keys 0
+900 btn 11
+950 btn 12
+1000 expect state notes 2
+# B (stopped): a copy of A; SEQUENCER's HOLD SEQ clears B only; one note in B (step recording: START back to STEP)
+1050 turn 0 1
+1060 turn 0 1
+1100 expect state page PATTERN
+1110 expect state card3 A
+1150 turn 5 1
+1200 expect state card3 B
+1210 expect state notes 2
+1250 turn 0 -1
+1260 turn 0 -1
+1300 expect state page SEQUENCER
+1350 press 11
+2500 release 11
+2550 expect state notes 0
+2600 turn 0 1
+2650 turn 2 -1
+2700 turn 0 -1
+2750 btn 11
+2800 keys 0x4000
+2900 keys 0
+3000 btn 11
+3050 expect state notes 1
+# back to A: its two notes; B keeps its one
+3100 turn 0 1
+3110 turn 0 1
+3150 turn 5 -1
+3200 expect state card3 A
+3210 expect state notes 2
+3250 turn 5 1
+3300 expect state notes 1
+3350 turn 5 -1
+3400 expect state notes 2
+# playing: B asked for waits for the next bar (A>B), then plays
+3450 turn 0 -1
+3460 turn 0 -1
+3500 btn 12
+3550 turn 0 1
+3560 turn 0 1
+3600 turn 5 1
+3650 expect state card3 A>B
+5700 expect state card3 B
+5710 expect state notes 1
+5750 turn 0 -1
+5760 turn 0 -1
+5800 btn 12
+# SONG: steps 1 = A x1, 2 = B x1; PLAY plays A, then B, then A again
+5850 turn 0 1
+5860 turn 0 1
+5870 turn 0 1
+5900 expect state page SONG
+5950 turn 2 1
+6000 expect state card0 SONG
+6050 turn 4 1
+6100 expect state card2 A
+6150 turn 3 1
+6200 turn 4 1
+6210 turn 4 1
+6250 expect state card2 B
+6300 expect state card3 X1
+6350 turn 0 -1
+6360 turn 0 -1
+6370 turn 0 -1
+6400 btn 12
+6500 expect state notes 2
+8600 expect state notes 1
+10600 expect state notes 2
+10700 btn 12
+10800 end

@@ -146,6 +146,7 @@
 6150 turn 0 -1
 6151 turn 0 -1
 6152 turn 0 -1
+6153 turn 0 -1
 6200 expect state page SCALE
 6250 turn 2 1
 6350 expect state glow.21 1

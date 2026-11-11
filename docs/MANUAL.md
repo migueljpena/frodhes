@@ -14,7 +14,7 @@ chord mode, a pattern recorder (sequencer), an arpeggiator, scales and tap tempo
 
 Frodhes is an independent open-source project, not affiliated with or endorsed by M-VAVE, the Rhodes or Fender trademark owners or any instrument maker. It comes with no warranty: install it at your own risk (M-VAVE's own firmware can always be put back); see [LICENSING.md](../LICENSING.md).
 
-![The FRODHES page: TYPE (here EARLY FELT), TONE, BELL and KEY VEL](manual/img/piano.png?v=749ef06f)
+![The FRODHES page: TYPE (here EARLY FELT), TONE, BELL and KEY VEL](manual/img/piano.png?v=6d394b11)
 
 ## Contents
 
@@ -77,7 +77,7 @@ amber and its place in the SELECT order on the right (3/23). Turn **SELECT** to 
 page's button to jump straight there. The pages, in SELECT order:
 
 PERFORM · FRODHES (main) · VOICE 1/2 · VOICE 2/2 · COMPRESSOR · DRIVE · FILTER · TREM/WAH · PHASER · CHORUS ·
-DELAY · REVERB · REVERB 2 · TEMPO · SCALE · CHORD · ARPEGGIO · LFO · SEQUENCER · RECORDING · PATTERN · ASSIGN · SETUP · MIDI · DISPLAY
+DELAY · REVERB · REVERB 2 · TEMPO · SCALE · CHORD · ARPEGGIO · LFO · SEQUENCER · RECORDING · PATTERN · SONG · ASSIGN · SETUP · MIDI · DISPLAY
 
 **The VOICE pages belong to the instrument.** Each TYPE brings its own controls, four to a page: the Rhodes types
 have two VOICE pages (VOICE 1/2: TONE, BARK, BELL, HAMMER; VOICE 2/2: DECAY, RELEASE, NOISE, TUNE), the WURLI 200A
@@ -148,7 +148,7 @@ stays dark; see LEDS on the DISPLAY page).
 
 ### PERFORM
 
-![PERFORM](manual/img/perform.png?v=40da9bb4)
+![PERFORM](manual/img/perform.png?v=0a1153eb)
 
 The first page, made for playing: four knobs for the sound while you play. Out of the box they follow the effects
 chain from left to right: the drive, the filter's cutoff, and the dry / wet of the delay and the reverb:
@@ -171,7 +171,7 @@ Turning it back to 0 makes it dry again (the effect stays switched on; its butto
 
 The page after PERFORM (press **HOME** twice) carries the instrument's name as its title and holds the essentials.
 
-![The main page](manual/img/piano.png?v=749ef06f)
+![The main page](manual/img/piano.png?v=6d394b11)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The instrument's own pages: on a Rhodes type there are two, right after the main
 are four, with the reed piano's controls: see [WURLI 200A](#5-wurli-200a-the-reed-piano). The **CP-80** has two, its
 panel's tone controls and its tremolo: see [CP-80](#6-cp-80-the-electric-grand).
 
-![VOICE 1/2](manual/img/voice1.png?v=deda5660)
+![VOICE 1/2](manual/img/voice1.png?v=2e842aec)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -195,7 +195,7 @@ panel's tone controls and its tremolo: see [CP-80](#6-cp-80-the-electric-grand).
 | K3 | **BELL** | The bright metallic overtone at the start of each note |
 | K4 | **HAMMER** | Hammer hardness: softer is darker, harder is brighter |
 
-![VOICE 2/2](manual/img/voice2.png?v=6507170b)
+![VOICE 2/2](manual/img/voice2.png?v=601dbb24)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -206,7 +206,7 @@ panel's tone controls and its tremolo: see [CP-80](#6-cp-80-the-electric-grand).
 
 ### COMPRESSOR
 
-![COMPRESSOR](manual/img/comp.png?v=2a1cac33)
+![COMPRESSOR](manual/img/comp.png?v=9bd1aa69)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -225,7 +225,7 @@ comes first in the chain, right after the piano.
 
 ### DRIVE
 
-![DRIVE](manual/img/drive.png?v=bd7cfd45)
+![DRIVE](manual/img/drive.png?v=01e3c5b4)
 
 The amp drive, right after the compressor (before the filter). AMOUNT can also be put on a PERFORM knob (DRIVE on ASSIGN). There are five drives, all
 overdrive types (none of them a fuzz): **FDRV** is the original Frodhes drive, and the other
@@ -264,7 +264,7 @@ knobs glides, so you can turn them while you play. Over MIDI: CC 81 AMOUNT, 82 T
 
 ### FILTER
 
-![FILTER](manual/img/filter.png?v=e1cfa936)
+![FILTER](manual/img/filter.png?v=578736de)
 
 A resonant filter right after the drive (before the tremolo and the other effects), moved by its own LFO. It
 filters the driven sound: a low-pass after the drive smooths its edge, a resonant sweep stays clean of the drive's
@@ -283,7 +283,7 @@ sound the FM-1 was left on. Over MIDI: CC 70 TYPE, 74 cutoff, 71 resonance, 72 L
 
 ### TREM/WAH
 
-![TREM/WAH](manual/img/trem.png?v=66a67e5c)
+![TREM/WAH](manual/img/trem.png?v=c3757904)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -296,7 +296,7 @@ On the **WURLI 200A** its own vibrato is not here but on its VOICE 3/4 page (see
 
 ### PHASER
 
-![PHASER](manual/img/phaser.png?v=bafcefbe)
+![PHASER](manual/img/phaser.png?v=5dc0fff4)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -307,7 +307,7 @@ On the **WURLI 200A** its own vibrato is not here but on its VOICE 3/4 page (see
 
 ### CHORUS
 
-![CHORUS](manual/img/chorus.png?v=787dc6ef)
+![CHORUS](manual/img/chorus.png?v=5800b534)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -325,7 +325,7 @@ their weight.
 
 ### DELAY
 
-![DELAY](manual/img/delay.png?v=0f277268)
+![DELAY](manual/img/delay.png?v=0c11d37e)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -351,7 +351,7 @@ back on to the type it last used (TAPE too). Over MIDI, CC 88 picks the type in 
 
 ### REVERB
 
-![REVERB](manual/img/reverb.png?v=fa574448)
+![REVERB](manual/img/reverb.png?v=81f8d7a1)
 
 The reverb, the last effect. It has three types: **HALL** (the reverb Frodhes always had), **PLATE** and
 **INFINITE**. Its second page, **REVERB 2**, has the pre-delay and three more controls. MIX can also be put on a
@@ -386,7 +386,7 @@ TONE glide when moved; MIX moves in small steps (every 32 samples, too small to 
 
 ### REVERB 2
 
-![REVERB 2](manual/img/reverb2.png?v=b667a608)
+![REVERB 2](manual/img/reverb2.png?v=f05b9ab3)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -400,7 +400,7 @@ The defaults are the reverb's sound before it had types. Over MIDI: CC 94 PRE-DE
 
 ### TEMPO
 
-![TEMPO](manual/img/tempo.png?v=3be6d6f4)
+![TEMPO](manual/img/tempo.png?v=27547599)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -411,7 +411,7 @@ The defaults are the reverb's sound before it had types. Over MIDI: CC 94 PRE-DE
 
 ### SCALE
 
-![SCALE](manual/img/scale.png?v=fd597800)
+![SCALE](manual/img/scale.png?v=722389ee)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -426,7 +426,7 @@ scale from any source, so a MIDI note out of the scale plays the chord of the ne
 
 ### CHORD
 
-![CHORD](manual/img/chord.png?v=eb41db0f)
+![CHORD](manual/img/chord.png?v=052552f0)
 
 Chord mode: **one key plays a whole chord**. Press **EDIT** to come here, and **EDIT** again to switch chord mode
 on / off (it comes back with the last chord type, MAJ the first time; the EDIT light shows it).
@@ -443,7 +443,7 @@ arpeggiator (which then arpeggiates the chord) and with the sequencer (which rec
 
 ### ARPEGGIO
 
-![ARPEGGIO](manual/img/arp.png?v=b679b85d)
+![ARPEGGIO](manual/img/arp.png?v=0e686b92)
 
 Hold a chord and the arpeggiator plays its notes one at a time, in time with the tempo (tap tempo and MIDI clock
 too). Press **ARP** to come here, and **ARP** again to switch it on / off (the ARP light shows it).
@@ -469,7 +469,7 @@ settings belong to the FM-1, not to a preset; ARP RATE and ARP GATE can also be 
 
 ### LFO
 
-![LFO](manual/img/lfo.png?v=46df590d)
+![LFO](manual/img/lfo.png?v=bd101e89)
 
 The filter's LFO (it moves FREQ by the FILTER page's LFO amount).
 
@@ -482,7 +482,7 @@ The filter's LFO (it moves FREQ by the FILTER page's LFO amount).
 
 ### SEQUENCER
 
-![SEQUENCER](manual/img/seq.png?v=7c39df98)
+![SEQUENCER](manual/img/seq.png?v=91b16431)
 
 A **pattern recorder**: play notes or chords (chord mode too) and they loop, quantized, while you keep adding and
 editing. The screen is made to be read at a glance: the top line shows where the loop is (**BAR 2/4 . 3** = bar 2
@@ -523,7 +523,7 @@ stored when the loop is stopped).
 
 ### RECORDING
 
-![RECORDING](manual/img/recording.png?v=7a036f60)
+![RECORDING](manual/img/recording.png?v=8789fb1a)
 
 The sequencer's second page (SELECT one step on from SEQUENCER): how a recording starts, a click to play to, and
 UNDO / REDO. These belong to the FM-1, not to a preset.
@@ -537,7 +537,7 @@ UNDO / REDO. These belong to the FM-1, not to a preset.
 
 ### PATTERN
 
-![PATTERN](manual/img/pattern.png?v=3b31deb6)
+![PATTERN](manual/img/pattern.png?v=86b67a2a)
 
 The sequencer's third page (SELECT two steps on from SEQUENCER): the whole pattern at once, while it plays.
 
@@ -546,13 +546,30 @@ The sequencer's third page (SELECT two steps on from SEQUENCER): the whole patte
 | K1 | **SHIFT** | Every note a 16th **later** (right) or **earlier** (left), around the loop; each note keeps its own timing within the 16th (QUANT OFF). The card shows how far it moved (+2, -1) |
 | K2 | **LENGTH** | **Right: x2**: the loop twice as long (up to 16 bars), its notes copied after themselves; if a shorter loop had hidden notes past its end (BARS, or LENGTH 1/2), they come back instead of a copy. **Left: 1/2**: half as long (down to 1 bar), the notes past the end kept, as BARS keeps them. The card shows the bars |
 | K3 | **TRANSPOSE** | Every note a semitone up (right) or down (left); the card shows how far (+2). A note already at the end of the MIDI range stays |
+| K4 | **SECTION** | **A**, **B**, **C**, **D**: four patterns (a verse, a chorus...). Stopped, the section changes at once; playing, it waits for the **next bar** (the card shows **A>B** meanwhile) and starts from its beginning. A section you go to while it is **empty** starts as a **copy** of the one you were on (a variation to build on; hold SEQ on SEQUENCER to clear it instead). Each section has its own BARS; QUANT, SWING and the tempo are shared. The four share the 448 notes. The SEQUENCER's top line shows the section (A BAR 2/4 . 3); everything on SEQUENCER, RECORDING and PATTERN acts on the section playing |
 
 These are edits: they drop what REDO (RECORDING) could bring back, and UNDO does not take them back; turn the other
 way to undo them (LENGTH x2 after 1/2 brings the hidden half back).
 
+### SONG
+
+![SONG](manual/img/song.png?v=f4c59288)
+
+The sequencer's fourth page: a **chain** of up to 8 steps, each a section played a number of times.
+
+| Knob | Card | What it does |
+| --- | --- | --- |
+| K1 | **MODE** | **LOOP**: the section playing loops (PATTERN's SECTION changes it). **SONG**: PLAY plays the chain from its first step, each step's section its TIMES, then the next step, and round again after the last |
+| K2 | **STEP** | Which of the 8 steps K3 and K4 show and set |
+| K3 | **SECTION** | That step's section, **A**–**D**, or **END** (an empty step: skipped) |
+| K4 | **TIMES** | How many times the step's section plays, **X1**–**X4** |
+
+The chain, LOOP / SONG and each section's BARS belong to the FM-1 (kept with the setup); the sections' notes are
+kept with the pattern, in the same flash as before (a pattern from an earlier version is section A).
+
 ### ASSIGN
 
-![ASSIGN](manual/img/assign.png?v=a46503c6)
+![ASSIGN](manual/img/assign.png?v=e1ebdea1)
 
 Choose what each PERFORM knob plays: K1 here sets what K1 on PERFORM does, and so on. ASSIGN sits near the end of
 the pages, just before SETUP (the hint on PERFORM says so). Each knob can play any of:
@@ -564,7 +581,7 @@ DRIVE, FILTER, DELAY and REVERB.
 
 ### SETUP
 
-![SETUP](manual/img/setup.png?v=e432acdf)
+![SETUP](manual/img/setup.png?v=0cf87e19)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -585,7 +602,7 @@ segments are worked out from), and the audio engine's time per block (it must st
 
 ### MIDI
 
-![MIDI](manual/img/midi.png?v=789009e2)
+![MIDI](manual/img/midi.png?v=1085f523)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -598,7 +615,7 @@ the TRS jack: notes, every CC in the table below, program changes, clock, start 
 
 ### DISPLAY
 
-![DISPLAY](manual/img/display.png?v=0c35af9c)
+![DISPLAY](manual/img/display.png?v=57335cba)
 
 | Knob | Card | What it does |
 | --- | --- | --- |
@@ -621,11 +638,11 @@ noise. Notes outside A1–C7 do not sound, as on the instrument. One step furthe
 through its own amp and speaker in a room (fitted to recordings of a 200A's line and speaker side by side: fuller
 low mids, a presence peak, the top rolled off), with the soft knock of each key coming back up, heard in the room.
 
-![The FRODHES page on the WURLI 200A: TYPE, BARK, the vibrato's DEPTH and KEY VEL](manual/img/piano-200a.png?v=078645b3)
-![VOICE 1/4 on the WURLI 200A](manual/img/voice1-200a.png?v=317d0c11)
-![VOICE 2/4 on the WURLI 200A](manual/img/voice2-200a.png?v=963da776)
-![VOICE 3/4: the 200A's vibrato](manual/img/voice3-200a.png?v=acbdf227)
-![VOICE 4/4: REG](manual/img/voice4-200a.png?v=12456afc)
+![The FRODHES page on the WURLI 200A: TYPE, BARK, the vibrato's DEPTH and KEY VEL](manual/img/piano-200a.png?v=50dbc538)
+![VOICE 1/4 on the WURLI 200A](manual/img/voice1-200a.png?v=0ec49d7b)
+![VOICE 2/4 on the WURLI 200A](manual/img/voice2-200a.png?v=483be2b5)
+![VOICE 3/4: the 200A's vibrato](manual/img/voice3-200a.png?v=96aaebb1)
+![VOICE 4/4: REG](manual/img/voice4-200a.png?v=f37ab9b0)
 
 **VOICE 1/4** (how the reed is struck): **TONE** the shape of the pickup's plates (down rounder and darker, up more
 mids and edge; the level stays), **BARK** how far the reed swings past them (more growl and more output; the main
@@ -661,9 +678,9 @@ and brighter. After the strings, the CP-80's own preamp: its tone controls, its 
 model comes from the service manual, the physics of the strings and the hammer, and the decays and tuning of a CP-70
 measured note by note. No recordings are played back.
 
-![The FRODHES page on the CP-80: TYPE, BASS, TREBLE and KEY VEL](manual/img/piano-cp80.png?v=7e29a428)
-![VOICE 1/2 on the CP-80: the tone controls](manual/img/voice1-cp80.png?v=56b4ed08)
-![VOICE 2/2 on the CP-80: the tremolo and TUNE](manual/img/voice2-cp80.png?v=cceeb62c)
+![The FRODHES page on the CP-80: TYPE, BASS, TREBLE and KEY VEL](manual/img/piano-cp80.png?v=9c87cdf8)
+![VOICE 1/2 on the CP-80: the tone controls](manual/img/voice1-cp80.png?v=48e1e0c8)
+![VOICE 2/2 on the CP-80: the tremolo and TUNE](manual/img/voice2-cp80.png?v=fe039ab8)
 
 On the FRODHES page, K2 is **BASS** and K3 **TREBLE**. **VOICE 1/2** has the CP-80 panel's tone controls: **BASS**,
 **MIDDLE**, **TREBLE** (5 is the setting the service manual calibrates; 0 and 10 its range) and **BRILLIANCE**
@@ -680,7 +697,7 @@ CPU time on the FM-1 is not measured yet.
 
 ## 7. Presets
 
-![Browsing presets](manual/img/browse.png?v=706d0054)
+![Browsing presets](manual/img/browse.png?v=2dad8a2b)
 
 Turn **PRESETS** to browse: **F01–F17** are the factory sounds (F16 and F17 the WURLI 200A), **U01–U16** your own, after F17. A preset loads when you stop
 turning (after 0.4 s). If you did not mean to, **hold SAVE** (0.7 s) to go back to the sound you had before the
@@ -752,7 +769,7 @@ The first save writes them to the FM-1 with your preset; from then on they are u
 again to store it, or **HOME** (or **OCT−**) to cancel. The name is made from the type and the effects that are on
 ("SUIT TRM PHA").
 
-![Save mode](manual/img/save.png?v=5fe94944)
+![Save mode](manual/img/save.png?v=aab41efe)
 
 The save waits for silence: the bottom line says **SAVING...** until the sound has died away, then **SAVED**. INFINITE's SUSTAIN and FREEZE hold their tail without end, so while one of them is on the save waits and the bottom line says **SAVE WAITS: SUSTAIN ON** or **SAVE WAITS: FREEZE ON**; turn DECAY down (or change the type, or switch the reverb OFF), let the tail die away, and the save goes through. The settings are saved the same way, once it is quiet. A user
 preset can be overwritten but not deleted, and browsing skips the empty ones. There is no factory reset: F01–F17 are
@@ -788,7 +805,7 @@ short crossfade), without changing any setting: compare the dry piano with
 your sound. The header shows **BYP** while they are off. It is not saved, so the FM-1 always starts with the effects
 on.
 
-![FX bypass](manual/img/bypass.png?v=1a61120e)
+![FX bypass](manual/img/bypass.png?v=a2152133)
 
 The order of the chain: **COMP → DRIVE → FILTER → TREM/WAH → PHASER → CHORUS → DELAY → REVERB → limiter.** The limiter at the
 end keeps even big chords of ten notes from ever clipping.

@@ -87,6 +87,7 @@
 3330 turn 0 1
 3331 turn 0 1
 3332 turn 0 1
+3333 turn 0 1
 3400 expect state page ASSIGN
 3500 expect state card0 DRIVE
 3510 turn 0 -1
@@ -110,6 +111,7 @@
 3690 turn 0 -1
 3691 turn 0 -1
 3692 turn 0 -1
+3693 turn 0 -1
 3700 expect state page PERFORM
 3700 expect state card0 OFF
 3710 turn 2 20
