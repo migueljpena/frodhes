@@ -111,8 +111,15 @@ static void seq_sanitize(void)
 }
 /* the other sections' notes follow the playing one's: room for k more at sq_n (they move up), or the gap closed
  * after the playing one's shrank from n0 (they move down) */
-static void sq_grow(uint32_t k) { if (sq_pk) memmove(&sq_ev[sq_n + k], &sq_ev[sq_n], sq_pk * sizeof(sq_ev_t)); }
-static void sq_shrunk(uint32_t n0) { if (sq_pk && n0 != sq_n) memmove(&sq_ev[sq_n], &sq_ev[n0], sq_pk * sizeof(sq_ev_t)); }
+/* (no memmove in the SDK's libc: an overlapping move of n events, by direction) */
+static void sq_move(uint32_t to, uint32_t from, uint32_t n)
+{
+    uint32_t i;
+    if (to > from) for (i = n; i-- > 0;) sq_ev[to + i] = sq_ev[from + i];
+    else if (to < from) for (i = 0; i < n; i++) sq_ev[to + i] = sq_ev[from + i];
+}
+static void sq_grow(uint32_t k) { if (sq_pk) sq_move(sq_n + k, sq_n, sq_pk); }
+static void sq_shrunk(uint32_t n0) { if (sq_pk && n0 != sq_n) sq_move(sq_n, n0, sq_pk); }
 /* the events of section t first: [0, the count) of [0, tot) (in place, the order otherwise free) */
 static uint32_t sq_partition(uint32_t tot, uint32_t t)
 {
