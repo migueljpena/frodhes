@@ -944,7 +944,7 @@ TREM/WAH work on the mono sum, and SPREAD follows their level (a hard drive narr
 | 108 / 109 | COMP ATTACK / RELEASE | 110 | LEVEL (64 = 0 dB) |
 | 111 | All effects off (≥ 64) / on | 28–31 | TONE / BARK / BELL / HAMMER |
 | 114 | USB VOL: knob (< 64) / fixed | 24 | Reserved (accepted and saved, no effect yet) |
-| 105 | SPREAD: the Rhodes across the stereo field by key (0 mono, the default; saved with the preset) | | |
+| 105 | SPREAD: the Rhodes across the stereo field by key (0 mono, the default; saved with the preset) | 9 | Two sounds (DUAL): 0–63 one sound, 64–127 two (as HOME + MONO / POLY); with the MIDI CHANNEL on ALL, channel 1 plays PART 1 and channel 2 PART 2 |
 | 116 | Developer: CPU load and USB audio health query (replies on CC 115–118; 107–110, the whole audio interrupt and its tail after the sound; 100–102, the USB audio counters since the last query: underruns, missed packets, overruns, rate adjustments, the ring's fill and its low point, the audio interrupt's spacing, the stream's state; the longest stretch a flash write held the interrupts off, the flash part's suspends, the longest erase; `tools/hil_cpu.py` reads them) | 119 | Developer: raw voice (≥ 64 bypasses every effect and the limiter; FX does not undo it) |
 | 4 | Developer: battery query (replies CC 4 / 5 = the reading: value / 8, value mod 8; CC 6 = the segments shown, 4 = USB power) | 8 | Developer: a simulated battery reading (value x 8; 0 = the real one) |
 | 102 / 103 / 104 | DECAY / RELEASE / NOISE | 120 / 123 | All notes off: every note held over MIDI is let go and rings out through the dampers, every tail ending within 8 s (keys still held on the FM-1, the arpeggiator's HOLD and the sequencer keep going) |

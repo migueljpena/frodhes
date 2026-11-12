@@ -15,6 +15,8 @@ the worst ones: --keyadc gate --worst --scenario pedal; run_final_rev.sh). --wor
 and the idle-with-every-effect one (the fixed part), 3 takes each as usual.
 
 --engine reed selects the 200A (CC 115 0: WURLI 200A), with its vibrato on (CC 47, P_MOT_ON: the engine's own)
+--dual: DUAL, two sounds (CC 9 127): the Rhodes beside the --engine one (reed or cp80), the chords' notes alternating
+channel 1 (PART 1) and channel 2 (PART 2), 5 voices an engine; the FM-1 stays in DUAL afterwards (CC 9 0 to leave)
 wherever the effects are on (the tremolo too: it can run on top of the vibrato), off elsewhere.
 --fx-each: idle, then each effect alone (minus idle without effects) = the per-effect cost table of fx.c (FX_US_*).
 --stages: a developer build (APP_DEFS=-DRH_PROF_STAGES ./build.sh) also answers each stage's longest time (frodhes.c
@@ -276,6 +278,7 @@ def run_cpu(argv):  # noqa: C901
     sys.argv = list(argv)                             # (the options as the command line's: main() restores it)
     eng = sys.argv[sys.argv.index("--engine") + 1] if "--engine" in sys.argv else "rhodes"
     reed = eng == "reed"                              # the 200A (CC 115 0..63)
+    dual = "--dual" in sys.argv                       # DUAL: two sounds
     kmode = sys.argv[sys.argv.index("--keyadc") + 1] if "--keyadc" in sys.argv else None
     if kmode is not None and kmode not in KEYADC:
         sys.exit("--keyadc: off, idle, stress or gate")
@@ -301,6 +304,8 @@ def run_cpu(argv):  # noqa: C901
                 cc(17, 64)
         if eng == "cp80":
             cc(79, 0)                                 # the CP-80 (frodhes.c CC 79: the CP engine's first TYPE)
+        if dual:
+            cc(9, 127)                                # DUAL: PART 2 the Rhodes (params.c dual_fix)
         if "--set" in sys.argv:                       # --set CC:V[,CC:V]: sent after every reset (an A/B of one knob)
             for pr in sys.argv[sys.argv.index("--set") + 1].split(","):
                 c_, v_ = pr.split(":")
@@ -392,8 +397,8 @@ def run_cpu(argv):  # noqa: C901
         repeated chords: their timing as before)"""
         if pedal:
             cc(64, 127)
-        for n in notes:
-            out.send(mido.Message("note_on", note=n, velocity=vel))
+        for i_, n in enumerate(notes):                # (DUAL: the parts by channel, alternating)
+            out.send(mido.Message("note_on", note=n, velocity=vel, channel=i_ % 2 if dual else 0))
         wait(0.3)
         attack = query()[0]
         if bypass:
@@ -402,8 +407,8 @@ def run_cpu(argv):  # noqa: C901
             cc(111, 0)
         wait(max(0.0, hold - 0.3 - (0.1 if bypass else 0.0)))
         held = query()[0]
-        for n in notes:
-            out.send(mido.Message("note_off", note=n))
+        for i_, n in enumerate(notes):
+            out.send(mido.Message("note_off", note=n, channel=i_ % 2 if dual else 0))
         if bend_on:
             bend(8192)
         if not release:

@@ -359,6 +359,8 @@ static void midi_cc(uint32_t cc, uint32_t v)
         ui_mark(E_CARDS); ui_mark(E_FOOTER);
         return;
     }
+    if (cc == 9u) { dual_set(v >= 64u); return; }     /* DUAL: one sound (0..63) / two (64..127; CHANNEL ALL: MIDI
+                                                        * channel 1 plays PART 1, channel 2 PART 2) */
     if (cc == 115u) {                                  /* the reed types (TYPE_ENGINE 1): 0..63 the 200A, 64..127 200A
                                                         * AMP (CC 80 is as before; Frodhes' CC 79, VIBES / MARIMBA, is
                                                         * not here) */
@@ -591,7 +593,12 @@ static void app_main(void)
         while ((src = midi_get(&st, &d1, &d2)) != 0) {   /* USB-MIDI and the TRS jack; the MIDI page's CHANNEL (0 = all) */
             uint8_t ty = st & 0xF0u;
             if (st < 0xF0u && set.midi_ch && (st & 0x0Fu) != set.midi_ch - 1u) continue;
-            if (ty == 0x90u && d2) src_on(SRC_MIDI + (d1 & 127u), d1 & 127u, d2, 0);
+            if (ty == 0x90u && d2) {            /* DUAL, CHANNEL ALL: channel 1 plays PART 1, channel 2 PART 2, the
+                                                 * others the active part */
+                if (set.dual && !set.midi_ch && (st & 0x0Fu) < 2u) src_part_force = (int8_t)(st & 0x0Fu);
+                src_on(SRC_MIDI + (d1 & 127u), d1 & 127u, d2, 0);
+                src_part_force = -1;
+            }
             else if (ty == 0x80u) src_off_v(SRC_MIDI + (d1 & 127u), d2 & 127u);   /* its release velocity */
             else if (ty == 0x90u) src_off(SRC_MIDI + (d1 & 127u));          /* a note-on at 0: none */
             else if (ty == 0xB0u) midi_cc(d1, d2);

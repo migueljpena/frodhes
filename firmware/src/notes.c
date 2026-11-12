@@ -233,6 +233,7 @@ static uint8_t src_active[SRC_N];
 static void live_note_on(uint32_t n, uint32_t vel);   /* seq.c: what is played, for the recorder */
 static void live_note_off(uint32_t n);
 static uint32_t part_live(void);                     /* params.c: the part the keys and MIDI play (0 out of DUAL) */
+static int8_t src_part_force = -1;                   /* frodhes.c: DUAL, a MIDI note's part by its channel (-1: the active) */
 static void src_note_on(uint32_t slot, uint32_t n, uint32_t vel, int echo)
 {
     nt_part = src[slot].part;
@@ -246,7 +247,8 @@ static void src_start(uint32_t slot, const uint8_t *notes, uint32_t c, uint32_t 
     uint32_t i;
     s->c = (uint8_t)(c > CH_MAX ? CH_MAX : c);
     for (i = 0; i < s->c; i++) s->n[i] = notes[i];
-    s->vel = (uint8_t)vel; s->echo = (uint8_t)echo; s->t0 = fm1_ms; s->started = 0; s->part = (uint8_t)part_live();
+    s->vel = (uint8_t)vel; s->echo = (uint8_t)echo; s->t0 = fm1_ms; s->started = 0;
+    s->part = (uint8_t)(src_part_force >= 0 ? (uint32_t)src_part_force : part_live());
     src_active[slot] = 1;
     if (s->c) { src_note_on(slot, s->n[0], vel, echo); s->started = 1; }
     for (i = 1; i < s->c && !CH_STRUM; i++) { src_note_on(slot, s->n[i], vel, echo); s->started = (uint8_t)(i + 1u); }
