@@ -69,6 +69,9 @@ typedef struct {              /* physical voicing per TYPE (params.json "types")
 #define RH_VOICES 10u
 #endif
 #define RH_NV RH_VOICES
+#ifndef ENG_CAP
+#define ENG_CAP(nv) (nv)                      /* (engine.c: DUAL's voice cap; alone: every voice) */
+#endif
 _Static_assert(RH_NV >= 1u && RH_NV <= 32u, "summaries are 32-bit masks");
 #define SUB 32u
 #define RAMP_SUB 7u
@@ -681,9 +684,9 @@ static int rh_strike(uint32_t note, uint32_t vel)      /* 0: every voice already
             rh_load_pulse(v, vel);
             return 1;
         }
-    for (i = 0; i < RH_NV; i++)
+    for (i = 0; i < ENG_CAP(RH_NV); i++)                /* (engine.c ENG_CAP: DUAL strikes 5 voices) */
         if (!rv[i].alive) { rh_init(&rv[i], note, vel); return 1; }
-    for (i = 0; i < RH_NV; i++) {                       /* steal: the quietest released voice, else the oldest */
+    for (i = 0; i < ENG_CAP(RH_NV); i++) {              /* steal: the quietest released voice, else the oldest */
         uint32_t m, sum = 0, score;
         if (rv[i].pend) continue;
         for (m = 0; m < RH_NM; m++) sum += (uint32_t)rv[i].m[m].peak >> 4;

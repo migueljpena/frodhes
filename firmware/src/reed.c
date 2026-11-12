@@ -28,6 +28,9 @@
 #endif
 #endif
 #define RE_NV RE_VOICES
+#ifndef ENG_CAP
+#define ENG_CAP(nv) (nv)                      /* (engine.c: DUAL's voice cap; alone: every voice) */
+#endif
 #ifndef FR_RAM
 #define FR_RAM                                  /* (frodhes.c: the audio hot loops in RAM) */
 #define FR_FAR(fn) fn
@@ -517,13 +520,13 @@ static int re_strike(uint32_t note, uint32_t vel)
             v->rel = 0; v->rpend = 0; v->quiet = 0; v->held = 1; v->age = ++re_ages;
             return 1;
         }
-    for (i = 0; i < RE_NV; i++) if (!re_v[i].alive) { best = i; break; }
+    for (i = 0; i < ENG_CAP(RE_NV); i++) if (!re_v[i].alive) { best = i; break; }   /* (DUAL: 5 voices) */
     if (best == RE_NV) {                                          /* every voice taken: the oldest not already
                                                                   * given a note fades in 5 ms (as rhodes.c: a steal
                                                                   * per voice at once; one at a time spread a chord
                                                                   * over the pedal's full voices across ~10 blocks,
                                                                   * tools/hil_crackle.py, 2026-10-28) */
-        for (i = 0; i < RE_NV; i++) if (!re_v[i].pend && re_v[i].age < old) { old = re_v[i].age; best = i; }
+        for (i = 0; i < ENG_CAP(RE_NV); i++) if (!re_v[i].pend && re_v[i].age < old) { old = re_v[i].age; best = i; }
         if (best == RE_NV) return 0;                              /* every voice waits for a note: next block */
         re_v[best].pend = 1; re_v[best].pend_note = (uint8_t)note; re_v[best].pend_vel = (uint8_t)vel;
         if (re_v[best].fade == 32768) re_v[best].fade = 32767;

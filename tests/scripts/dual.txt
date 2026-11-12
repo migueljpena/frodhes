@@ -1,0 +1,86 @@
+# DUAL, two sounds (params.c dual_*, engine.c, ui.c ui_combo_key): HOME (button 8) held + a key is a combination, the
+# key does not sound and HOME does not change the page. Keys: OP1 = 1, OP5 = 10, PIT = 15, MONO = 20, POLY = 22,
+# F#5 = 25; C4 = 7, E4 = 11, G4 = 14. PART 1 is the TYPE (ST77 at first), PART 2 the other family (200A).
+50 expect state dual 0
+50 expect state page PERFORM
+100 press 8
+150 keys 0x400000
+200 keys 0
+250 release 8
+300 expect state dual 1
+300 expect state part 0
+300 expect state type1 ST77
+300 expect state type2 200A
+300 expect state page PERFORM
+300 expect state pitches 0
+# PART 1: a chord on the Rhodes, none on the 200A
+400 keys 0x4880
+600 expect state rhheld 3
+600 expect state otherheld 0
+700 keys 0
+# HOME + F#5: PART 2; the same chord on the 200A
+800 press 8
+850 keys 0x2000000
+900 keys 0
+950 release 8
+1000 expect state part 1
+1000 expect state msg P2_WURLI_200A
+1100 keys 0x4880
+1300 expect state otherheld 3
+1300 expect state rhheld 0
+1400 keys 0
+# five voices a part in DUAL: seven keys, five sounding on the 200A
+1500 keys 0x7F
+1700 expect state otherheld 5
+1800 keys 0
+# HOME + PIT on PART 2: the CP-80
+1900 press 8
+1950 keys 0x8000
+2000 keys 0
+2050 release 8
+2100 expect state type2 CP80
+2100 expect state cp 1
+2100 expect state type1 ST77
+# HOME + OP1 on PART 2: a Rhodes there, so PART 1 goes to the other family (200A)
+2200 press 8
+2250 keys 0x2
+2300 keys 0
+2350 release 8
+2400 expect state type2 ST77
+2400 expect state type1 200A
+2400 expect state reed 1
+# the sequencer keeps each note's part: 1 bar (CC 61), START NOTE, C4 on PART 2 (the Rhodes now), G4 on PART 1 (200A)
+3000 btn 11
+3050 midi 0xB0 61 1
+3100 turn 0 1
+3150 turn 2 1
+3200 turn 0 -1
+3250 btn 11
+3300 keys 0x80
+3400 keys 0
+3500 press 8
+3550 keys 0x2000000
+3600 keys 0
+3650 release 8
+3700 expect state part 0
+3800 keys 0x4000
+3900 keys 0
+4000 btn 11
+4100 expect state notes 2
+# the next pass (2 s on): C4 on the Rhodes, then G4 on the 200A
+5350 expect state rhheld 1
+5350 expect state otherheld 0
+5850 expect state otherheld 1
+5850 expect state rhheld 0
+# HOME + MONO: one sound again; everything plays PART 1 (the 200A)
+6100 press 8
+6150 keys 0x100000
+6200 keys 0
+6250 release 8
+6300 expect state dual 0
+7350 expect state otherheld 1
+7350 expect state rhheld 0
+# HOME alone still changes the page, on its release
+8000 btn 8
+8100 expect state page PERFORM
+8200 end

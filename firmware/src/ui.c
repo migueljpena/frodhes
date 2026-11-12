@@ -1782,6 +1782,67 @@ static void ui_fx_button(uint32_t pg, uint32_t k)
     ui_mark(E_CARDS);
 }
 
+/* ---- HOME + a key: the combination layer (DUAL, two sounds). Held, HOME turns the keys into buttons (they do not
+ * sound); its own press (PERFORM <-> the main page) then waits for its release, and is dropped if a key was used.
+ * The black keys by their print: OP1 OP2 OP3 OP4 OP5 OP6 PIT GLO MONO POLY, and F#5 (no print) */
+static uint8_t home_combo;                             /* a key was used while HOME was held */
+static const int8_t COMBO_BLACK[27] = {                /* key 0 = F3 .. 26 = G5: the black key's number (0 = OP1), -1 */
+    -1, 0, -1, 1, -1, 2, -1, -1, 3, -1, 4, -1, -1, 5, -1, 6, -1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1};
+enum { CB_OP1, CB_OP2, CB_OP3, CB_OP4, CB_OP5, CB_OP6, CB_PIT, CB_GLO, CB_MONO, CB_POLY, CB_F5 };
+static void dual_say(void)                             /* "P2 WURLI 200A": the active part and its sound */
+{
+    char m[32];
+    uint32_t p = part_live();
+    if (!set.dual) { p_strcpy(m, N_TYPE_LONG[PV(P_TYPE)], 31); ui_say_big(m); return; }
+    m[0] = 'P'; m[1] = (char)('1' + p); m[2] = ' ';
+    p_strcpy(m + 3, N_TYPE_LONG[part_type(p)], 28);
+    ui_say_big(m);
+}
+/* every note let go before the parts change (the notes in flight; engine.c: an all-off reaches both engines) */
+static void dual_release(void)
+{
+    uint32_t i;
+    out_quiet_off = 1;
+    for (i = 0; i < SRC_N; i++) src_off(i);
+    sq_all_off();
+    out_quiet_off = 0;
+    arp_stop_note();
+    eng_q(EV_ALL_OFF, 0, 0);
+}
+static void dual_set(uint32_t on)
+{
+    if (set.dual == on) { dual_say(); return; }
+    dual_release();
+    set.dual = (uint8_t)on;
+    if (!on) set.part = 0;
+    dual_apply();
+    set_dirty = 1; set_t_change = fm1_ms;
+    ui_mark(E_HEADER); ui_mark(E_CARDS);
+    if (on) {
+        char m[32];
+        p_strcpy(m, "2 SOUNDS: ", 31);
+        p_strcpy(m + 10, N_TYPE[PV(P_TYPE)], 4);
+        p_strcpy(m + 14, " + ", 3);
+        p_strcpy(m + 17, N_TYPE[set.type2], 4);
+        ui_say_big(m);
+    } else dual_say();
+}
+static int ui_combo_key(uint32_t k)                    /* frodhes.c: a key pressed; 1 = it was a combination */
+{
+    int32_t bk;
+    if (!(fm1_in.buttons >> BTN_HOME & 1u) || pr_save_mode || k >= 27u) return 0;
+    home_combo = 1;
+    bk = COMBO_BLACK[k];
+    if (bk >= CB_OP1 && bk <= CB_PIT) { part_type_pick((uint32_t)bk); dual_say(); ui_mark(E_CARDS); ui_mark(E_HEADER); }
+    else if (bk == CB_MONO) dual_set(0);
+    else if (bk == CB_POLY) dual_set(1);
+    else if (bk == CB_F5) {
+        if (!set.dual) ui_say("1 SOUND: HOME + POLY FOR 2");
+        else { set.part ^= 1u; set_dirty = 1; set_t_change = fm1_ms; dual_say(); ui_mark(E_HEADER); }
+    }
+    return 1;
+}
+
 static void ui_input(uint32_t b, uint32_t rel)
 {
     int32_t d[FM1_NENC];                                /* (the SMK-37: 8; its K1 = ENC_MASTER is platform.c's MASTER,
@@ -1809,7 +1870,12 @@ static void ui_input(uint32_t b, uint32_t rel)
         presets_poll(d[ENC_PRESETS], was ? d[ENC_KNOB1] : 0, b, rel);
         if (was || pr_save_mode) { ui_mark(E_FOOTER); return; }      /* the save mode owns the pass */
     }
-    if (b >> BTN_HOME & 1u) ui_goto(ui_page == PG_PERF ? PG_PIANO : PG_PERF);    /* PERFORM <-> the main page */
+    if (b >> BTN_HOME & 1u) home_combo = 0;
+    if (rel >> BTN_HOME & 1u) {                         /* PERFORM <-> the main page, on the release (HOME + a key:
+                                                         * not at all) */
+        if (!home_combo) ui_goto(ui_page == PG_PERF ? PG_PIANO : PG_PERF);
+        home_combo = 0;
+    }
     if (b >> BTN_EDIT & 1u) {                           /* CHORD; on it: chord mode on / off (0.9.3: was VOICE) */
         if (ui_page != PG_CHORD) ui_goto(PG_CHORD);
         else { chord_toggle(); ui_say(chord_on() ? "CHORDS ON" : "CHORDS OFF"); ui_changed(); ui_mark(E_CARDS); }
@@ -1869,8 +1935,15 @@ static void ui_input(uint32_t b, uint32_t rel)
         } else sq_browse(d[ENC_ALGORITHM]);
         ui_mark(E_TITLE); ui_mark(E_ROLL); ui_mark(E_METER); ui_mark(E_CARD0 + 3);
     } else if (d[ENC_ALGORITHM]) {
-        slot_turn(P_TYPE, sgn(d[ENC_ALGORITHM]));
-        ui_say_big(N_TYPE_LONG[PV(P_TYPE)]);           /* the TYPE flash: large */
+        if (part_live()) {                              /* DUAL on PART 2: its own TYPE */
+            int32_t t = (int32_t)set.type2 + sgn(d[ENC_ALGORITHM]);
+            part_type_pick((uint32_t)clampi(t, 0, (int32_t)N_TYPE_N - 1));
+            dual_say();
+        } else {
+            slot_turn(P_TYPE, sgn(d[ENC_ALGORITHM]));
+            if (set.dual) dual_say();
+            else ui_say_big(N_TYPE_LONG[PV(P_TYPE)]);   /* the TYPE flash: large */
+        }
         ui_mark(E_CARDS);
     }
     for (k = 0; k < 4u; k++) {

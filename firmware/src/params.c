@@ -189,9 +189,13 @@ typedef struct {
 #if BOARD_SMK37
     uint8_t smk_mst[2];                        /* 0.9.6, SMK-37: K1's MASTER + 1, little endian (0, every record
                                                 * before: smk_input.h's 724; frodhes_smk.h smk_master_stored) */
-    uint8_t reserved[18];
+#endif
+    uint8_t dual, type2, part;                 /* DUAL: two sounds (0 / 1), PART 2's TYPE (one Rhodes and one other
+                                                * with P_TYPE), the part the keys play (0 / 1). Records before: 0 */
+#if BOARD_SMK37
+    uint8_t reserved[15];
 #else
-    uint8_t reserved[20];
+    uint8_t reserved[17];
 #endif
 } settings_t;
 _Static_assert(sizeof(settings_t) == 256, "settings record is 256 B");
@@ -315,6 +319,7 @@ static void params_sanitize(void)
         for (i = 0; i < P_SLOTS; i++) p[i] = i < 32u ? set.panel[i] : i < P_COUNT ? PARAMS[i].def : 0;
         for (i = 0; i < 16u; i++) set.panel2[i] = set.undo2[i] = 0;
         for (i = 0; i < sizeof set.reserved; i++) set.reserved[i] = 0;
+        set.dual = set.type2 = set.part = 0;
 #if BOARD_SMK37
         set.smk_mst[0] = set.smk_mst[1] = 0;
 #endif
@@ -428,13 +433,26 @@ static void mot_rate_apply(void)
     eng_vib_knob(VK_INC, mot_sync_inc ? mot_sync_inc : FX_LFO_INC[MOT_RATE_V(PV(P_MOT_RATE))]);
 }
 
+/* ---- DUAL: two sounds. PART 1 is the TYPE (P_TYPE, the preset's), PART 2 set.type2; one is always a Rhodes (TYPE
+ * 0..3) and the other the 200A / 200A AMP / CP-80 (engine.c: one engine of each renders). The keys and MIDI play the
+ * active part (set.part); the sequencer keeps each note's part (seq.c SQ_P2). Out of DUAL, everything plays PART 1. */
+#define TYPE_FAM(t) ((uint32_t)(t) < 4u ? 0u : 1u)              /* 0 the Rhodes, 1 the others */
+static void dual_fix(void)                                       /* PART 2 always of the other family (in DUAL:
+                                                                  * out of it a TYPE never touches the setup) */
+{
+    if (set.dual && (set.type2 >= N_TYPE_N || TYPE_FAM(set.type2) == TYPE_FAM(PV(P_TYPE)))) set.type2 = TYPE_FAM(PV(P_TYPE)) ? 0u : 4u;
+}
+static void dual_apply(void) { dual_fix(); eng_set_dual(set.dual, set.type2); }
+static uint32_t part_live(void) { return set.dual ? set.part & 1u : 0u; }
+static uint32_t part_type(uint32_t p) { return p && set.dual ? set.type2 : PV(P_TYPE); }
+
 /* ---- apply a parameter to the engine (main loop; volatile one-writer handover). The Rhodes volatiles are written
  * exactly as before; the reed engine gets the same knobs through re_knob() (each engine reads only its own) */
 static void param_apply(uint32_t id)
 {
     int32_t v = PV(id);
     switch (id) {
-    case P_TYPE: eng_set_type((uint32_t)v); fx_set(FXP_DRIVE_ROW, TYPE_DRIVE_ROW[v]); tw_apply(); break;
+    case P_TYPE: eng_t1 = (uint8_t)v; dual_apply(); fx_set(FXP_DRIVE_ROW, TYPE_DRIVE_ROW[v]); tw_apply(); break;
     case P_DRIVE: fx_set(FXP_DRIVE, v); break;
     case P_TW_SW: tw_apply(); break;
     case P_TW_DEPTH: fx_set(FXP_TW_DEPTH, MW_ADD(v)); break;
@@ -517,6 +535,17 @@ static void param_set(uint32_t id, int32_t v)
 /* a TYPE picked on the panel (the TYPE card, ALGORITHM) or by CC 80 / 115, not by a preset load (Frodhes started
  * VIBES' motor here; the 200A's vibrato stays as the sound has it) */
 static void type_pick(int32_t t) { param_set(P_TYPE, t); }
+/* a TYPE for the active part (ALGORITHM, HOME + a black key): out of DUAL or on PART 1 the TYPE; on PART 2 its own. The
+ * other part, of the same family, moves to the other family's first TYPE (ST77 or 200A) */
+static void part_type_pick(uint32_t t)
+{
+    if (t >= N_TYPE_N) return;
+    if (!part_live()) { type_pick((int32_t)t); return; }
+    set.type2 = (uint8_t)t;
+    if (TYPE_FAM(t) == TYPE_FAM(PV(P_TYPE))) param_set(P_TYPE, TYPE_FAM(t) ? 0 : 4);   /* (dual_apply in it) */
+    else dual_apply();
+    set_dirty = 1; set_t_change = fm1_ms;
+}
 
 /* ---- value text (<= 5 chars) */
 static void fmt_r10(char *s, int32_t v)           /* panel 0.0 .. 10.0 */

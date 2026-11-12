@@ -14,6 +14,7 @@
 
 #define MIDI_OUT_CH (set.midi_ch ? set.midi_ch - 1u : 0u)   /* the MIDI page's CHANNEL (ALL: sent on 1) */
 static void eng_q(uint32_t type, uint32_t n, uint32_t v);   /* notes.c: to the engine, in order */
+static uint8_t nt_part;                         /* notes.c: the part (DUAL) the notes go to now */
 #define ARP_MAX 16u
 enum { ARP_OFF, ARP_UP, ARP_DOWN, ARP_UPDN, ARP_ORDER, ARP_RANDOM, ARP_NMODE };
 static const char *const ARP_MODE_NAME[ARP_NMODE] = {"OFF", "UP", "DOWN", "UP-DN", "ORDER", "RANDOM"};
@@ -29,6 +30,7 @@ static const char *const ARP_RATE_NAME[6] = {"1/4", "1/8", "1/8T", "1/16", "1/16
 static uint8_t arp_note[ARP_MAX], arp_vel[ARP_MAX], arp_down[ARP_MAX], arp_n;   /* in the order played */
 static uint32_t arp_step_no = 0xFFFFFFFFu, arp_off_t, arp_seed = 0x1234567u;
 static uint8_t arp_playing = 255, arp_pos, arp_dir;
+static uint8_t arp_part;                        /* DUAL: the part its notes go to (notes.c nt_part: the last note in) */
 
 static void arp_defaults(void) { ARP_MODE = ARP_OFF; ARP_RATE = 3; ARP_OCT = 0; ARP_GATE = 60; ARP_LAST = ARP_UP; ARP_HOLD = 0; }
 static void arp_sanitize(void)
@@ -41,7 +43,7 @@ static int arp_on(void) { return ARP_MODE != ARP_OFF; }
 
 static void arp_stop_note(void)
 {
-    if (arp_playing < 128u) { eng_q(EV_NOTE_OFF, arp_playing, 0); midi_send(0x80 | MIDI_OUT_CH, arp_playing, 0); }
+    if (arp_playing < 128u) { nt_part = arp_part; eng_q(EV_NOTE_OFF, arp_playing, 0); midi_send(0x80 | MIDI_OUT_CH, arp_playing, 0); }
     arp_playing = 255;
 }
 
@@ -51,6 +53,7 @@ static void arp_in_on(uint32_t n, uint32_t vel)
 {
     uint32_t i;
     int any = 0;
+    arp_part = nt_part;
     for (i = 0; i < arp_n; i++) any |= arp_down[i];
     if (!any) { arp_n = 0; arp_step_no = 0xFFFFFFFFu; arp_pos = 0; arp_dir = 0; }   /* a new chord: replaces, from its start */
     for (i = 0; i < arp_n; i++)
@@ -135,7 +138,7 @@ static void arp_poll(void)
         uint32_t n = arp_next(), v = arp_vel[0];                       /* one velocity: the first note's */
         arp_step_no = step;
         arp_stop_note();
-        eng_q(EV_NOTE_ON, n, v); midi_send(0x90 | MIDI_OUT_CH, n, v);
+        nt_part = arp_part; eng_q(EV_NOTE_ON, n, v); midi_send(0x90 | MIDI_OUT_CH, n, v);
         arp_playing = (uint8_t)n;
         arp_off_t = now + unit_ms10 * ARP_GATE / 1000u - (ARP_GATE >= 100u ? 2u : 0u);
     }

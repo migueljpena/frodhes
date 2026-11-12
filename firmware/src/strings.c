@@ -29,6 +29,9 @@
 #endif
 #endif
 #define CP_NV CP_VOICES
+#ifndef ENG_CAP
+#define ENG_CAP(nv) (nv)                      /* (engine.c: DUAL's voice cap; alone: every voice) */
+#endif
 #include "cp_tables.h"
 _Static_assert(CP_NV >= 1u && CP_NV <= 32u, "summaries are 32-bit masks");
 _Static_assert(CP_NB == 5u, "strings.c: five bands");
@@ -239,12 +242,12 @@ static int cp_strike(uint32_t note, uint32_t vel)
             v->held = 1; v->damp = 0; v->quiet = 0; v->age = ++cp_ages;
             return 1;
         }
-    for (i = 0; i < CP_NV; i++) if (!cp_v[i].alive) { best = i; break; }
+    for (i = 0; i < ENG_CAP(CP_NV); i++) if (!cp_v[i].alive) { best = i; break; }   /* (DUAL: 5 voices) */
     if (best == CP_NV) {                                          /* every voice taken: the oldest let go, else the
                                                                   * oldest held, not already given a note, fades
                                                                   * out over a block (as reed.c) */
         for (h = 0; h < 2u && best == CP_NV; h++)
-            for (i = 0; i < CP_NV; i++)
+            for (i = 0; i < ENG_CAP(CP_NV); i++)
                 if (!cp_v[i].pend && cp_v[i].held == h && cp_v[i].age < old) { old = cp_v[i].age; best = i; }
         if (best == CP_NV) return 0;
         cp_v[best].pend = 1; cp_v[best].pend_note = (uint8_t)note; cp_v[best].pend_vel = (uint8_t)vel;

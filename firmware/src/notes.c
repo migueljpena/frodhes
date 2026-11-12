@@ -41,15 +41,20 @@ static int eng_ring_room(void) { return eq_w - eq_r < 31u; }   /* (one spare: a 
                                                                 * (merged in, it splits rh_F / rh_x: engine.c eq) */
 #endif
 static struct { uint32_t down[4], sus[4]; uint8_t on; } ped PED_OWN_SECTION;
-static void eng_send(uint32_t type, uint32_t n, uint32_t v)
+/* DUAL (two sounds): the part the notes go to now, 0 PART 1 / 1 PART 2. Set by whoever plays a note (a source: its
+ * own; the sequencer: the event's; the arpeggiator: its own) right before out_on / out_off / eng_q; the pitch counts
+ * below are per part (index part << 7 | pitch) */
+static uint8_t nt_part;
+#define NT_IX(n) ((uint32_t)nt_part << 7 | ((n) & 127u))
+static void eng_send(uint32_t type, uint32_t n, uint32_t v, uint32_t part)
 {
     uint32_t i;
     if (type == EV_NOTE_ON) {
         if (n < 128u && v) { ped.down[n >> 5] |= 1u << (n & 31u); if (ped.on) ped.sus[n >> 5] |= 1u << (n & 31u); }
-        eng_note_on(n, v);
+        eng_note_on_p(n, v, part);
     } else if (type == EV_NOTE_OFF) {
         if (n < 128u) ped.down[n >> 5] &= ~(1u << (n & 31u));
-        eng_note_off(n, v);
+        eng_note_off_p(n, v, part);
     } else if (type == EV_PEDAL) {
         uint8_t on = v >= 64u;
         for (i = 0; i < 4u; i++) ped.sus[i] = on ? (ped.on ? ped.sus[i] : 0u) | ped.down[i] : 0u;
@@ -62,9 +67,9 @@ static void eng_send(uint32_t type, uint32_t n, uint32_t v)
 }
 static void eng_q(uint32_t type, uint32_t n, uint32_t v)
 {
-    if (engq_r == engq_w && eng_ring_room()) { eng_send(type, n, v); return; }
+    if (engq_r == engq_w && eng_ring_room()) { eng_send(type, n, v, nt_part); return; }
     if (engq_w - engq_r >= ENGQ_N) { engq_drop++; return; }
-    engq[engq_w % ENGQ_N] = type << 24 | (n & 127u) << 8 | (v & 255u);
+    engq[engq_w % ENGQ_N] = type << 24 | (uint32_t)(nt_part & 1u) << 15 | (n & 127u) << 8 | (v & 255u);
     engq_w++;
 }
 static void eng_pump(void)
@@ -72,50 +77,54 @@ static void eng_pump(void)
     while (engq_r != engq_w && eng_ring_room()) {
         uint32_t e = engq[engq_r % ENGQ_N];
         engq_r++;
-        eng_send(e >> 24, e >> 8 & 127u, e & 255u);
+        eng_send(e >> 24, e >> 8 & 127u, e & 255u, e >> 15 & 1u);
     }
 }
 static int eng_idle(void) { return engq_r == engq_w && eng_quiet(); }   /* nothing waiting, nothing sounding */
 
 /* ---- out: the piano or the arpeggiator, per pitch counted */
-static uint8_t note_to_arp[128], out_ref[128], out_echo[128];
+static uint8_t note_to_arp[256], out_ref[256], out_echo[256];   /* per part: NT_IX */
 static uint8_t out_quiet_off;                    /* all notes off (frodhes.c): the engine gets one EV_ALL_OFF instead
                                                   * of a note-off per note (a burst of them overflowed its ring) */
 static void note_in_on(uint32_t n, uint32_t vel, int echo)
 {
-    if (arp_on()) { note_to_arp[n] = 1; arp_in_on(n, vel); return; }
-    note_to_arp[n] = 0;
+    if (arp_on()) { note_to_arp[NT_IX(n)] = 1; arp_in_on(n, vel); return; }
+    note_to_arp[NT_IX(n)] = 0;
     eng_q(EV_NOTE_ON, n, vel);
     if (echo) midi_send(0x90 | MIDI_OUT_CH, n, vel);
 }
 /* rv: the release velocity (MIDI note-off velocity 1..127; 0 = none given: the engines' neutral release) */
 static void note_in_off(uint32_t n, uint32_t rv, int echo)
 {
-    if (note_to_arp[n]) { note_to_arp[n] = 0; arp_in_off(n); return; }
+    if (note_to_arp[NT_IX(n)]) { note_to_arp[NT_IX(n)] = 0; arp_in_off(n); return; }
     if (!out_quiet_off) eng_q(EV_NOTE_OFF, n, rv);
     if (echo) midi_send(0x80 | MIDI_OUT_CH, n, rv);
 }
 /* a pitch still counted held when the TYPE changed to another engine (or VIBES <-> MARIMBA) was stopped by the change
  * (engine.c eng_switch): pressed again (a MIDI note-on with no note-off between, a second source on it), it is struck
  * again on the new engine, once per change (eng_epoch); it stayed silent until every source let it go (0.9.3) */
-static uint16_t out_epoch[128];
+static uint16_t out_epoch[256];
 static void out_resound(uint32_t n, uint32_t vel)
 {
-    if (n > 127u || !out_ref[n] || out_epoch[n] == eng_epoch) return;
-    out_epoch[n] = eng_epoch;
-    if (!note_to_arp[n]) eng_q(EV_NOTE_ON, n, vel);          /* (the arpeggiator strikes its notes each step) */
+    if (n > 127u || !out_ref[NT_IX(n)] || out_epoch[NT_IX(n)] == eng_epoch) return;
+    out_epoch[NT_IX(n)] = eng_epoch;
+    if (!note_to_arp[NT_IX(n)]) eng_q(EV_NOTE_ON, n, vel);   /* (the arpeggiator strikes its notes each step) */
 }
 static void out_on(uint32_t n, uint32_t vel, int echo)
 {
+    uint32_t x;
     if (n > 127u) return;
-    if (out_ref[n] == 0u) { out_ref[n] = 1; out_epoch[n] = eng_epoch; out_echo[n] = (uint8_t)echo; note_in_on(n, vel, echo); }
-    else { out_resound(n, vel); out_ref[n]++; }
+    x = NT_IX(n);
+    if (out_ref[x] == 0u) { out_ref[x] = 1; out_epoch[x] = eng_epoch; out_echo[x] = (uint8_t)echo; note_in_on(n, vel, echo); }
+    else { out_resound(n, vel); out_ref[x]++; }
 }
 static void out_off_v(uint32_t n, uint32_t rv)    /* the last source to let go gives the release velocity */
 {
-    if (n > 127u || !out_ref[n]) return;
-    if (--out_ref[n] == 0u) note_in_off(n, rv, out_echo[n]);
+    if (n > 127u || !out_ref[NT_IX(n)]) return;
+    if (--out_ref[NT_IX(n)] == 0u) note_in_off(n, rv, out_echo[NT_IX(n)]);
 }
+/* a pitch held on either part (the key lights, the host's counts) */
+static int out_held(uint32_t n) { return n < 128u && (out_ref[n] || out_ref[128u + n]); }
 static void out_off(uint32_t n) { out_off_v(n, 0); }
 
 /* ---- chord mode */
@@ -218,13 +227,15 @@ static void chord_name(const uint8_t *notes, uint32_t c, char *s)
 }
 
 /* ---- sources */
-typedef struct { uint8_t n[CH_MAX], c, started, vel, echo; uint32_t t0; } src_t;
+typedef struct { uint8_t n[CH_MAX], c, started, vel, echo, part; uint32_t t0; } src_t;
 static src_t src[SRC_N];
 static uint8_t src_active[SRC_N];
 static void live_note_on(uint32_t n, uint32_t vel);   /* seq.c: what is played, for the recorder */
 static void live_note_off(uint32_t n);
+static uint32_t part_live(void);                     /* params.c: the part the keys and MIDI play (0 out of DUAL) */
 static void src_note_on(uint32_t slot, uint32_t n, uint32_t vel, int echo)
 {
+    nt_part = src[slot].part;
     out_on(n, vel, echo);
     if (slot != SRC_SEQ) live_note_on(n, vel);
 }
@@ -235,7 +246,7 @@ static void src_start(uint32_t slot, const uint8_t *notes, uint32_t c, uint32_t 
     uint32_t i;
     s->c = (uint8_t)(c > CH_MAX ? CH_MAX : c);
     for (i = 0; i < s->c; i++) s->n[i] = notes[i];
-    s->vel = (uint8_t)vel; s->echo = (uint8_t)echo; s->t0 = fm1_ms; s->started = 0;
+    s->vel = (uint8_t)vel; s->echo = (uint8_t)echo; s->t0 = fm1_ms; s->started = 0; s->part = (uint8_t)part_live();
     src_active[slot] = 1;
     if (s->c) { src_note_on(slot, s->n[0], vel, echo); s->started = 1; }
     for (i = 1; i < s->c && !CH_STRUM; i++) { src_note_on(slot, s->n[i], vel, echo); s->started = (uint8_t)(i + 1u); }
@@ -247,6 +258,7 @@ static void src_on(uint32_t slot, uint32_t n, uint32_t vel, int echo)
     uint32_t c;
     if (src_active[slot]) {                                  /* pressed again, never let go: only a pitch a TYPE
                                                                * change stopped sounds again (out_resound) */
+        nt_part = src[slot].part;
         for (c = 0; c < src[slot].started; c++) out_resound(src[slot].n[c], vel);
         return;
     }
@@ -260,6 +272,7 @@ static void src_off_v(uint32_t slot, uint32_t rv)          /* rv: the release ve
     uint32_t i;
     if (!src_active[slot]) return;
     for (i = 0; i < s->started; i++) {                        /* a strum cut short: the rest never starts */
+        nt_part = s->part;
         out_off_v(s->n[i], rv);
         if (slot != SRC_SEQ) live_note_off(s->n[i]);
     }

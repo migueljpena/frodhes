@@ -162,7 +162,8 @@ static void host_race_check(void)
 #define HRC(f) (eng_cur == ENG_REED ? (uint32_t)re_v[i].f : eng_cur == ENG_CP ? (uint32_t)cp_v[i].f : (uint32_t)rv[i].f)
         uint32_t alive = HRC(alive), held = HRC(held), note = HRC(note), pend = HRC(pend), pn = HRC(pend_note);
 #undef HRC
-        int want = (out_ref[note & 127u] && !note_to_arp[note & 127u]) || arp_playing == note;
+        int want = (out_ref[note & 127u] && !note_to_arp[note & 127u]) || (out_ref[128u + (note & 127u)] &&
+                   !note_to_arp[128u + (note & 127u)]) || arp_playing == note;
         if (calm && alive && held && !want) { if (bad[i] < 255u && ++bad[i] == 3u) printf("%6u ms  RACE STUCK voice %u note %u\n", fm1_ms, i, note); }
         else bad[i] = 0;
         if (!alive && pend) { if (!lost[i]) printf("%6u ms  RACE LOST voice %u note %u (pend %u)\n", fm1_ms, i, pn, pend); lost[i] = 1; }
@@ -470,7 +471,7 @@ static void st_old_scan(void)
 
 static void app_main(void)
 {
-    uint32_t prev = 0, k;
+    uint32_t prev = 0, k, combo_keys = 0;    /* combo_keys: keys pressed as HOME + key (ui.c ui_combo_key) */
     int link = 0, fresh;
     st_tail = (uint8_t *)pr_user;                   /* the record: the settings, then the user presets (set_store.c) */
     st_new = settings_load(&set, sizeof set) == 0;
@@ -501,6 +502,9 @@ static void app_main(void)
     if (set.palette >= COLOR_N) set.palette = 0;   /* AMBER (ui.c S_COLOR) */
     if (set.dim >= DIM_N) set.dim = 0;
     if (set.leds > 4u) set.leds = 0;                /* (ui.c LEDS_N: 0 ROOTS 1 OFF 2 PLAYED 3 ALL 4 SCALE) */
+    if (set.dual > 1u) set.dual = 0;                /* DUAL (params.c dual_fix: PART 2 of the other family) */
+    if (set.part > 1u) set.part = 0;
+    dual_fix();
     usb_pre_master = set.usb_fixed;
     uart_midi_on = !set.trs_off;
     fm1_led_group_ids(KEY_LED(0), KEY_LED(26));     /* BRIGHTNESS: the keys' LEDs are their own group */
@@ -563,11 +567,12 @@ static void app_main(void)
         go = kv_keys(down, up);                 /* the presses whose velocity is known (keyvel.h: held up to 6 ms; a
                                                  * key let go first plays here, then stops below) */
         for (k = 0; k < NKEYS; k++) {           /* a key stops exactly the notes it started (notes.c sources) */
-            if (go >> k & 1u) {
+            if (down >> k & 1u && ui_combo_key(k)) combo_keys |= 1u << k;   /* HOME + the key (ui.c): no note */
+            if (go >> k & 1u && !(combo_keys >> k & 1u)) {
                 uint32_t n = scale_key_note(k);
                 if (n < 128u) src_on(SRC_KEYS + k, n, FR_KEY_VEL(k), 1);
             }
-            if (up >> k & 1u) src_off(SRC_KEYS + k);
+            if (up >> k & 1u) { if (combo_keys >> k & 1u) combo_keys &= ~(1u << k); else src_off(SRC_KEYS + k); }
         }
 #if BOARD_SMK37
         smk_poll();                             /* the outer keys, pads, faders, wheels, the pedal (frodhes_smk.h) */
@@ -825,6 +830,19 @@ static int host_state(const char *key, char *v, unsigned n)
     else if (!strcmp(key, "reg")) snprintf(v, n, "%u", (unsigned)set.reg);   /* the 200A's REG (settings) */
     else if (!strcmp(key, "cp")) snprintf(v, n, "%d", eng_want == ENG_CP);
     else if (!strcmp(key, "voices")) snprintf(v, n, "%u", host_bits(eng_active_bits()));
+    else if (!strcmp(key, "dual")) snprintf(v, n, "%u", (unsigned)set.dual);   /* DUAL: on, the active part, PART 2's TYPE */
+    else if (!strcmp(key, "part")) snprintf(v, n, "%u", (unsigned)set.part);
+    else if (!strcmp(key, "type2")) snprintf(v, n, "%s", N_TYPE[set.type2 < N_TYPE_N ? set.type2 : 0]);
+    else if (!strcmp(key, "type1")) snprintf(v, n, "%s", N_TYPE[PV(P_TYPE)]);
+    else if (!strcmp(key, "rhv")) snprintf(v, n, "%u", host_bits(rh_active_bits));   /* the Rhodes' voices sounding */
+    else if (!strcmp(key, "rhheld")) snprintf(v, n, "%u", host_bits(rh_held_bits));   /* DUAL: held, per engine */
+    else if (!strcmp(key, "otherheld")) {
+        uint32_t hb = 0;
+        if (eng_cur == ENG_REED) for (i = 0; i < RE_NV; i++) hb |= (uint32_t)(re_v[i].alive && re_v[i].held) << i;
+        if (eng_cur == ENG_CP) for (i = 0; i < CP_NV; i++) hb |= (uint32_t)(cp_v[i].alive && cp_v[i].held) << i;
+        snprintf(v, n, "%u", host_bits(hb));
+    }
+    else if (!strcmp(key, "otherv")) snprintf(v, n, "%u", eng_cur == ENG_RHODES ? 0u : host_bits(eng_active_bits()));
     else if (!strcmp(key, "held")) {
         uint32_t hb = rh_held_bits;
         if (eng_cur == ENG_REED) for (i = hb = 0; i < RE_NV; i++) hb |= (uint32_t)(re_v[i].alive && re_v[i].held) << i;
@@ -840,9 +858,9 @@ static int host_state(const char *key, char *v, unsigned n)
                                      : rv[i].alive && rv[i].note == nn && rv[i].fade == 32768;
         snprintf(v, n, "%u", c);
     }
-    else if (!strcmp(key, "pitches")) { for (i = c = 0; i < 128u; i++) c += out_ref[i] != 0; snprintf(v, n, "%u", c + (arp_playing < 128u)); }   /* held by a source or the arpeggiator */
+    else if (!strcmp(key, "pitches")) { for (i = c = 0; i < 128u; i++) c += out_held(i); snprintf(v, n, "%u", c + (arp_playing < 128u)); }   /* held by a source or the arpeggiator */
     else if (!strcmp(key, "srcs")) { for (i = c = 0; i < SRC_N; i++) c += src_active[i]; snprintf(v, n, "%u", c); }
-    else if (!strcmp(key, "refs")) { for (i = c = 0; i < 128u; i++) c += out_ref[i]; snprintf(v, n, "%u", c); }
+    else if (!strcmp(key, "refs")) { for (i = c = 0; i < 256u; i++) c += out_ref[i]; snprintf(v, n, "%u", c); }
     else if (!strcmp(key, "quiet")) snprintf(v, n, "%d", eng_quiet() && fx_quiet());
     else if (!strcmp(key, "batt")) snprintf(v, n, "%u", batt_shown());
     else if (!strcmp(key, "battraw")) snprintf(v, n, "%d", batt_raw());

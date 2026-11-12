@@ -40,7 +40,10 @@
 #define SQ_MAXACT 32u
 /* SQ_A, SQ_B: the pattern's two sectors, per board (frodhes_store.h) */
 #define SQ_MAGIC 0x46535131u                        /* "FSQ1" */
-typedef struct { uint16_t tick, len; uint8_t note, vel, take, rsv; } sq_ev_t;
+typedef struct { uint16_t tick, len; uint8_t note, vel, take, rsv; } sq_ev_t;   /* rsv: the section (bits 0-1), PART 2
+                                                    * (SQ_P2: DUAL's second sound; patterns before: 0, PART 1) */
+#define SQ_SECM 3u
+#define SQ_P2 0x10u
 typedef struct { uint32_t magic, seq, n, crc; } sq_hdr_t;
 static sq_ev_t sq_ev[SQ_MAXEV];
 static uint32_t sq_n, sq_flash_seq;
@@ -51,11 +54,12 @@ static uint8_t sq_ext, sq_jump, sq_src;
 static uint32_t sq_jseen;                           /* tempo.c clk_jumps, as seq_poll saw it */
 static uint16_t sq_L;                               /* (the loop length seq_poll last saw) */                     /* sq_ext 1: sq_pos follows the clock's pulses (sq_k0 set); sq_jump:
                                                      * Start / Continue's first position (only from there on) */
-static struct { uint8_t note; uint16_t off; } sq_act[SQ_MAXACT];
+static struct { uint8_t note, part; uint16_t off; } sq_act[SQ_MAXACT];
 static uint32_t sq_nact;
 static uint16_t rec_start[128];
 static uint8_t rec_vel[128], live_held[128];
 static uint8_t sq_dirty, sq_roll_dirty, sq_btn_down;
+static uint8_t sq_pmute;                                 /* DUAL: bit p, PART p+1 muted in the playback (not kept) */
 static int32_t sq_cur = -1;                              /* the page's cursor, in 16ths (ui.c moves it) */
 static uint32_t sq_cur_t;
 static uint32_t st_keys, st_start, st_len, st_n;          /* step recording: the notes held, where, how long (16ths) */
@@ -125,7 +129,7 @@ static uint32_t sq_partition(uint32_t tot, uint32_t t)
 {
     uint32_t i = 0, j = tot;
     while (i < j) {
-        if (sq_ev[i].rsv == t) { i++; continue; }
+        if ((sq_ev[i].rsv & SQ_SECM) == t) { i++; continue; }
         j--;
         { sq_ev_t e = sq_ev[i]; sq_ev[i] = sq_ev[j]; sq_ev[j] = e; }
     }
@@ -154,7 +158,7 @@ static int sq_in(uint32_t t, uint32_t p0, uint32_t p1)   /* t in (p0, p1], aroun
 static void sq_all_off(void)
 {
     uint32_t i;
-    for (i = 0; i < sq_nact; i++) out_off(sq_act[i].note);
+    for (i = 0; i < sq_nact; i++) { nt_part = sq_act[i].part; out_off(sq_act[i].note); }
     sq_nact = 0;
 }
 static void sq_add(uint32_t tick, uint32_t len, uint32_t note, uint32_t vel)
@@ -164,8 +168,9 @@ static void sq_add(uint32_t tick, uint32_t len, uint32_t note, uint32_t vel)
     if (sq_n + sq_pk >= SQ_MAXEV) return;
     sq_grow(1);
     e = &sq_ev[sq_n++];
-    e->tick = (uint16_t)tick; e->len = (uint16_t)len; e->note = (uint8_t)note; e->vel = (uint8_t)vel;
-    e->take = sq_take; e->rsv = SQ_SEC;
+    e->tick = (uint16_t)tick; e->len = (uint16_t)len; e->note = (uint8_t)note; e->vel = (uint8_t)(vel & 127u);
+    e->take = sq_take; e->rsv = (uint8_t)(SQ_SEC | (vel >> 7 & 1u ? SQ_P2 : 0u));   /* vel bit 7: PART 2 (the part played,
+                                                                                        * notes.c nt_part) */
     sq_changed();
 }
 static uint32_t sq_rec_tick(void)                       /* the loop's tick SQ_LAT_MS ago: where a live note was heard */
@@ -344,11 +349,11 @@ static uint32_t sq_sec_set(uint32_t t)
     sq_rec_close_all();
     sq_all_off();
     sq_un = 0;
-    for (i = 0; i < sq_n; i++) sq_ev[i].rsv = SQ_SEC;
+    for (i = 0; i < sq_n; i++) sq_ev[i].rsv = (uint8_t)((sq_ev[i].rsv & SQ_P2) | SQ_SEC);
     SQ_SBARS(SQ_SEC) = SQ_BARS;
-    for (i = sq_n; i < tot; i++) if (sq_ev[i].rsv == t) c++;
+    for (i = sq_n; i < tot; i++) if ((sq_ev[i].rsv & SQ_SECM) == t) c++;
     if (!c && sq_n && tot + sq_n <= SQ_MAXEV) {          /* empty: a copy of the one playing */
-        for (i = 0; i < sq_n; i++) { sq_ev[tot + i] = sq_ev[i]; sq_ev[tot + i].rsv = (uint8_t)t; }
+        for (i = 0; i < sq_n; i++) { sq_ev[tot + i] = sq_ev[i]; sq_ev[tot + i].rsv = (uint8_t)((sq_ev[i].rsv & SQ_P2) | t); }
         tot += sq_n; cp = 1;
         SQ_SBARS(t) = SQ_BARS;
     }
@@ -364,7 +369,7 @@ static uint32_t sq_sec_notes(uint32_t t)               /* a section's notes */
 {
     uint32_t i, c = 0;
     if (t == SQ_SEC) return sq_n;
-    for (i = sq_n; i < sq_n + sq_pk; i++) if (sq_ev[i].rsv == t) c++;
+    for (i = sq_n; i < sq_n + sq_pk; i++) if ((sq_ev[i].rsv & SQ_SECM) == t) c++;
     return c;
 }
 /* SONG: the chain's step k (from k on, the first with a section; none: 0xFF) */
@@ -438,7 +443,7 @@ static void st_note_on(uint32_t n, uint32_t vel)
         st_len = sq_grid16(); st_n = 0; sq_take++;
     }
     st_keys++;
-    if (sq_n < SQ_MAXEV && st_n < CH_MAX * 2u) { st_idx[st_n++] = (uint16_t)sq_n; sq_add(st_start * 24u, st_len * 24u - 2u, n, vel); }
+    if (sq_n < SQ_MAXEV && st_n < CH_MAX * 2u) { st_idx[st_n++] = (uint16_t)sq_n; sq_add(st_start * 24u, st_len * 24u - 2u, n, vel | (uint32_t)nt_part << 7); }
     sq_cur = (int32_t)st_start; sq_cur_t = fm1_ms;
 }
 static void st_note_off(void)
@@ -469,14 +474,14 @@ static void live_note_on(uint32_t n, uint32_t vel)
                                                          * sound); an external clock starts it */
         if (SQ_START == 3u && (sq_free || !sq_n)) {     /* FREE on an empty pattern: the free take, in ms */
             if (!sq_free) { sq_free = 1; sq_free_t0 = fm1_ms; sq_take++; ui_mark(6); }
-            if (rec_start[n] == 0xFFFFu && fm1_ms - sq_free_t0 < 32768u) { rec_start[n] = (uint16_t)(fm1_ms - sq_free_t0); rec_vel[n] = (uint8_t)vel; }
+            if (rec_start[n] == 0xFFFFu && fm1_ms - sq_free_t0 < 32768u) { rec_start[n] = (uint16_t)(fm1_ms - sq_free_t0); rec_vel[n] = (uint8_t)(vel | (uint32_t)nt_part << 7); }
             return;
         }
         seq_start();                                    /* NOTE: this note starts the loop, on bar 1 beat 1 */
-        rec_start[n] = 0; rec_vel[n] = (uint8_t)vel;
+        rec_start[n] = 0; rec_vel[n] = (uint8_t)(vel | (uint32_t)nt_part << 7);
         return;
     }
-    if (rec_start[n] == 0xFFFFu) { rec_start[n] = (uint16_t)sq_rec_tick(); rec_vel[n] = (uint8_t)vel; }
+    if (rec_start[n] == 0xFFFFu) { rec_start[n] = (uint16_t)sq_rec_tick(); rec_vel[n] = (uint8_t)(vel | (uint32_t)nt_part << 7); }
 }
 static void live_note_off(uint32_t n)
 {
@@ -582,7 +587,7 @@ static void seq_poll(void)
         for (b = 0; b < L; b += SQ_PPQ) if (sq_in(b, p0, p1)) sq_click_req = (uint8_t)(b % (4u * SQ_PPQ) ? 1u : 2u);
     }
     for (i = 0; i < sq_nact;) {                         /* note offs first: a repeated note restarts cleanly */
-        if (sq_in(sq_act[i].off, p0, p1)) { out_off(sq_act[i].note); sq_act[i] = sq_act[--sq_nact]; }
+        if (sq_in(sq_act[i].off, p0, p1)) { nt_part = sq_act[i].part; out_off(sq_act[i].note); sq_act[i] = sq_act[--sq_nact]; }
         else i++;
     }
     for (i = 0; i < sq_n;) {
@@ -593,8 +598,10 @@ static void seq_poll(void)
         if (!noon && sq_in(t, p0, p1)) {
             if (sq_erase && live_held[e->note]) { sq_ev[i] = sq_ev[--sq_n]; sq_shrunk(sq_n + 1u); sq_edited(); continue; }
             if (sq_nact < SQ_MAXACT) {
+                nt_part = (uint8_t)((e->rsv & SQ_P2) != 0u);   /* (DUAL: its part's sound; else one sound) */
+                if (sq_pmute >> nt_part & 1u) { i++; continue; }   /* a part muted */
                 out_on(e->note, e->vel, 1);
-                sq_act[sq_nact].note = e->note;
+                sq_act[sq_nact].note = e->note; sq_act[sq_nact].part = nt_part;
                 sq_act[sq_nact].off = (uint16_t)((t + (e->len < L ? e->len : L - 1u)) % L);
                 if (sq_in(sq_act[sq_nact].off, t, p1)) sq_act[sq_nact].off = (uint16_t)((p1 + 1u) % L);   /* (a late pass
                                                          * over its end too: it ends with the next, not a loop later) */
@@ -756,7 +763,7 @@ static void sq_sv_begin(void)                           /* a save starts (seq_sa
     at = sq_sv_tgt;
     {   /* every section (the playing one's events marked as its: they were recorded as it, a pattern from before is A) */
         uint32_t i;
-        for (i = 0; i < sq_n; i++) sq_ev[i].rsv = SQ_SEC;
+        for (i = 0; i < sq_n; i++) sq_ev[i].rsv = (uint8_t)((sq_ev[i].rsv & SQ_P2) | SQ_SEC);
     }
     sq_sv_h.magic = SQ_MAGIC; sq_sv_h.seq = ++sq_flash_seq; sq_sv_h.n = sq_n + sq_pk;
     sq_sv_h.crc = crc32((const uint8_t *)sq_ev, (sq_n + sq_pk) * sizeof(sq_ev_t));   /* (an edit while it writes: the crc
